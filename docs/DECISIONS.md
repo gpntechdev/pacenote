@@ -796,3 +796,12 @@ Not exercised:
 - onboard with a URL.
 Consequences: "done" follows the user's first authorised ticket run: `start --from
 PROJ-123` on their Jira, then `/specd:refresh` after the ticket changes.
+
+## 2026-10-12 M5: marked done
+
+Context: the build entry above left "done" to the first authorised ticket run.
+Decision: the user marked M5 done on the headless smoke run. A live Atlassian fetch is
+still unexercised.
+Consequences: the Atlassian tool names in `agents/intake.md` and the five-page cap are
+checked on the first real ticket, and a mismatch goes here as a fix, not as a reopened
+milestone. PLAN section 7 now points to M6.
