@@ -86,10 +86,11 @@ Not a flow step: no `state.yml`, no gate.
 8. **Generate** when no candidate is installed for a need, per `generate.md`: one
    `explorer` run at `models.cheap` for the layer's conventions, one `researcher` run at
    `models.judgment` for current library facts (Context7 first), the skill written from
-   `./templates/project-skill.md` into the home `skill-lock where` gives, `audit-static`
-   on it (a `block` is fixed before showing), shown as a path and a ten-line summary,
-   approve or edit or drop. Approve: `skill-lock record ... --verdict <clean|warn>` and
-   `config-set --add layers.<layer>=<layer_path>`. The user may also skip the need.
+   `./templates/project-skill.md` into the draft folder `skill-lock where` gives (never
+   straight into the home), `audit-static` on the draft (a `block` is fixed before
+   showing), shown as a path and a ten-line summary, approve or edit or drop. Approve:
+   `skill-lock record --from <draft> ...` and `config-set --add
+   layers.<layer>=<layer_path>`. The user may also skip the need.
 9. **Updates** per `audit.md`, "Updates": a `repo` entry whose allowlisted repo has moved
    is fetched at the new commit and goes through steps 5 to 7 again; a `modified` or
    `missing` entry is restored or re-audited, never silently re-pinned.
@@ -115,5 +116,6 @@ Not a flow step: no `state.yml`, no gate.
   than `skill-fetch`; widening the allowlist without the user asking (`/specd:config`).
 - Installing on a stage-1 `block` or a stage-2 `refuse` because the skill "looks fine".
 - Running a bundled script, a setup command or an install line from a skill, at any time.
-- Copying a skill by hand, editing `skills.lock`, or writing `layers` with a text tool.
+- Copying a skill by hand, writing into a skill home directly, editing `skills.lock`, or
+  writing `layers` with a text tool.
 - Generating a skill from general knowledge of the framework instead of this codebase.

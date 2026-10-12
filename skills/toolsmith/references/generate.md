@@ -30,13 +30,16 @@ URLs and dates.
 ## Writing the skill
 
 - Name: `<layer>-<topic>` in kebab case (`frontend-components`, `backend-errors`). Run
-  `skill-lock where --name <name>`; a folder that exists and is not locked belongs to the
-  user: pick another name.
-- Copy `../templates/project-skill.md` to `<home>/SKILL.md` and fill it. Only pointers and
-  rules the explorer found, plus researcher facts with their URL. No code blocks longer
-  than five lines; the codebase is the example.
+  `skill-lock where --workspace <workspace_root> --code-root <code_root> --name <name>`;
+  `exists` true and `locked` false means the folder belongs to the user: pick another
+  name. It prints an empty `draft` folder.
+- Copy `../templates/project-skill.md` to `<draft>/SKILL.md` and fill it. The draft sits
+  in the gitignored `<workspace_root>/.drafts/`, outside every folder Claude Code loads
+  skills from; it reaches the skill home only through `skill-lock record` after approval.
+- Only pointers and rules the explorer found, plus researcher facts with their URL. No
+  code blocks longer than five lines; the codebase is the example.
 - At most 120 lines. No `allowed-tools`, no scripts, no hooks, no setup steps.
-- Run `audit-static --dir <home>`. A `block` is a mistake in the draft (a pasted secret
+- Run `audit-static --dir <draft>`. A `block` is a mistake in the draft (a pasted secret
   name, an install line): fix the text and run it again. `warn` for documentation URLs is
   expected; the report lists them.
 
@@ -44,4 +47,6 @@ URLs and dates.
 
 Print the path, the description line and a summary of at most ten lines (sections, the
 pointers it relies on, the researcher facts it states). Ask approve, edit, or drop. On
-approve run `skill-lock record` and `config-set --add`. On drop delete the folder.
+approve run `skill-lock record ... --from <draft> --name <name> --layer <layer> --verdict
+<clean|warn>` (it moves the draft into the home) and `config-set --add
+layers.<layer>=<layer_path>`. On drop run `skill-lock discard --name <name>`.

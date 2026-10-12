@@ -3,10 +3,12 @@
 
 Usage: skill-lock install --workspace W --code-root C --from QDIR --name NAME --layer L
                           --verdict clean|warn [--repo O/R --path P --commit SHA] [--replace]
-       skill-lock record  --workspace W --code-root C --name NAME --layer L --verdict clean|warn
+       skill-lock record  --workspace W --code-root C --from DRAFT --name NAME --layer L
+                          --verdict clean|warn
        skill-lock verify  --workspace W
        skill-lock list    --workspace W
        skill-lock where   --workspace W --code-root C --name NAME
+       skill-lock discard --workspace W --name NAME
 
 The skill home is derived, never asked: <repo>/.claude/skills/<name>/ for an embedded
 workspace (W is <repo>/.specd), <W>/.claude/skills/<name>/ for a wrapper, and
@@ -15,10 +17,14 @@ install: copies a quarantine folder (W/.quarantine/...) to the skill home and wr
          lock section, source `repo` with --repo/--path/--commit, else `local`. Refuses a
          block verdict, a source outside the quarantine, and a home that exists but is not
          in the lock (a skill the user wrote) unless --replace.
-record:  writes the lock section for a skill already written to its home (source
-         `generated`).
+record:  moves a generated draft (W/.drafts/<name>/) to the skill home and writes its lock
+         section (source `generated`). Same refusal for a home the user owns. With no draft
+         and the home already locked, re-pins the home as it is (an edited generated skill).
 verify:  recomputes each entry's tree hash: ok | modified | missing.
-where:   prints the skill home and its path relative to C, without writing anything.
+where:   prints the skill home, its path relative to C, and an empty draft folder
+         W/.drafts/<name>/ to write a generated skill into (W/.drafts/ holds a `*`
+         .gitignore). Drafts never sit where Claude Code loads skills.
+discard: removes the draft folder of NAME.
 Every write command prints {name, dir, layer_path, sha256, lock}: `layer_path` is the
 SKILL.md path relative to the code root, the value for specd.yml `layers.<layer>`.
 skills.lock is flat YAML: one section per skill, scalar keys. Stdlib only.
@@ -189,13 +195,47 @@ def cmd_install(argv):
     return finish(workspace, code_root, name, entry, dest)
 
 
+def drafts(workspace):
+    d = os.path.join(workspace, ".drafts")
+    os.makedirs(d, exist_ok=True)
+    ignore = os.path.join(d, ".gitignore")
+    if not os.path.exists(ignore):
+        with open(ignore, "w", encoding="utf-8") as f:
+            f.write("*\n")
+    return d
+
+
 def cmd_record(argv):
     workspace = common(argv)
     code_root = os.path.abspath(need(argv, "--code-root"))
     name, layer, verdict = names(argv)
     dest = home(workspace, name)
+    locked = name in read_lock(workspace)
+    src = opt(argv, "--from")
+    if src:
+        src = os.path.abspath(src)
+        if src != os.path.join(workspace, ".drafts", name) or not os.path.isdir(src):
+            raise Refused("--from must be the draft folder %s" % os.path.join(workspace, ".drafts", name))
+        if os.path.exists(dest) and not locked and "--replace" not in argv:
+            raise Refused("%s exists and is not in %s; pick another name or pass --replace" % (dest, LOCK))
+        if os.path.exists(dest):
+            shutil.rmtree(dest)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.move(src, dest)
+    elif not locked:
+        raise Refused("--from DRAFT is required for a skill not yet in %s" % LOCK)
     entry = {"source": "generated", "layer": layer, "verdict": verdict}
     return finish(workspace, code_root, name, entry, dest)
+
+
+def cmd_discard(argv):
+    workspace = common(argv)
+    name = need(argv, "--name")
+    draft = os.path.join(workspace, ".drafts", name)
+    existed = NAME.match(name) is not None and os.path.isdir(draft)
+    if existed:
+        shutil.rmtree(draft)
+    return {"removed": draft if existed else ""}
 
 
 def cmd_verify(argv):
@@ -221,14 +261,20 @@ def cmd_where(argv):
     workspace = common(argv)
     code_root = os.path.abspath(need(argv, "--code-root"))
     name = need(argv, "--name")
+    if not NAME.match(name):
+        raise Refused("--name takes letters, digits, dot, dash, underscore")
     dest = home(workspace, name)
+    draft = os.path.join(drafts(workspace), name)
+    if os.path.lexists(draft):
+        shutil.rmtree(draft)
+    os.makedirs(draft)
     return {"name": name, "dir": dest, "exists": os.path.exists(dest),
-            "locked": name in read_lock(workspace),
+            "locked": name in read_lock(workspace), "draft": draft,
             "layer_path": os.path.relpath(os.path.join(dest, "SKILL.md"), code_root)}
 
 
 COMMANDS = {"install": cmd_install, "record": cmd_record, "verify": cmd_verify,
-            "list": cmd_list, "where": cmd_where}
+            "list": cmd_list, "where": cmd_where, "discard": cmd_discard}
 
 
 def main(argv):
