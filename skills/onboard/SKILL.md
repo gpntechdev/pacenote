@@ -77,8 +77,8 @@ signed-off section.
    [`../_shared/no-attribution.md`](../_shared/no-attribution.md)).
 7. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Next`: the next unfinished
    section as `/specd:onboard`, or when all are signed off, `/specd:scaffold` in greenfield;
-   in brownfield, `/specd:start <feature>`. Mention that
-   `/specd:toolsmith` (project skills, MCP recommendations) comes later.
+   in brownfield, `/specd:toolsmith` (project skills per layer, MCP servers), then
+   `/specd:start <feature>` as the alternative line.
 
 Each run covers one section, or one batch of a large section, then stops. The user runs
 `/clear` and the command again; step 2 finds where to continue from the draft markers.

@@ -1,0 +1,294 @@
+#!/usr/bin/env python3
+"""Install audited skills and keep skills.lock, the record of what is installed and from where.
+
+Usage: skill-lock install --workspace W --code-root C --from QDIR --name NAME --layer L
+                          --verdict clean|warn [--repo O/R --path P --commit SHA] [--replace]
+       skill-lock record  --workspace W --code-root C --from DRAFT --name NAME --layer L
+                          --verdict clean|warn
+       skill-lock verify  --workspace W
+       skill-lock list    --workspace W
+       skill-lock where   --workspace W --code-root C --name NAME
+       skill-lock discard --workspace W --name NAME
+
+The skill home is derived, never asked: <repo>/.claude/skills/<name>/ for an embedded
+workspace (W is <repo>/.specd), <W>/.claude/skills/<name>/ for a wrapper, and
+<W>/skills/<name>/ when the workspace is private (.specd/ in .git/info/exclude).
+install: copies a quarantine folder (W/.quarantine/...) to the skill home and writes its
+         lock section, source `repo` with --repo/--path/--commit, else `local`. Refuses a
+         block verdict, a source outside the quarantine, and a home that exists but is not
+         in the lock (a skill the user wrote) unless --replace.
+record:  moves a generated draft (W/.drafts/<name>/) to the skill home and writes its lock
+         section (source `generated`). Same refusal for a home the user owns. With no draft
+         and the home already locked, re-pins the home as it is (an edited generated skill).
+verify:  recomputes each entry's tree hash: ok | modified | missing.
+where:   prints the skill home, its path relative to C, and an empty draft folder
+         W/.drafts/<name>/ to write a generated skill into (W/.drafts/ holds a `*`
+         .gitignore). Drafts never sit where Claude Code loads skills.
+discard: removes the draft folder of NAME.
+Every write command prints {name, dir, layer_path, sha256, lock}: `layer_path` is the
+SKILL.md path relative to the code root, the value for specd.yml `layers.<layer>`.
+skills.lock is flat YAML: one section per skill, scalar keys. Stdlib only.
+"""
+import datetime
+import hashlib
+import json
+import os
+import re
+import shutil
+import sys
+
+LOCK = "skills.lock"
+HEADER = ("# skills.lock: installed and generated project skills, one section each.\n"
+          "# Written by scripts/skill-lock; never edit by hand. The commit pins the source and\n"
+          "# sha256 is the hash of the installed files, so drift or an update re-runs the audit.\n")
+KEYS = ["source", "repo", "path", "commit", "sha256", "dir", "layer", "verdict", "audited"]
+NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+class Refused(Exception):
+    pass
+
+
+def opt(argv, flag, default=None):
+    if flag in argv:
+        i = argv.index(flag)
+        if i + 1 >= len(argv) or argv[i + 1].startswith("--"):
+            raise Refused("%s needs a value" % flag)
+        return argv[i + 1]
+    return default
+
+
+def need(argv, flag):
+    value = opt(argv, flag)
+    if not value:
+        raise Refused("%s is required" % flag)
+    return value
+
+
+def git_dir(root):
+    p = os.path.join(root, ".git")
+    if os.path.isdir(p):
+        return p
+    if os.path.isfile(p):
+        with open(p, encoding="utf-8") as f:
+            m = re.match(r"gitdir:\s*(.+)", f.read().strip())
+        if m:
+            return os.path.normpath(os.path.join(root, m.group(1).strip()))
+    return None
+
+
+def private(repo):
+    gd = git_dir(repo)
+    exclude = os.path.join(gd, "info", "exclude") if gd else ""
+    if not exclude or not os.path.isfile(exclude):
+        return False
+    with open(exclude, encoding="utf-8") as f:
+        return ".specd/" in f.read().splitlines()
+
+
+def home(workspace, name):
+    if os.path.basename(workspace) == ".specd":
+        repo = os.path.dirname(workspace)
+        if private(repo):
+            return os.path.join(workspace, "skills", name)
+        return os.path.join(repo, ".claude", "skills", name)
+    return os.path.join(workspace, ".claude", "skills", name)
+
+
+def tree_hash(root):
+    h = hashlib.sha256()
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames.sort()
+        for fn in sorted(filenames):
+            full = os.path.join(dirpath, fn)
+            rel = os.path.relpath(full, root).replace(os.sep, "/")
+            with open(full, "rb") as f:
+                digest = hashlib.sha256(f.read()).hexdigest()
+            h.update(("%s %s\n" % (digest, rel)).encode())
+    return h.hexdigest()
+
+
+def read_lock(workspace):
+    path = os.path.join(workspace, LOCK)
+    entries, current = {}, None
+    if not os.path.exists(path):
+        return entries
+    with open(path, encoding="utf-8") as f:
+        for raw in f:
+            line = raw.split("#", 1)[0].rstrip()
+            if not line.strip():
+                continue
+            m = re.match(r"^(\s*)([A-Za-z0-9][\w.-]*):\s*(.*)$", line)
+            if not m:
+                raise Refused("cannot parse %s: %r" % (path, raw.rstrip()))
+            if not m.group(1):
+                current = entries.setdefault(m.group(2), {})
+            elif current is not None:
+                current[m.group(2)] = m.group(3).strip().strip('"')
+    return entries
+
+
+def write_lock(workspace, entries):
+    out = [HEADER]
+    for name in sorted(entries):
+        out.append("\n%s:\n" % name)
+        e = entries[name]
+        for k in KEYS + sorted(k for k in e if k not in KEYS):
+            if k in e and e[k] != "":
+                out.append('  %s: "%s"\n' % (k, e[k]) if " " in e[k] else "  %s: %s\n" % (k, e[k]))
+    path = os.path.join(workspace, LOCK)
+    with open(path, "w", encoding="utf-8") as f:
+        f.writelines(out)
+    return path
+
+
+def common(argv):
+    workspace = os.path.abspath(need(argv, "--workspace"))
+    if not os.path.isfile(os.path.join(workspace, "specd.yml")):
+        raise Refused("no specd.yml in %s" % workspace)
+    return workspace
+
+
+def names(argv):
+    name, layer = need(argv, "--name"), need(argv, "--layer")
+    if not NAME.match(name) or not NAME.match(layer):
+        raise Refused("--name and --layer take letters, digits, dot, dash, underscore")
+    verdict = need(argv, "--verdict")
+    if verdict not in ("clean", "warn"):
+        raise Refused("only a clean or warn audit verdict can be installed, got %s" % verdict)
+    return name, layer, verdict
+
+
+def finish(workspace, code_root, name, entry, dest):
+    if not os.path.isfile(os.path.join(dest, "SKILL.md")):
+        raise Refused("%s has no SKILL.md" % dest)
+    entry["sha256"] = tree_hash(dest)
+    entry["dir"] = os.path.relpath(dest, workspace)
+    entry["audited"] = datetime.date.today().isoformat()
+    entries = read_lock(workspace)
+    entries[name] = entry
+    lock = write_lock(workspace, entries)
+    return {"name": name, "dir": dest, "layer": entry["layer"],
+            "layer_path": os.path.relpath(os.path.join(dest, "SKILL.md"), code_root),
+            "sha256": entry["sha256"], "lock": lock}
+
+
+def cmd_install(argv):
+    workspace = common(argv)
+    code_root = os.path.abspath(need(argv, "--code-root"))
+    name, layer, verdict = names(argv)
+    src = os.path.abspath(need(argv, "--from"))
+    quarantine = os.path.join(workspace, ".quarantine")
+    if os.path.dirname(src) != quarantine or not os.path.isdir(src):
+        raise Refused("--from must be a folder in %s" % quarantine)
+    dest = home(workspace, name)
+    if os.path.exists(dest) and name not in read_lock(workspace) and "--replace" not in argv:
+        raise Refused("%s exists and is not in %s; pick another name or pass --replace" % (dest, LOCK))
+    repo, path, commit = opt(argv, "--repo", ""), opt(argv, "--path", ""), opt(argv, "--commit", "")
+    if repo and not re.match(r"^[0-9a-f]{40}$", commit):
+        raise Refused("--repo needs the full --commit it was fetched at")
+    if os.path.exists(dest):
+        shutil.rmtree(dest)
+    shutil.copytree(src, dest, symlinks=True)
+    entry = {"source": "repo" if repo else "local", "repo": repo, "path": path, "commit": commit,
+             "layer": layer, "verdict": verdict}
+    return finish(workspace, code_root, name, entry, dest)
+
+
+def drafts(workspace):
+    d = os.path.join(workspace, ".drafts")
+    os.makedirs(d, exist_ok=True)
+    ignore = os.path.join(d, ".gitignore")
+    if not os.path.exists(ignore):
+        with open(ignore, "w", encoding="utf-8") as f:
+            f.write("*\n")
+    return d
+
+
+def cmd_record(argv):
+    workspace = common(argv)
+    code_root = os.path.abspath(need(argv, "--code-root"))
+    name, layer, verdict = names(argv)
+    dest = home(workspace, name)
+    locked = name in read_lock(workspace)
+    src = opt(argv, "--from")
+    if src:
+        src = os.path.abspath(src)
+        if src != os.path.join(workspace, ".drafts", name) or not os.path.isdir(src):
+            raise Refused("--from must be the draft folder %s" % os.path.join(workspace, ".drafts", name))
+        if os.path.exists(dest) and not locked and "--replace" not in argv:
+            raise Refused("%s exists and is not in %s; pick another name or pass --replace" % (dest, LOCK))
+        if os.path.exists(dest):
+            shutil.rmtree(dest)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.move(src, dest)
+    elif not locked:
+        raise Refused("--from DRAFT is required for a skill not yet in %s" % LOCK)
+    entry = {"source": "generated", "layer": layer, "verdict": verdict}
+    return finish(workspace, code_root, name, entry, dest)
+
+
+def cmd_discard(argv):
+    workspace = common(argv)
+    name = need(argv, "--name")
+    draft = os.path.join(workspace, ".drafts", name)
+    existed = NAME.match(name) is not None and os.path.isdir(draft)
+    if existed:
+        shutil.rmtree(draft)
+    return {"removed": draft if existed else ""}
+
+
+def cmd_verify(argv):
+    workspace = common(argv)
+    out = []
+    for name, e in sorted(read_lock(workspace).items()):
+        dest = os.path.normpath(os.path.join(workspace, e.get("dir", "")))
+        if not os.path.isdir(dest):
+            status = "missing"
+        else:
+            status = "ok" if tree_hash(dest) == e.get("sha256") else "modified"
+        out.append({"name": name, "status": status, "dir": dest, "layer": e.get("layer", ""),
+                    "source": e.get("source", "")})
+    return {"entries": out}
+
+
+def cmd_list(argv):
+    workspace = common(argv)
+    return {"lock": os.path.join(workspace, LOCK), "entries": read_lock(workspace)}
+
+
+def cmd_where(argv):
+    workspace = common(argv)
+    code_root = os.path.abspath(need(argv, "--code-root"))
+    name = need(argv, "--name")
+    if not NAME.match(name):
+        raise Refused("--name takes letters, digits, dot, dash, underscore")
+    dest = home(workspace, name)
+    draft = os.path.join(drafts(workspace), name)
+    if os.path.lexists(draft):
+        shutil.rmtree(draft)
+    os.makedirs(draft)
+    return {"name": name, "dir": dest, "exists": os.path.exists(dest),
+            "locked": name in read_lock(workspace), "draft": draft,
+            "layer_path": os.path.relpath(os.path.join(dest, "SKILL.md"), code_root)}
+
+
+COMMANDS = {"install": cmd_install, "record": cmd_record, "verify": cmd_verify,
+            "list": cmd_list, "where": cmd_where, "discard": cmd_discard}
+
+
+def main(argv):
+    if not argv or argv[0] in ("--help", "-h") or argv[0] not in COMMANDS:
+        print(__doc__.strip())
+        return 0 if argv and argv[0] in ("--help", "-h") else 2
+    try:
+        result = COMMANDS[argv[0]](argv[1:])
+    except Refused as e:
+        print("specd: %s" % e, file=sys.stderr)
+        return 1
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -78,8 +78,9 @@ context-engineering rules in `docs/PLAN.md` section 3.9. Each rule is tagged `[v
   holds no knowledge itself. This repo's own CLAUDE.md follows the same cap. `[validated]`
 - Anything loaded every session is one small file; anything read selectively is a folder with
   an index. `[review]`
-- Hooks are few: gate enforcement and the secrets guardrail. A new hook needs an entry in
-  `docs/DECISIONS.md`. `[review]`
+- Hooks are few: the secrets guardrail and the source guard (redacted snapshots, the
+  `intake` and `skill-auditor` fences). A new hook, or a new fence in an existing one,
+  needs an entry in `docs/DECISIONS.md`. `[review]`
 
 ## 10. Frontmatter contract
 
@@ -87,8 +88,9 @@ context-engineering rules in `docs/PLAN.md` section 3.9. Each rule is tagged `[v
   `disable-model-invocation`, `user-invocable`) only when the skill needs them. `[validated:
   name, description]`
 - Agent (`agents/<name>.md`): `name` equal to the file name, `description`, `tools` as the
-  minimal list the agent needs. Read-only agents get no `Write`, `Edit` or `Bash`.
-  `[validated: name, description, tools]`
+  minimal list the agent needs. Read-only agents get no `Write`, `Edit` or `Bash`. Agents
+  that read hostile content (`intake`, `skill-auditor`) also get no way to act and no
+  network. `[validated: name, description, tools]`
 
 ## 11. Naming and prose
 
@@ -101,7 +103,7 @@ context-engineering rules in `docs/PLAN.md` section 3.9. Each rule is tagged `[v
 
 ## 12. Definition of done for a change to this repo
 
-- `scripts/validate` and `claude plugin validate .` pass.
+- `scripts/validate`, `tests/test-audit` and `claude plugin validate .` pass.
 - A changed convention or a new decision is recorded in `docs/DECISIONS.md`, not in chat and
   not in commit messages alone.
 - Commits follow Conventional Commits and carry no AI attribution line.

@@ -80,7 +80,7 @@ the user's own repo around the code repo ([`./references/wrapper.md`](./referenc
 7. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Next`: `/specd:onboard`.
    Greenfield: add a second line "then `/specd:scaffold` once the architecture section is
    signed off". Wrapper: the two lines from `wrapper.md` ("Handoff additions"). Last line:
-   "project skills and MCP recommendations come with `/specd:toolsmith`, not yet available".
+   "then `/specd:toolsmith` for project skills and MCP servers, once onboarding is done".
    Atlassian installed: one more line, "authorise it once with `/mcp` in an interactive
    session; until then a ticket key falls back to a paste".
 

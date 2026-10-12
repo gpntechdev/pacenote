@@ -14,9 +14,11 @@ Wrapper: the same files at the root of DIR (specd.yml, docs/, spec/, sources/), 
 names the code repo folder inside DIR, which is gitignored together with .worktrees/;
 --docs REL (default docs) puts the docs folder elsewhere, e.g. NAME/docs to ship them with
 the code. --private is refused: the wrapper is the user's own repo.
---add-mcp NAME (atlassian) only merges that MCP server into DIR/.mcp.json, the file init
-wrote (embedded: the repo root; wrapper: the wrapper root); in a private workspace (.specd/
-git-excluded) it is skipped with a `claude mcp add` hint.
+--add-mcp NAME (atlassian, playwright, chrome-devtools, dbhub) only merges that MCP server
+into DIR/.mcp.json, the file init wrote (embedded: the repo root; wrapper: the wrapper root);
+in a private workspace (.specd/ git-excluded) it is skipped with a `claude mcp add` hint.
+dbhub reads its connection string from the DATABASE_URL environment variable, never from
+the file.
 Each artifact is reported as created, merged or skipped. Exit 1 on refusal. Stdlib only.
 """
 import json
@@ -32,8 +34,11 @@ BEGIN, END = "<!-- specd:begin -->", "<!-- specd:end -->"
 MCP_SERVERS = {
     "context7": {"type": "http", "url": "https://mcp.context7.com/mcp"},
     "atlassian": {"type": "http", "url": "https://mcp.atlassian.com/v1/mcp"},
+    "playwright": {"command": "npx", "args": ["@playwright/mcp@latest"]},
+    "chrome-devtools": {"command": "npx", "args": ["-y", "chrome-devtools-mcp@latest"]},
+    "dbhub": {"command": "npx", "args": ["-y", "@bytebase/dbhub@latest", "--transport", "stdio"],
+              "env": {"DSN": "${DATABASE_URL}"}},
 }
-MCP_HINT = "run: claude mcp add --transport http %s %s"
 EXCLUDES = [".specd/", "CLAUDE.local.md", ".claude/settings.local.json"]
 WORKTREES = ".worktrees/"
 
@@ -92,6 +97,15 @@ def ensure_file(path, text):
     else:
         write(path, text)
         report["created"].append(path)
+
+
+def mcp_hint(name):
+    server = MCP_SERVERS[name]
+    if "url" in server:
+        return "run: claude mcp add --transport %s %s %s" % (server["type"], name, server["url"])
+    env = "".join(' -e %s="%s"' % (k, re.sub(r"\$\{(\w+)\}", r"$\1", v))
+                  for k, v in sorted(server.get("env", {}).items()))
+    return "run: claude mcp add%s %s -- %s" % (env, name, " ".join([server["command"]] + server["args"]))
 
 
 def merge_settings(path, attribution):
@@ -219,7 +233,7 @@ def add_mcp(root, name):
     if exclude and os.path.isfile(exclude) and ".specd/" in read(exclude).splitlines():
         report["private"] = True
         skip(os.path.join(root, ".mcp.json"), "private mode")
-        report["warnings"].append(MCP_HINT % (name, MCP_SERVERS[name]["url"]))
+        report["warnings"].append(mcp_hint(name))
     else:
         merge_mcp(os.path.join(root, ".mcp.json"), name)
     print(json.dumps(report, indent=2))
@@ -280,7 +294,7 @@ def main(argv):
     merge_settings(os.path.join(root, settings), attribution)
     if private:
         skip(os.path.join(root, ".mcp.json"), "private mode")
-        report["warnings"].append(MCP_HINT % ("context7", MCP_SERVERS["context7"]["url"]))
+        report["warnings"].append(mcp_hint("context7"))
     else:
         merge_mcp(os.path.join(root, ".mcp.json"))
     target = "CLAUDE.local.md" if private else "CLAUDE.md"

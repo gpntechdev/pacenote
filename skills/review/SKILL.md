@@ -5,7 +5,9 @@ description: >
   the spec, or runs `/specd:review [feature]`; also as the next step after
   `/specd:implement` finishes. It writes the feature's diff to disk, dispatches the reviewer
   agent in a fresh context with only the spec, design, tasks, conventions and the diff,
-  records its findings in `review.md`, resolves each one with you (fix, accept, dispute),
+  proposes specialist passes (security, performance, accessibility, tests) from the diff and
+  runs the ones you pick, each in its own fresh context, records the findings in
+  `review.md`, resolves each one with you (fix, accept, dispute),
   turns the fixes into new tasks and sends the flow back to implement, or forward to verify
   when nothing is left. Not for ad-hoc code review outside a feature.
 ---
@@ -15,7 +17,8 @@ description: >
 An independent pass over the whole feature diff by an agent that did not write it and sees
 only the artifacts. Findings are the user's to resolve; fixes become tasks, so the loop
 back to `implement` uses the same machinery as the first pass. Specialist passes
-(security, performance, accessibility, tests) arrive with M6.
+(security, performance, accessibility, tests) are optional, run after the base reviewer,
+and are dispatched from here because a subagent cannot dispatch another.
 
 ## Gate
 
@@ -30,10 +33,13 @@ stop by hand.
   `review.md` (earlier rounds).
 - `<docs_root>/conventions.md`, [`../_shared/principles.md`](../_shared/principles.md) (path
   for the agent).
-- `<workspace_root>/specd.yml`: `models.judgment`, `git.authority`, `layers.*`.
+- `<workspace_root>/specd.yml`: `models.judgment`, `git.authority`, `layers.*`,
+  `flow.specialists`.
 - [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/gates.md`](../_shared/gates.md),
   [`../_shared/state-yml.md`](../_shared/state-yml.md).
-- `./templates/review.md`, [`./references/reviewer-prompt.md`](./references/reviewer-prompt.md).
+- `./templates/review.md`, [`./references/reviewer-prompt.md`](./references/reviewer-prompt.md),
+  [`./references/specialist-prompt.md`](./references/specialist-prompt.md) and the lens files
+  in `./references/specialists/` (paths for the agent).
 
 ## Outputs
 
@@ -54,27 +60,33 @@ stop by hand.
    paths, the layer files for every `layer` the feature's tasks name (`layers.*`, resolved
    against `code_root`, missing ones dropped), the round, the changed-file list, earlier
    findings marked accepted or disputed.
-4. **Record.** Create `review.md` from `./templates/review.md` on round 1; append
-   `## Round n` with the AC table, the findings and the verdict as they came back. Delete
+4. **Specialists.** `flow.specialists` is `off`: skip. Otherwise propose lenses from the
+   diff per `specialist-prompt.md`, ask once (multi-select), and dispatch `specialist` at
+   `models.judgment` once per picked lens, sequentially, each with its lens file, its id
+   prefix and the base reviewer's findings as settled.
+5. **Record.** Create `review.md` from `./templates/review.md` on round 1; append
+   `## Round n` with the AC table, every finding (base and specialist, ids as they came
+   back) and the verdict; a specialist `blocker` makes it `fix first`. Delete
    `review.diff`.
-5. **Resolve** each finding with the user, most severe first, at most four per question:
+6. **Resolve** each finding with the user, most severe first, at most four per question:
    **fix** (append a task to a `Review fixes (round n)` phase in `tasks.md` with the finding's
-   fix as goal, `covers: F<n>` plus the AC when one is named, a `commit:` line, `risk` from
+   fix as goal, `covers: <finding id>` plus the AC when one is named, a `commit:` line, `risk` from
    the finding, inline unless its body would pass the heavy-task threshold in
    `breakdown.md`; `state set tasks.T<k>=todo`), **accept** (one-line reason recorded), or
    **dispute** (recorded as accepted with the user's reason). A `missing` AC cannot be
    accepted; it is a fix or the spec changes (`/specd:specify`, which re-runs the flow).
-6. **Route.** `state set review.round=<n> review.open=<fix count>`. Fixes: `step=implement`,
+7. **Route.** `state set review.round=<n> review.open=<fix count>`. Fixes: `step=implement`,
    `Next: /specd:implement <feature>` then this command again. None: `state set step=next`
    (`verify` on full, `deliver` on quick, where this round's AC table is the evidence),
    `Next: /specd:<step> <feature>` with the step it reported. Commit `review.md`,
    `tasks.md`, `state.yml` with `git -C <workspace_root>`.
-7. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: accepted findings
+8. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: accepted findings
    the user may want to revisit, the verdict.
 
 ## Anti-patterns
 
 - Reviewing in the main thread, or giving the agent the conversation's history.
+- Running a specialist pass inside the base reviewer's dispatch, or two lenses in one run.
 - Fixing a finding here "since it is small"; fixes are tasks, so they get a commit and G4.
 - Accepting a `missing` AC to move on.
 - Leaving `review.diff` on disk or in the commit.

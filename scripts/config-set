@@ -2,12 +2,16 @@
 """Patch keys in a specd.yml in place and print what changed as JSON.
 
 Usage: config-set --file PATH key=value [key=value ...]
+       config-set --file PATH --add|--remove key=value [key=value ...]
 
 Keys are `top` or `section.key`. Values are written in the documented form: true, false,
 integers and [a-z_]+ words bare, anything else double-quoted. Indentation, comments, order
 and unknown keys survive. All-or-nothing: every key is checked before anything is written.
-Refuses list keys, unknown keys, duplicate keys and malformed lines. Exit 1 with a one-line
-message on any refusal. Stdlib only.
+Refuses list keys, unknown keys, duplicate keys and malformed lines.
+--add appends each value as a `- item` of a list key (skipped when already there) and
+--remove deletes it; scalar keys are refused. Under `layers` a missing key is created,
+so `--add layers.frontend=<path>` opens a new layer. Exit 1 with a one-line message on any
+refusal. Stdlib only.
 """
 import json
 import os
@@ -17,6 +21,8 @@ import sys
 LINE = re.compile(r"^(\s*)([A-Za-z_][\w]*):(\s*)(.*?)(\s*#.*)?$")
 BARE = re.compile(r"^(true|false|-?\d+|[a-z_]+)$")
 LIST_KEYS = {"skills.allowlist"}
+OPEN_SECTIONS = {"layers"}  # sections whose keys are names chosen by the user
+ITEM = re.compile(r"^(\s*)-\s+(.*?)\s*$")
 
 
 def fail(msg):
@@ -64,6 +70,81 @@ def is_list(lines, n):
     return False
 
 
+def items(lines, n):
+    """Return [(line number, value)] of the `- item` lines under the key on line n."""
+    out = []
+    for j in range(n + 1, len(lines)):
+        raw = lines[j]
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        m = ITEM.match(raw.rstrip("\n"))
+        if not m:
+            break
+        out.append((j, m.group(2).strip('"')))
+    return out
+
+
+def section_end(lines, start):
+    """Line index after the last non-blank line of the top-level section opened on `start`."""
+    last = start
+    for j in range(start + 1, len(lines)):
+        raw = lines[j]
+        if raw.strip() and not raw[0].isspace():
+            break
+        if raw.strip():
+            last = j
+    return last + 1
+
+
+def item_text(value):
+    return value if re.match(r"^[\w./@~+-]+$", value) else '"%s"' % value
+
+
+def patch_list(path, lines, found, pairs, remove):
+    out = []
+    for pair in pairs:
+        if "=" not in pair:
+            return fail("expected key=value, got %r" % pair)
+        key, value = pair.split("=", 1)
+        if not value or '"' in value or "\n" in value:
+            return fail("value for %s must be non-empty, without a double quote or newline" % key)
+        section = key.split(".", 1)[0]
+        if key not in found:
+            if remove or "." not in key or section not in OPEN_SECTIONS or section not in found \
+                    or not re.match(r"^[A-Za-z_][\w]*$", key.split(".", 1)[1]):
+                return fail("unknown list key %s in %s" % (key, path))
+            at = section_end(lines, found[section])
+            lines[at:at] = ["  %s:\n" % key.split(".", 1)[1]]
+            found, _, _ = index(lines)
+        n = found[key]
+        m = LINE.match(lines[n].rstrip("\n"))
+        if m.group(4) not in ("", "[]"):
+            return fail("%s is a scalar key; use key=value without --add/--remove" % key)
+        current = items(lines, n)
+        values = [v for _, v in current]
+        if remove:
+            hits = [j for j, v in current if v == value]
+            if not hits:
+                out.append({"key": key, "removed": value, "changed": False})
+                continue
+            del lines[hits[0]]
+            out.append({"key": key, "removed": value, "changed": True})
+        else:
+            if value in values:
+                out.append({"key": key, "added": value, "changed": False})
+                continue
+            if m.group(4) == "[]":
+                lines[n] = "%s%s:%s\n" % (m.group(1), m.group(2), m.group(5) and " " + m.group(5).strip() or "")
+            at = (current[-1][0] if current else n) + 1
+            lines[at:at] = ["%s  - %s\n" % (m.group(1), item_text(value))]
+            out.append({"key": key, "added": value, "changed": True})
+        found, _, _ = index(lines)
+    with open(path, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+    print(json.dumps({"file": os.path.abspath(path), "lists": out}, indent=2))
+    return 0
+
+
 def render(value):
     if BARE.match(value):
         return value
@@ -80,7 +161,8 @@ def main(argv):
     if i + 1 >= len(argv):
         return fail("--file needs a path")
     path = argv[i + 1]
-    pairs = [a for j, a in enumerate(argv) if j not in (i, i + 1)]
+    remove = "--remove" in argv
+    pairs = [a for j, a in enumerate(argv) if j not in (i, i + 1) and a not in ("--add", "--remove")]
     if not pairs:
         return fail("no key=value given")
     if not os.path.isfile(path):
@@ -92,6 +174,10 @@ def main(argv):
         return fail("cannot parse %s line %s" % (path, ", ".join(str(b) for b in bad)))
     if dups:
         return fail("duplicate key in %s: %s" % (path, ", ".join(sorted(set(dups)))))
+    if "--add" in argv and remove:
+        return fail("--add and --remove are separate calls")
+    if "--add" in argv or remove:
+        return patch_list(path, lines, found, pairs, remove)
     changes = []
     for pair in pairs:
         if "=" not in pair:

@@ -71,8 +71,8 @@ A `state.yml` with another `step` means resume from that step.
    skeleton, and the spec folder and docs change with it when they are in the same repo
    (embedded); in a wrapper those two go in a second commit of the same message with
    `git -C <workspace_root>`. No attribution.
-8. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Next`: `/specd:start <feature>`;
-   mention `/specd:toolsmith` as the later step for project skills and MCPs. Note that
+8. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Next`: `/specd:toolsmith`
+   (project skills per layer, MCP servers), then `/specd:start <feature>` as the alternative. Note that
    `<spec_root>/scaffold/` is a closed quick feature with `retention: clean`;
    `/specd:close scaffold` removes it.
 

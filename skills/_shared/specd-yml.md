@@ -35,6 +35,7 @@ flow:
   gate_granularity: phase    # task | phase | end: where implement stops for G4
   tdd: false                 # tests first; the coverage matrix exists either way
   critic: gates              # gates | off | always
+  specialists: ask           # ask | off: review proposes specialist passes from the diff
   retention: distill         # distill | clean | keep: docs + close policy for full tier
   keep_days: 30              # status warns about kept spec folders older than this
 
@@ -57,13 +58,13 @@ sources:
   mcp: none                  # none | atlassian: the MCP server that fetches bare ticket keys
                              # (PROJ-123) and its own page URLs; URLs, files and pastes need no key
 
-skills:                      # M6. Where toolsmith may search for third-party skills
-  allowlist:
+skills:                      # GitHub repos toolsmith may search for third-party skills;
+  allowlist:                 # change with /specd:config --add / --remove
     - anthropics/skills
 
-layers:                      # M6. layer -> files implement adds to "Read first" for tasks of
-                             #     that layer; paths relative to code_root. Filled by toolsmith
-                             #     or by hand, e.g.
+layers:                      # layer -> files implement and review add to "Read first" for
+                             #     tasks of that layer; paths relative to code_root. Filled by
+                             #     toolsmith or /specd:config --add, e.g.
                              #     frontend:
                              #       - .claude/skills/react-conventions/SKILL.md
 ```
@@ -83,17 +84,23 @@ layers:                      # M6. layer -> files implement adds to "Read first"
 | `flow.gate_granularity` | `task`, `phase`, `end` | implement; risky tasks always stop |
 | `flow.tdd` | bool | tasks (tests block), implement (tests first) |
 | `flow.critic` | `gates` (before G1 and G2 on the full tier), `always` (quick's G1 too), `off` | specify, design; `critique` runs regardless |
+| `flow.specialists` | `ask` (review proposes security, performance, accessibility or tests passes from the diff and asks), `off` | review |
 | `flow.retention` | `distill`, `clean`, `keep` | docs (write the record on `distill`) and close; trivial and quick default to `clean` |
 | `flow.keep_days` | integer | status, spec-clean |
 | `models.<role>` | model name | any skill that spawns an agent; roles only elsewhere |
 | `commands.*` | shell command | implement, verify, scaffold; empty = detect |
 | `docs.lessons_max_lines` | integer | lessons-prune |
 | `sources.mcp` | `none`, `atlassian` | start, fix, onboard, refresh: a bare ticket key (and an `*.atlassian.net` URL) goes through this server ([`sources.md`](./sources.md)); `none` asks for a paste. A file from before M5 has `sources: []`: replace that line by hand with the two lines above |
-| `skills.allowlist` | list of `owner/repo` | toolsmith (M6) |
-| `layers.<name>` | list of paths, relative to `code_root` (not `workspace_root`) | tasks (the `layer` vocabulary), implement and review (files the agent reads first); written by toolsmith (M6) or by hand |
+| `skills.allowlist` | list of GitHub `owner/repo` | toolsmith: the only repos it searches and fetches from (`skill-fetch` refuses others); `config-set --add` / `--remove` |
+| `layers.<name>` | list of paths, relative to `code_root` (not `workspace_root`) | tasks (the `layer` vocabulary), implement and review (files the agent reads first); written by toolsmith or `config-set --add layers.<name>=<path>` |
 
 Retention per tier: trivial and quick close with `clean` unless the feature's `state.yml` says
 otherwise; full uses `flow.retention`.
+
+Next to this file, `toolsmith` keeps `skills.lock` (one section per installed or generated
+skill: source, repo, path, commit, sha256, dir, layer, verdict, audited; written only by
+`scripts/skill-lock`) and the gitignored `.quarantine/` folder that candidates are fetched
+into for the audit.
 
 ## Rules for readers
 

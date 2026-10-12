@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Tests for scripts/audit-static against the fixtures in tests/fixtures/.
+
+Usage: test-audit [--help]   (run from anywhere; stdlib unittest)
+"""
+import json
+import os
+import subprocess
+import sys
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+AUDIT = os.path.join(ROOT, "scripts", "audit-static")
+FIXTURES = os.path.join(ROOT, "tests", "fixtures")
+STATIC = ["hidden-unicode", "encoded-blob", "pipe-to-shell", "bundled-hook", "secrets",
+          "network", "bundled-script", "allowed-tools"]
+
+
+def audit(name):
+    out = subprocess.run([sys.executable, AUDIT, "--dir", os.path.join(FIXTURES, name)],
+                         check=True, capture_output=True, text=True).stdout
+    return json.loads(out)
+
+
+class AuditStatic(unittest.TestCase):
+    def test_malicious_hits_every_category_and_blocks(self):
+        report = audit("malicious-skill")
+        self.assertEqual(report["verdict"], "block")
+        for category in STATIC:
+            self.assertIn(category, report["counts"], category)
+
+    def test_prose_injection_is_invisible_to_stage_one(self):
+        report = audit("malicious-skill")
+        files = {f["file"] for f in report["findings"]}
+        self.assertNotIn(os.path.join("references", "style.md"), files)
+
+    def test_matches_are_escaped(self):
+        report = audit("malicious-skill")
+        for f in report["findings"]:
+            self.assertTrue(all(32 <= ord(c) < 127 for c in f["match"]), f)
+            self.assertLessEqual(len(f["match"]), 80)
+
+    def test_clean_skill_is_clean(self):
+        report = audit("clean-skill")
+        self.assertEqual(report["verdict"], "clean")
+        self.assertEqual(report["findings"], [])
+
+
+if __name__ == "__main__":
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(__doc__.strip())
+        sys.exit(0)
+    unittest.main(verbosity=2)
