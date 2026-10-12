@@ -3,8 +3,8 @@ name: toolsmith
 description: >
   Invoke whenever the user asks to find, install, vet, audit, update or generate project
   skills for this codebase, asks which MCP servers the project should use, says the stack
-  changed (a new framework, a new layer), or runs `/specd:toolsmith [<need>] [--audit
-  <path>] [--update]`; also as the last step after `/specd:onboard` or `/specd:scaffold`.
+  changed (a new framework, a new layer), or runs `/specd:toolsmith [<need>] [--from
+  <skill folder>] [--update]`; also as the last step after `/specd:onboard` or `/specd:scaffold`.
   Per need of the detected stack it searches only the allowlisted repos, fetches the best
   candidate into a quarantine Claude Code never loads, runs the two-stage audit (a static
   script, then an isolated auditor agent), shows you the report and installs only on your
@@ -32,8 +32,8 @@ Not a flow step: no `state.yml`, no gate.
   `git.authority`, `sources.mcp`. `<workspace_root>/skills.lock` through `skill-lock`.
 - `<docs_root>/project.md`, `<docs_root>/architecture/overview.md`,
   `<docs_root>/conventions.md` when present; the `.mcp.json` server names.
-- The arguments: a need in words, `--audit <path>` (audit a local skill folder, install
-  nothing), `--update` (re-check installed skills only).
+- The arguments: a need in words, `--from <skill folder>` (a local candidate, audited
+  like a fetched one), `--update` (re-check installed skills only).
 - [`./references/needs.md`](./references/needs.md), [`./references/audit.md`](./references/audit.md),
   [`./references/generate.md`](./references/generate.md), [`./references/mcp.md`](./references/mcp.md),
   `./templates/audit-report.md`, `./templates/project-skill.md`.
@@ -54,7 +54,8 @@ Not a flow step: no `state.yml`, no gate.
    `detect-repo` and `detect-commands --from <code_root>`. Run
    `"${CLAUDE_PLUGIN_ROOT}/scripts/skill-lock" verify --workspace <workspace_root>`;
    `modified` or `missing` entries go to step 9 first. `--update`: step 9 only, then 11.
-   `--audit <path>`: `skill-fetch stage --dir <path>`, steps 5 and 6, then 10; never install.
+   `--from <folder>`: ask its layer, `skill-fetch stage --dir <folder>`, then steps 5 to 7
+   (no `--repo`: the lock entry is `local`), then 11.
 2. **Needs.** Build the list per `needs.md`: layers from the docs and detection, at most
    three needs per layer, minus needs a locked skill already covers. Show it as
    `layer · need` lines and ask once: confirm, edit, or drop. A need given as the argument
