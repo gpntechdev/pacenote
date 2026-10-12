@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 """Fetch third-party skill candidates into the quarantine folder. Never runs what it fetches.
 
-Usage: skill-fetch list  --workspace W --repo OWNER/REPO [--ref REF]
+Usage: skill-fetch find  --workspace W --query TEXT [--owner OWNER]
+       skill-fetch list  --workspace W --repo OWNER/REPO [--ref REF]
        skill-fetch fetch --workspace W --repo OWNER/REPO --path PATH --commit SHA
        skill-fetch stage --workspace W --dir DIR [--name NAME]
        skill-fetch clean --workspace W [--dir QUARANTINE_DIR]
 
 W is workspace_root (the folder holding specd.yml). `list` and `fetch` refuse a repo that
 is not in specd.yml `skills.allowlist`; GitHub repos only.
+find:  searches the skills.sh index, the search behind find-skills' `npx skills find`
+       (same endpoint, limit 20, sorted by installs), and groups the hits by repo:
+       {query, dropped, repos: [{repo, allowlisted, installs, skills: [{name, installs}],
+       stars, license, pushed_at}]}. Hits whose source is not a GitHub owner/repo are
+       dropped and counted; archived repos are dropped. GitHub metadata is added for at
+       most 8 repos that are not allowlisted. Names only, no skill content. Refused when
+       specd.yml `skills.discovery` is `off`.
 list:  resolves REF (default: the default branch) to a commit and prints the folders that
        hold a SKILL.md: {repo, commit, skills: [{name, path}]}. Names and paths only, no
        file content.
@@ -28,9 +36,13 @@ import shutil
 import sys
 import tarfile
 import urllib.error
+import urllib.parse
 import urllib.request
 
 API = "https://api.github.com/repos/%s"
+SEARCH = "https://skills.sh/api/search?%s"
+SEARCH_LIMIT = "20"
+META_REPOS = 8
 CODELOAD = "https://codeload.github.com/%s/tar.gz/%s"
 QUARANTINE = ".quarantine"
 MAX_FILES = 300
@@ -54,12 +66,13 @@ def opt(argv, flag, default=None):
     return default
 
 
-def allowlist(workspace):
-    """Read skills.allowlist from W/specd.yml (flat subset: section, key, `- item` lines)."""
+def read_skills(workspace):
+    """Return (skills.allowlist, skills.discovery) from W/specd.yml (flat subset: section,
+    key, `- item` lines)."""
     path = os.path.join(workspace, "specd.yml")
     if not os.path.isfile(path):
         raise Refused("no specd.yml in %s" % workspace)
-    items, section, key = [], None, None
+    items, discovery, section, key = [], "skills.sh", None, None
     with open(path, encoding="utf-8") as f:
         for raw in f:
             line = raw.split("#", 1)[0].rstrip()
@@ -71,11 +84,17 @@ def allowlist(workspace):
                     section, key = m.group(2), None
                 else:
                     key = m.group(2)
+                    if section == "skills" and key == "discovery" and m.group(3).strip():
+                        discovery = m.group(3).strip().strip("\"'")
                 continue
             item = re.match(r"^\s+-\s+(.+)$", line)
             if item and section == "skills" and key == "allowlist":
                 items.append(item.group(1).strip().strip("\"'"))
-    return items
+    return items, discovery
+
+
+def allowlist(workspace):
+    return read_skills(workspace)[0]
 
 
 def check_repo(workspace, repo):
@@ -115,6 +134,74 @@ def fresh(path):
     if os.path.lexists(path):
         shutil.rmtree(path)
     os.makedirs(path)
+
+
+def group(response, allowed):
+    """Group a skills.sh search response by GitHub repo; pure, for tests."""
+    allowed = {a.lower() for a in allowed}
+    repos, dropped = {}, 0
+    for hit in (response or {}).get("skills") or []:
+        source = str(hit.get("source") or "")
+        name = SAFE.sub("-", str(hit.get("skillId") or hit.get("name") or ""))[:80].strip("-.")
+        if not REPO.match(source) or not name:
+            dropped += 1
+            continue
+        try:
+            installs = max(0, int(hit.get("installs") or 0))
+        except (TypeError, ValueError):
+            installs = 0
+        entry = repos.setdefault(source.lower(), {"repo": source, "allowlisted": source.lower() in allowed,
+                                                  "installs": 0, "skills": []})
+        entry["installs"] += installs
+        entry["skills"].append({"name": name, "installs": installs})
+    out = sorted(repos.values(), key=lambda r: -r["installs"])
+    for r in out:
+        r["skills"].sort(key=lambda s: -s["installs"])
+    return out, dropped
+
+
+def repo_meta(repo):
+    try:
+        d = json.loads(get(API % repo, limit=1024 * 1024))
+    except (Refused, ValueError):
+        return None
+    return {"stars": d.get("stargazers_count"), "archived": bool(d.get("archived")),
+            "license": ((d.get("license") or {}).get("spdx_id") or ""),
+            "pushed_at": d.get("pushed_at") or ""}
+
+
+def cmd_find(workspace, argv):
+    query, owner = opt(argv, "--query", ""), opt(argv, "--owner")
+    allowed, discovery = read_skills(workspace)
+    if discovery == "off":
+        raise Refused("skills.discovery is off; search stays inside skills.allowlist")
+    query = " ".join(query.split())[:120]
+    if not query:
+        raise Refused("--query TEXT is required")
+    params = {"q": query, "limit": SEARCH_LIMIT}
+    if owner:
+        if not re.match(r"^[A-Za-z0-9-]{1,39}$", owner):
+            raise Refused("--owner must be a GitHub owner")
+        params["owner"] = owner.lower()
+    try:
+        response = json.loads(get(SEARCH % urllib.parse.urlencode(params), accept="application/json",
+                                  limit=4 * 1024 * 1024))
+    except ValueError:
+        raise Refused("skills.sh returned something that is not JSON")
+    repos, dropped = group(response, allowed)
+    kept, looked_up = [], 0
+    for r in repos:
+        meta = None
+        if not r["allowlisted"] and looked_up < META_REPOS:
+            looked_up += 1
+            meta = repo_meta(r["repo"])
+        if meta and meta["archived"]:
+            dropped += len(r["skills"])
+            continue
+        if meta:
+            r.update(stars=meta["stars"], license=meta["license"], pushed_at=meta["pushed_at"])
+        kept.append(r)
+    return {"query": query, "dropped": dropped, "repos": kept}
 
 
 def cmd_list(workspace, argv):
@@ -241,7 +328,7 @@ def cmd_clean(workspace, argv):
     return {"removed": target if existed else ""}
 
 
-COMMANDS = {"list": cmd_list, "fetch": cmd_fetch, "stage": cmd_stage, "clean": cmd_clean}
+COMMANDS = {"find": cmd_find, "list": cmd_list, "fetch": cmd_fetch, "stage": cmd_stage, "clean": cmd_clean}
 
 
 def main(argv):

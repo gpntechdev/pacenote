@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+"""Tests for `skill-fetch find`'s grouping of a skills.sh search response, offline.
+
+Usage: test-skill-find [--help]   (run from anywhere; stdlib unittest)
+"""
+import importlib.util
+import json
+import os
+import sys
+import unittest
+from importlib.machinery import SourceFileLoader
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FIXTURE = os.path.join(ROOT, "tests", "fixtures", "skills-search.json")
+
+
+def load_skill_fetch():
+    loader = SourceFileLoader("skill_fetch", os.path.join(ROOT, "scripts", "skill-fetch"))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+class Group(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.sf = load_skill_fetch()
+        with open(FIXTURE, encoding="utf-8") as f:
+            cls.response = json.load(f)
+
+    def test_groups_by_repo_sorted_by_installs(self):
+        repos, _ = self.sf.group(self.response, [])
+        names = [r["repo"] for r in repos]
+        self.assertEqual(names[0], "affaan-m/ecc")
+        flutter = next(r for r in repos if r["repo"] == "flutter/agent-plugins")
+        self.assertEqual(flutter["installs"], 1086 + 9574)
+        self.assertEqual(flutter["skills"][0]["name"], "flutter-managing-state")
+
+    def test_allowlisted_flag_is_case_insensitive(self):
+        repos, _ = self.sf.group(self.response, ["Flutter/Agent-Plugins"])
+        flags = {r["repo"]: r["allowlisted"] for r in repos}
+        self.assertTrue(flags["flutter/agent-plugins"])
+        self.assertFalse(flags["affaan-m/ecc"])
+
+    def test_non_github_sources_are_dropped(self):
+        repos, dropped = self.sf.group(self.response, [])
+        self.assertNotIn("smithery.ai", [r["repo"] for r in repos])
+        self.assertEqual(dropped, 1)
+
+    def test_names_are_sanitised(self):
+        repos, _ = self.sf.group(self.response, [])
+        for r in repos:
+            for s in r["skills"]:
+                self.assertRegex(s["name"], r"^[A-Za-z0-9._-]+$")
+                self.assertLessEqual(len(s["name"]), 80)
+        evil = next(r for r in repos if r["repo"] == "Evil/Repo")
+        self.assertEqual(evil["skills"][0]["installs"], 12)
+
+    def test_empty_or_malformed_response(self):
+        self.assertEqual(self.sf.group({}, []), ([], 0))
+        self.assertEqual(self.sf.group(None, []), ([], 0))
+
+
+if __name__ == "__main__":
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(__doc__.strip())
+        sys.exit(0)
+    unittest.main(verbosity=2)
