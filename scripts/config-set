@@ -16,7 +16,7 @@ import sys
 
 LINE = re.compile(r"^(\s*)([A-Za-z_][\w]*):(\s*)(.*?)(\s*#.*)?$")
 BARE = re.compile(r"^(true|false|-?\d+|[a-z_]+)$")
-LIST_KEYS = {"sources", "skills.allowlist"}
+LIST_KEYS = {"skills.allowlist"}
 
 
 def fail(msg):

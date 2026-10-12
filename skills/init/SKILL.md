@@ -7,7 +7,8 @@ description: >
   repo around a client repo that must get no files), detects greenfield or brownfield, git
   host, ticket convention and project commands with scripts, asks a short interview
   (retention, TDD, gate granularity, PR host, private mode; wrapper: where docs land), then
-  writes `specd.yml`, the no-attribution setting, `.mcp.json` with Context7 and a pointer
+  writes `specd.yml`, the no-attribution setting, `.mcp.json` with Context7 (and the
+  Atlassian server when Jira is the ticket source) and a pointer
   block in `CLAUDE.md`, and commits. It writes no project knowledge; that is
   `/specd:onboard`, which it hands off to.
 ---
@@ -59,14 +60,18 @@ the user's own repo around the code repo ([`./references/wrapper.md`](./referenc
    - PR host: prefilled from `remote_host`; ask only when it is `none`;
    - ticket key: ask only when `ticket_key` is empty ("none" is a valid answer);
    - embedded: private mode, no (default) / yes, for a repo whose team should not see specd
-     files; wrapper: where `docs/` lands (`wrapper.md`, "Interview").
+     files; wrapper: where `docs/` lands (`wrapper.md`, "Interview");
+   - ticket source: none (default) / Jira + Confluence, which installs the Atlassian MCP
+     server so `start --from PROJ-123` fetches the ticket ([`../_shared/sources.md`](../_shared/sources.md)).
 4. **Create.** Run `"${CLAUDE_PLUGIN_ROOT}/scripts/init-workspace" --root <root> [--private]`
-   (wrapper: `--mode wrapper --code <name> [--docs <name>/docs]`). Show its `created`,
-   `merged`, `skipped` and `warnings` lists as they came back.
+   (wrapper: `--mode wrapper --code <name> [--docs <name>/docs]`); Jira + Confluence: then
+   `init-workspace --root <root> --add-mcp atlassian`. Show the `created`, `merged`,
+   `skipped` and `warnings` lists as they came back.
 5. **Configure.** Run `"${CLAUDE_PLUGIN_ROOT}/scripts/config-set" --file <config>` with the
    interview answers and the derived values: `project` (from `project_name`), `git.pr_host`,
    `git.ticket_key`, each non-empty `commands.*` from `detect-commands`, and in wrapper mode
-   `mode`, `paths.code_root` and `paths.docs_root` (`wrapper.md`). Show the `old -> new`
+   `mode`, `paths.code_root` and `paths.docs_root` (`wrapper.md`), and `sources.mcp=atlassian`
+   when chosen. Show the `old -> new`
    list; mark derived values so the user can correct them with `/specd:config`.
 6. **Commit** (skip in private mode): stage exactly the paths the script created or merged
    plus `CLAUDE.md`, commit `chore: initialise specd workspace` on the current branch of the
@@ -76,6 +81,8 @@ the user's own repo around the code repo ([`./references/wrapper.md`](./referenc
    Greenfield: add a second line "then `/specd:scaffold` once the architecture section is
    signed off". Wrapper: the two lines from `wrapper.md` ("Handoff additions"). Last line:
    "project skills and MCP recommendations come with `/specd:toolsmith`, not yet available".
+   Atlassian installed: one more line, "authorise it once with `/mcp` in an interactive
+   session; until then a ticket key falls back to a paste".
 
 ## Anti-patterns
 
