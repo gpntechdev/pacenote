@@ -53,8 +53,9 @@ commands:                    # empty = detected (config -> Makefile -> package.j
 docs:
   lessons_max_lines: 80      # cap for lessons.md; lessons-prune enforces it
 
-sources: []                  # M5. Items: {type: local, paths: [...]} | {type: url}
-                             #     | {type: paste} | {type: "mcp:<server>"}
+sources:
+  mcp: none                  # none | atlassian: the MCP server that fetches bare ticket keys
+                             # (PROJ-123) and its own page URLs; URLs, files and pastes need no key
 
 skills:                      # M6. Where toolsmith may search for third-party skills
   allowlist:
@@ -87,7 +88,7 @@ layers:                      # M6. layer -> files implement adds to "Read first"
 | `models.<role>` | model name | any skill that spawns an agent; roles only elsewhere |
 | `commands.*` | shell command | implement, verify, scaffold; empty = detect |
 | `docs.lessons_max_lines` | integer | lessons-prune |
-| `sources` | list | start (M5) |
+| `sources.mcp` | `none`, `atlassian` | start, fix, onboard, refresh: a bare ticket key (and an `*.atlassian.net` URL) goes through this server ([`sources.md`](./sources.md)); `none` asks for a paste. A file from before M5 has `sources: []`: replace that line by hand with the two lines above |
 | `skills.allowlist` | list of `owner/repo` | toolsmith (M6) |
 | `layers.<name>` | list of paths, relative to `code_root` (not `workspace_root`) | tasks (the `layer` vocabulary), implement and review (files the agent reads first); written by toolsmith (M6) or by hand |
 

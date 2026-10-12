@@ -72,8 +72,9 @@ stays a plain path.
 | `gitlab` | `<remote_url>/-/blob/<branch>/<path>` |
 | `none`, or a repo without a remote | the plain path in backticks |
 
-A source's `origin` (the first comment line of `sources/<feature>-<slug>.md`) is linked as
-it is when it is a URL; a pasted source is not linked.
+A source's `origin` (in the header line of `sources/<feature>-<slug>.md`; read only that
+line) is linked as it is when it is a URL, whatever its `via`; a paste without a URL and a
+local file path are not linked.
 
 ## Draft PR or MR
 

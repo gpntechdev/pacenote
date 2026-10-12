@@ -1,5 +1,5 @@
 {
-  "description": "specd secrets guardrail",
+  "description": "specd secrets guardrail and source snapshot guard",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,6 +8,16 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/secrets-guard\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/source-guard\"",
             "timeout": 5
           }
         ]

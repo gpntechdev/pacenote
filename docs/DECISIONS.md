@@ -671,3 +671,137 @@ the same quick flow in embedded mode with unchanged commits. Not exercised: push
 repo that needs a dependency install per worktree.
 Consequences: the "done" mark follows the user's first wrapper around a real client repo;
 the parts to watch are the per-worktree install and the merge at `close`.
+
+## 2026-10-12 M5: adapters follow the input's shape; `sources.mcp` is one flat key; Atlassian first
+
+Context: the `sources: []` list in `specd.yml` described nested items the flat parser
+cannot read, and `config-set` refused it. PLAN 3.7 lists adapters per type; the user's
+tickets live in Jira and their pages in Confluence.
+Decision: the adapter is picked from the input: a bare ticket key, or an `*.atlassian.net`
+URL, goes through the MCP server named by `sources.mcp`; any other `http(s)` URL goes
+through `scripts/fetch-source`; a path is a file; text is a paste (`_shared/sources.md`).
+`sources.mcp: none | atlassian` replaces the list and is patched by `config-set` like any
+scalar. The first server is Atlassian's remote MCP (`https://mcp.atlassian.com/v1/mcp`,
+OAuth through `/mcp`), installed into `.mcp.json` only on confirmation: one question at
+`init`, or `/specd:config sources.mcp=atlassian`, both through `init-workspace --add-mcp
+atlassian` (wrapper: the wrapper's file; private mode: skipped with a `claude mcp add`
+hint). A ticket's linked Confluence pages and Jira issues are fetched at depth 1, at most
+5, each its own snapshot. Links to other sites are listed in the brief and never fetched
+on their own, because a URL found in fetched text is not one the user gave. Server
+missing, unconnected or unauthorised: ask for a paste and go on; the step never fails.
+Consequences: a workspace from before M5 still has `sources: []`; readers treat the key as
+`none` and the config skill shows the by-hand replacement. No migration code. The
+Atlassian read tool names in `agents/intake.md` are from the server's published list and
+are confirmed on the first authorised run; a wrong name degrades to a paste, it does not
+fail.
+
+## 2026-10-12 M5: redaction is a script, applied by a hook before any snapshot is saved
+
+Context: the redaction rule was a regex list in prose (`_shared/sources.md`), applied by
+whoever wrote the snapshot. An MCP fetch is done by an agent, and an agent without Bash
+cannot run a script.
+Decision: `scripts/redact` holds the patterns and the header handling; `fetch-source` and
+`refresh-source` call it. `hooks/source-guard`, a second PreToolUse hook on `Read|Write`,
+runs it on every Write whose content starts with the `specd:source` header, from the main
+thread or any agent, and returns `updatedInput` with the redacted content and
+`redactions=` set. A spike on Claude Code 2.1.296 confirmed that `updatedInput` rewrites a
+Write without a `permissionDecision`, and that hook input carries `agent_type`
+(`specd:intake` for the plugin agent). If redaction raises, the hook denies the write. The
+URL adapter fetches with a script (urllib and a stdlib HTML-to-text converter), not
+WebFetch, so the snapshot is verbatim and no model sees the page before the intake agent.
+Consequences: a new hook, as AUTHORING 9 requires an entry for; `secrets-guard` is
+unchanged. Redaction is deterministic and counted the same on every pass, because the
+count is the number of `[redacted]` markers. An Edit or a Bash write of a snapshot is not
+covered; `sources.md` forbids both.
+
+## 2026-10-12 M5: fetched text reaches the main thread only as the intake agent's summary
+
+Context: PLAN 3.3 and 3.6 say intake's fetched content is summarised by an agent that
+cannot act on it; DECISIONS 2026-09-24 deferred that agent to M5. The first smoke run
+showed that prose is not enough: `specify` opened a fetched snapshot in full in the main
+thread, although its Inputs line said not to.
+Decision: a new `intake` agent (`researcher` is unchanged and keeps its web tools for M6).
+- Tools: `Read`, `Write`, and the Atlassian read tools by exact name. No Bash, Edit,
+  WebFetch, WebSearch, Agent, or MCP write tools.
+- Three modes, named in the dispatch prompt: `condense` (a snapshot), `fetch` (a ticket or
+  page, written as snapshots) and `diff` (a refresh diff).
+- It answers in at most 40 lines: `Status`, `Snapshots`, `Asked`, `Not said`, `Flagged`
+  (instructions found, quoted in one line each, not followed) and `Not fetched`.
+- `source-guard` fences it: its Writes must be `sources/<name>.md` files with a header.
+- The guard also denies anyone else a Read of a fetched snapshot (`via` `http` or `mcp:*`)
+  past line 1, and any Read of a refresh diff.
+- The header now carries `via`. The brief's Sources lines carry it too, so `specify` knows
+  what it may open without opening anything.
+- The brief gains an optional `## Flagged` section.
+- `scripts/validate` gets a `NO_ACT_AGENTS` check: no acting tools, and MCP tools only when
+  their names are read verbs.
+- Files and pastes stay main-thread reads: they are the user's own text.
+Consequences: an injected instruction surfaces as one quoted line in the brief and is
+never followed. Bash and Grep on `sources/` are not inspected; this is the same boundary as
+the 2026-09-22 secrets entry, revisited on an observed leak. The header line itself (title,
+origin) is fetched text that the main thread reads, so it is sanitised to plain attribute
+values and the title is capped at 60 characters.
+
+## 2026-10-12 M5: refresh is a thin skill; it names the gate and never re-runs triage
+
+Context: PLAN 3.7 gives snapshots a refresh util; the snapshot must be able to change
+without the spec drifting silently or being rewritten behind the user's back.
+Decision: `/specd:refresh [<feature> | <snapshot>]`.
+- `scripts/refresh-source` does the deterministic part: it re-fetches `http` origins, takes
+  `--new` for MCP re-fetches (written by `intake` to `<slug>.new.md`) and for file origins,
+  redacts, diffs, overwrites the snapshot only when the body changed, and computes the
+  advice from `state.yml`. Quick or full with G1 approved gives `reopen G1` (re-run
+  `specify`, which clears the later gates). Trivial with G4 or G5 approved gives
+  `reopen G4`.
+- `intake` summarises the diff. The diff file lives in the spec folder, is never
+  committed, and is deleted after the run.
+- A patch to `brief.md` is offered and applied only on a yes; `spec.md` and `state.yml` are
+  never touched.
+- Triage is not re-run. A change that trips an escalation signal names `start --tier`.
+- An onboard snapshot names `/specd:onboard <section>`.
+Consequences: a skill rather than a mode of `start`, whose spine sits at 126 of 150 lines.
+Refresh is not a flow step and runs no `state check`.
+
+## 2026-10-12 M5: built; smoke-tested headless
+
+Context: PLAN 5 makes M5 done when a ticket becomes an approved spec without copy-paste. As
+for M2 to M4, the plugin's own verification is headless (memory: headless smoke testing).
+Decision: the milestone is marked built. Headless runs in scratch repos, logged as
+`stream-json`:
+- `start --from` a public page (RFC 2324) took the snapshot (`via="http"`, `redactions=0`);
+  the main thread read only the header and the page text appeared only in the subagent's
+  context; specify reached an approved G1 with no paste.
+- A seeded local page carried an instruction to `touch` a file and edit `README.md`, plus
+  an `api_key`. The instruction landed in the brief's `## Flagged` with no tool call made
+  for it; both secrets were redacted (`redactions=2`) and the key appears nowhere in the
+  run log.
+- A direct request to read that snapshot in full was denied by the hook and fell back to
+  the header and the agent.
+- After the served page changed, `/specd:refresh` reported `+1 -1`, named G1, offered the
+  brief patch and, on "skip", committed only the snapshot; `spec.md` and `brief.md` were
+  unchanged.
+- A ticket key with `sources.mcp: none` gave a paste request with the config hint. With
+  Atlassian installed but `needs-auth`, the main thread saw the status and asked for a
+  paste without dispatching `intake`.
+- The 50-line paste flow ran triage, tier, branch and commit as before, with the hook
+  redacting the token in the paste snapshot.
+- Wrapper with worktrees: the snapshot landed in `.worktrees/<feature>/sources/` only, and
+  deliver's PR body linked the origin.
+Not exercised:
+- a live Atlassian fetch (OAuth is interactive), so the MCP tool names and the
+  linked-page cap are unverified;
+- `intake`'s `unavailable` answer through a real dispatch;
+- a login-walled page;
+- refresh of an MCP or file origin;
+- onboard with a URL.
+Consequences: "done" follows the user's first authorised ticket run: `start --from
+PROJ-123` on their Jira, then `/specd:refresh` after the ticket changes.
+
+## 2026-10-12 M5: marked done
+
+Context: the build entry above left "done" to the first authorised ticket run.
+Decision: the user marked M5 done on the headless smoke run. A live Atlassian fetch is
+still unexercised.
+Consequences: the Atlassian tool names in `agents/intake.md` and the five-page cap are
+checked on the first real ticket, and a mismatch goes here as a fix, not as a reopened
+milestone. PLAN section 7 now points to M6.

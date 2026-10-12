@@ -57,8 +57,9 @@ signed-off section.
    Five or fewer: index and items in one run. Greenfield: run the section's interview from
    [`./references/interview.md`](./references/interview.md); the architecture section may
    dispatch `researcher` at `models.judgment`. In both kinds, when the user pastes or names a
-   page, snapshot it per [`../_shared/sources.md`](../_shared/sources.md) and read the
-   snapshot.
+   page, a URL or a ticket, take it in per [`../_shared/sources.md`](../_shared/sources.md)
+   (section name as `--section`): read a file or paste snapshot; a fetched one reaches the
+   draft only through the `intake` agent's answer.
 4. **Draft to disk first.** Copy the section's template(s) to their targets now, with the
    draft marker as line 1; fill from the gathered material; cite `path:line` and
    `sources/<slug>.md`; link existing docs instead of copying them. In brownfield, a target

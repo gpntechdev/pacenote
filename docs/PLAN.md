@@ -2,7 +2,7 @@
 
 Name: **specd** (read "spec'd": spec-driven). Command prefix `/specd:`, config `specd.yml`, embedded folder `.specd/`.
 
-Status: v4, updated 2026-10-09. v2 reworked modes, folders, flow and init; v3 split init into commands and restructured `docs/`; v4 settles the remaining open questions (section 6). Progress: M0 and M1 done, M2 built and run on real features (DECISIONS 2026-10-05/06 record the amendments), M3 built and awaiting its week of mixed tasks, M4 built (section 5). Git model amended by DECISIONS 2026-09-24: branch at `start`, commits per step. Light flows amended by DECISIONS 2026-10-06 M3: the step order per tier lives in `scripts/state`, specify-lite writes `spec.md` and `tasks.md`, trivial has G4 and G5. Wrapper mode amended by DECISIONS 2026-10-09 M4: the wrapper branch is merged by `close`, worktrees are opt-in and hold the wrapper and the code, the gate hook stays out.
+Status: v4, updated 2026-10-12. v2 reworked modes, folders, flow and init; v3 split init into commands and restructured `docs/`; v4 settles the remaining open questions (section 6). Progress: M0 and M1 done, M2 built and run on real features (DECISIONS 2026-10-05/06 record the amendments), M3 built and awaiting its week of mixed tasks, M4 built, M5 done (section 5). Git model amended by DECISIONS 2026-09-24: branch at `start`, commits per step. Light flows amended by DECISIONS 2026-10-06 M3: the step order per tier lives in `scripts/state`, specify-lite writes `spec.md` and `tasks.md`, trivial has G4 and G5. Wrapper mode amended by DECISIONS 2026-10-09 M4: the wrapper branch is merged by `close`, worktrees are opt-in and hold the wrapper and the code, the gate hook stays out. Sources amended by DECISIONS 2026-10-12 M5: adapters follow the input's shape, `sources.mcp` is one flat key, fetched text reaches the main thread only through the `intake` agent, redaction is a script run by a hook.
 
 ## 1. Goal and non-goals
 
@@ -170,11 +170,11 @@ Full tier runs design by default (sections auto-selected, you can add/remove); q
 
 Agents exist only where an isolated context pays for itself: heavy reading, or independence from the implementer's reasoning. Interactive steps stay in the main thread.
 
-Agents: `explorer` (codebase scan, cheap, returns a map with file:line pointers), `researcher`, `architect`, `critic`, `implementer`, `reviewer`, specialist reviewers (`security`, `performance`, `accessibility`, `tests`), `doc-writer`, `skill-auditor`.
+Agents: `explorer` (codebase scan, cheap, returns a map with file:line pointers), `intake` (summarises fetched sources; cannot act on them), `researcher`, `architect`, `critic`, `implementer`, `reviewer`, specialist reviewers (`security`, `performance`, `accessibility`, `tests`), `doc-writer`, `skill-auditor`.
 
 Stack specialisation is knowledge, not agents: a task names a `layer` (`frontend`, `backend`, …), `specd.yml` `layers` maps each layer to project skill files, and `implement` and `review` pass those files to the one `implementer` / `reviewer` as "read first". Subagents cannot spawn subagents, so routing always happens in the main thread; a per-layer agent is added only when a layer needs tools the generic agent lacks (a browser or database MCP).
 
-Skills: `init`, `onboard`, `scaffold`, `toolsmith`, `config` (change a setting mid-flow, e.g. gate granularity or PR host), `start`, `specify`, `design`, `tasks`, `implement`, `review`, `verify`, `runtime-verify`, `docs`, `deliver`, `feedback`, `close`, `fix`, `critique`, `status` (resume), `principles`, `skill-audit`, utils (`research`, `analyze`, `docs-clean`, `spec-clean`, `lessons-prune`).
+Skills: `init`, `onboard`, `scaffold`, `toolsmith`, `config` (change a setting mid-flow, e.g. gate granularity or PR host), `start`, `specify`, `design`, `tasks`, `implement`, `review`, `verify`, `runtime-verify`, `docs`, `deliver`, `feedback`, `close`, `fix`, `critique`, `status` (resume), `principles`, `skill-audit`, utils (`refresh`, `research`, `analyze`, `docs-clean`, `spec-clean`, `lessons-prune`).
 
 Model tiers are roles, not model names: `judgment`, `execution`, `cheap`, mapped in `specd.yml` (default opus/sonnet/haiku), overridable per role.
 
@@ -207,7 +207,7 @@ The same data-not-instructions rule applies to `intake`: fetched content is summ
 
 ### 3.7 Sources
 
-`specd.yml` lists sources with a type: `local` (paths/globs), `paste`, `url`, `mcp:<server>` (Atlassian, Google Drive, Slack, GitHub…). `start` accepts a ticket key, URL, file or pasted text per feature and falls back to asking. It always writes a distilled brief with links back, never raw dumps. A util refreshes snapshotted docs.
+The adapter follows the input's shape (DECISIONS 2026-10-12 M5): a ticket key goes through the MCP server in `sources.mcp` (Atlassian first; Google Drive, Slack, GitHub… later), a URL through a fetch script, a path is a file, text is a paste. `start` accepts any of them per feature and falls back to asking for a paste. It always writes a distilled brief with links back, never raw dumps; fetched text is condensed by the `intake` agent and redacted before it is saved. `/specd:refresh` re-fetches snapshots and names the gate to re-open.
 
 ### 3.8 MCP
 
@@ -223,7 +223,7 @@ Go into `docs/AUTHORING.md`; a validator script enforces the mechanical ones.
 - Subagents return a bounded summary with file:line pointers, never file dumps.
 - Deterministic work (command detection, static audit, state validation) is a script, not a prompt.
 - The generated CLAUDE.md stays under ~60 lines and only points to `docs/`.
-- Hooks are few: a secrets guardrail that denies reading or editing `.env`, key and credential files; `intake` redacts secret-looking strings when snapshotting external docs. Gate enforcement is `state check` in every skill, not a hook (DECISIONS 2026-10-09 M4).
+- Hooks are few: a secrets guardrail that denies reading or editing `.env`, key and credential files; a source guard that redacts every snapshot before it is saved, fences the `intake` agent and keeps fetched text out of the main thread (DECISIONS 2026-10-12 M5). Gate enforcement is `state check` in every skill, not a hook (DECISIONS 2026-10-09 M4).
 
 ## 4. Repo layout (this folder)
 
@@ -249,7 +249,7 @@ Each milestone ends in something you use on a real task; findings go to `DECISIO
 | M2 | Full flow | start (intake local/paste + triage), specify, design, tasks (+ test plan), implement, review (base), verify, deliver, close (`distill`/`clean`/`keep`), `status` | One real feature shipped as a draft PR; resume after `/clear` works. **MVP** | built 2026-09-24; awaiting the real-feature run (see DECISIONS) |
 | M3 | Light flows + critic | trivial, quick, `fix`, escalation, `critic` at gates, `critique` on demand | A week of mixed tasks without wanting to bypass the flow | built 2026-10-06; the week of mixed tasks is the user's (see DECISIONS) |
 | M4 | Wrapper + parallel | Wrapper init, two-repo commits, worktrees per feature | Two features in parallel on a client-style repo with zero files added to it | built 2026-10-09; headless smoke run of two parallel features on a scratch client repo (see DECISIONS) |
-| M5 | Sources | `url` adapter, first MCP adapter, snapshot + refresh | A ticket becomes an approved spec without copy-paste | |
+| M5 | Sources | `url` adapter, first MCP adapter, snapshot + refresh | A ticket becomes an approved spec without copy-paste | done 2026-10-12; headless smoke run on URL, injection, refresh, paste and wrapper paths; live Atlassian fetch not exercised (see DECISIONS) |
 | M6 | Toolsmith + audit | `toolsmith` command, allowlist search, quarantine, two-stage audit, `skills.lock`, generation fallback, specialist reviewers, MCP recommendations | Audit catches a seeded malicious test skill; one community skill installed via the pipeline | |
 | M7 | Utils | research, analyze, docs-clean, spec-clean, lessons-prune, runtime-verify | — | |
 | M8 | Portability + team | `install.sh` for Codex/Cursor, team-sharing guide, evals for key skills | Full flow runs on a second assistant | |
@@ -262,4 +262,4 @@ All previously open questions are now decisions (see the v4 rows in section 2): 
 
 ## 7. Next step
 
-M3's week of mixed tasks (trivial, quick, fixes, one escalation) on a real repo continues on the user's side; findings go to `DECISIONS.md` first, the triage table (`skills/start/references/triage.md`) and the escalation signals being the parts most likely to need tuning. M4 is built: the first real wrapper around a client repo, with `git.worktrees` on for two features at once, is the run that closes it (dependency install per worktree and the `close` merge are the parts to watch). Then M5: the `url` adapter, the first MCP adapter, snapshot and refresh, with the isolating intake agent the 2026-09-24 sources entry deferred.
+M3's week of mixed tasks and M4's first real wrapper run continue on the user's side; findings go to `DECISIONS.md` first. M5 is done; the first authorised Jira ticket (`/specd:config sources.mcp=atlassian`, `/mcp` once, then `/specd:start <feature> --from PROJ-123`) is the run to watch for the Atlassian tool names in `agents/intake.md` and the five-page cap. Next is M6: `toolsmith` (allowlist search, quarantine, `skills.lock`, generation fallback), the two-stage `skill-audit` (a deterministic static script, then a `skill-auditor` agent with read-only tools and no network, reusing the data-not-instructions pattern of the `intake` agent and its guard), specialist reviewers and MCP recommendations. It is done when the audit catches a seeded malicious test skill and one community skill is installed through the pipeline.
