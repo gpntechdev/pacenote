@@ -32,7 +32,8 @@ reproduction). Re-entry after a G4 stop or a review round is the same command: t
 ## Inputs
 
 - Arguments: `[feature] [tasks]`; the task selection grammar is in `loop.md`.
-- `resolve-paths`, `detect-repo`, `state find`, `state check`, `detect-commands`.
+- `resolve-paths`, `detect-repo`, `state find`, `state check`, `detect-commands`
+  ([`../_shared/paths.md`](../_shared/paths.md): the opening sequence, which repo commits what).
 - `<spec_root>/<feature>/tasks.md`, `state.yml`, `spec.md`, `design.md` (when present);
   `tasks/T<n>.md` when the task in hand is an index line pointing there; on trivial
   `brief.md` instead of the three.
@@ -56,8 +57,11 @@ reproduction). Re-entry after a G4 stop or a review round is the same command: t
 ## Protocol
 
 1. **Resolve.** Split the arguments per `loop.md` into the feature and the selection.
-   `resolve-paths`, `detect-repo`, `state find`, `state check --step implement` per
-   `gates.md`; `detect-commands`. Set `step=implement`. Read `tasks.md` and `state.yml`
+   Resolve per `paths.md` ("Resolving for a feature"), `state check --step implement` per
+   `gates.md`; `detect-commands --from <code_root>`. The current branch of `<code_root>`
+   must be `branch` from `state.yml`; otherwise refuse in one line (`checkout <branch> in
+   <code_root> first`, or `/specd:start` again when its worktree is gone). Set
+   `step=implement`. Read `tasks.md` and `state.yml`
    once; on trivial, compose the implicit `T1` from `brief.md` per `loop.md` instead and
    show it. Validate the selection (`loop.md`): an unknown id, or a selected task whose
    dependency is neither `done` nor selected, is a refusal in one line. Show the task board

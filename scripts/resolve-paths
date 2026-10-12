@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """Resolve specd workspace roots and print them as JSON.
 
-Usage: resolve-paths [--from DIR]
+Usage: resolve-paths [--from DIR] [--feature NAME]
 
 Walks upward from DIR (default: current directory) looking for specd.yml
-(wrapper mode) or .specd/specd.yml (embedded mode). Prints one JSON object
-with absolute paths. Exit 1 when no config is found. Stdlib only.
+(wrapper mode) or .specd/specd.yml (embedded mode). A feature worktree
+(`<wrapper>/.worktrees/<name>/`) is a wrapper layout of its own, so resolving
+from inside it returns the worktree's roots; --feature NAME resolves from
+`<wrapper>/.worktrees/NAME/` when that worktree exists, else from DIR as usual.
+Prints one JSON object with absolute paths: mode, project, workspace_root,
+code_root, docs_root, spec_root, config, plus worktree (the worktree root, or ""),
+feature (its name, or "") and wrapper_root (the main checkout's workspace root;
+equals workspace_root outside a worktree). Exit 1 when no config is found.
+Stdlib only.
 """
 import json
 import os
@@ -16,6 +23,7 @@ DEFAULTS = {
     "embedded": {"code_root": "..", "docs_root": "docs", "spec_root": "spec"},
     "wrapper": {"code_root": None, "docs_root": "docs", "spec_root": "spec"},
 }
+WORKTREES = ".worktrees"
 
 
 def find_config(start):
@@ -29,6 +37,14 @@ def find_config(start):
         if parent == d:
             return None
         d = parent
+
+
+def worktree_of(workspace):
+    """(worktree root, feature, wrapper root) for a workspace under .worktrees/, else empties."""
+    parent = os.path.dirname(workspace)
+    if os.path.basename(parent) == WORKTREES:
+        return workspace, os.path.basename(workspace), os.path.dirname(parent)
+    return "", "", workspace
 
 
 def read_keys(path):
@@ -55,25 +71,36 @@ def read_keys(path):
     return top, paths
 
 
+def opt(argv, flag):
+    if flag in argv:
+        i = argv.index(flag)
+        if i + 1 >= len(argv):
+            print("resolve-paths: %s needs a value" % flag, file=sys.stderr)
+            sys.exit(2)
+        return argv[i + 1]
+    return None
+
+
 def main(argv):
-    start = "."
     if "--help" in argv or "-h" in argv:
         print(__doc__.strip())
         return 0
-    if "--from" in argv:
-        i = argv.index("--from")
-        if i + 1 >= len(argv):
-            print("resolve-paths: --from needs a directory", file=sys.stderr)
-            return 2
-        start = argv[i + 1]
+    start = opt(argv, "--from") or "."
+    feature = opt(argv, "--feature")
     config = find_config(start)
     if not config:
         print("specd: no specd.yml found from %s; run /specd:init" % os.path.abspath(start),
               file=sys.stderr)
         return 1
+    if feature:
+        _, _, wrapper_root = worktree_of(os.path.dirname(config))
+        candidate = os.path.join(wrapper_root, WORKTREES, feature, "specd.yml")
+        if os.path.isfile(candidate):
+            config = candidate
     top, paths = read_keys(config)
     mode = top["mode"] if top["mode"] in DEFAULTS else "embedded"
     workspace = os.path.dirname(config)
+    worktree, wt_feature, wrapper_root = worktree_of(workspace)
     defaults = dict(DEFAULTS[mode])
     if mode == "wrapper":
         defaults["code_root"] = os.path.join(".", top["project"] or ".")
@@ -82,6 +109,9 @@ def main(argv):
         rel = paths.get(key) or defaults[key]
         out[key] = os.path.normpath(os.path.join(workspace, rel))
     out["config"] = config
+    out["worktree"] = worktree
+    out["feature"] = wt_feature
+    out["wrapper_root"] = wrapper_root
     print(json.dumps(out, indent=2))
     return 0
 

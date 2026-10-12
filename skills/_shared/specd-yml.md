@@ -20,14 +20,16 @@ mode: embedded               # embedded | wrapper
 project: ""                  # display name; in wrapper mode also the code folder name
 
 paths:                       # relative to workspace_root (the folder holding this file)
-  code_root: ".."            # embedded: the repo root; wrapper: "./<project>"
-  docs_root: "docs"          # persistent knowledge; wrapper mode may point into the code repo
+  code_root: ".."            # embedded: the repo root; wrapper: "./<project>", written by init
+  docs_root: "docs"          # persistent knowledge; wrapper: "<project>/docs" to ship with the code
   spec_root: "spec"          # ephemeral working set, one folder per feature
 
 git:
   authority: draft_pr        # draft_pr | push | commit | none: the most deliver may do
   pr_host: github            # github | gitlab | none
   ticket_key: ""             # prefix such as "PROJ-"; empty = no ticket convention
+  worktrees: false           # wrapper only: start opens each feature in .worktrees/<feature>/
+                             # (wrapper + code worktrees on the feature branch) for parallel work
 
 flow:
   gate_granularity: phase    # task | phase | end: where implement stops for G4
@@ -70,12 +72,13 @@ layers:                      # M6. layer -> files implement adds to "Read first"
 | Key | Values | Used by |
 |---|---|---|
 | `specd` | integer | every reader, to refuse an unknown schema |
-| `mode` | `embedded`, `wrapper` | path resolution, deliver (one repo or two) |
+| `mode` | `embedded`, `wrapper` | path resolution (skills name roots, never the mode) |
 | `project` | string | wrapper code folder name, generated docs |
 | `paths.*` | relative or absolute path | path resolution |
 | `git.authority` | `draft_pr` > `push` > `commit` > `none` | deliver stops at this level |
 | `git.pr_host` | `github`, `gitlab`, `none` | deliver picks the PR command |
 | `git.ticket_key` | prefix string | start (branch names), deliver |
+| `git.worktrees` | bool | start (`scripts/worktree add`), close (remove); wrapper mode only, embedded ignores it |
 | `flow.gate_granularity` | `task`, `phase`, `end` | implement; risky tasks always stop |
 | `flow.tdd` | bool | tasks (tests block), implement (tests first) |
 | `flow.critic` | `gates` (before G1 and G2 on the full tier), `always` (quick's G1 too), `off` | specify, design; `critique` runs regardless |

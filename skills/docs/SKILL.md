@@ -29,7 +29,8 @@ refresh the record.
 - `<docs_root>/decisions/README.md`, `architecture/overview.md` and areas, `data-models/`,
   `features/` and its `README.md`.
 - `<workspace_root>/specd.yml`: `flow.retention`, `git.authority`.
-- [`../_shared/state-yml.md`](../_shared/state-yml.md), `./templates/feature.md`,
+- [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/state-yml.md`](../_shared/state-yml.md),
+  `./templates/feature.md`,
   `./templates/features-README.md`,
   [`../_shared/templates/decision.md`](../_shared/templates/decision.md),
   [`./references/distill.md`](./references/distill.md).
@@ -44,7 +45,8 @@ refresh the record.
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths`, `state find`, `state check --step docs`. Set `step=docs`.
+1. **Resolve** per `paths.md` ("Resolving for a feature"), `state check --step docs`.
+   Set `step=docs`.
    Effective policy = `retention` in `state.yml`, else `clean` for trivial and quick,
    `flow.retention` for full. Default is **write** when the policy is `distill`, **skip**
    otherwise; confirm in one question with the default first.
@@ -67,8 +69,9 @@ refresh the record.
    exists is refreshed, not rewritten (`distill.md`, "Refreshing").
 3. **Skip.** Say nothing was written and why (policy); the spec folder is the only record
    until `close`.
-4. **Commit** `docs(<feature>): record` in the repo containing the paths, when anything
-   was written. `state set step=deliver`.
+4. **Commit** `docs(<feature>): record` with `git -C <docs_root>` (the repo containing the
+   paths), when anything was written; `state.yml` with `git -C <workspace_root>` when that is
+   another repo. `state set step=deliver`.
 5. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Produced`: the docs
    written, or none. `Review`: decisions recorded, deltas applied. `Next: /specd:deliver
    <feature>`.

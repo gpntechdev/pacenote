@@ -31,7 +31,8 @@ stop by hand.
 - `<docs_root>/conventions.md`, [`../_shared/principles.md`](../_shared/principles.md) (path
   for the agent).
 - `<workspace_root>/specd.yml`: `models.judgment`, `git.authority`, `layers.*`.
-- [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md).
+- [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/gates.md`](../_shared/gates.md),
+  [`../_shared/state-yml.md`](../_shared/state-yml.md).
 - `./templates/review.md`, [`./references/reviewer-prompt.md`](./references/reviewer-prompt.md).
 
 ## Outputs
@@ -44,7 +45,7 @@ stop by hand.
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths`, `detect-repo`, `state find`, `state check --step review`
+1. **Resolve** per `paths.md` ("Resolving for a feature"), `state check --step review`
    per `gates.md`. Round = `review.round + 1`; refuse a fourth. Set `step=review`.
 2. **Diff.** `git -C <code_root> diff <default branch>...HEAD` into
    `<spec_root>/<feature>/review.diff`, excluding `<spec_root>` and `<docs_root>` paths;
@@ -67,7 +68,7 @@ stop by hand.
    `Next: /specd:implement <feature>` then this command again. None: `state set step=next`
    (`verify` on full, `deliver` on quick, where this round's AC table is the evidence),
    `Next: /specd:<step> <feature>` with the step it reported. Commit `review.md`,
-   `tasks.md`, `state.yml`.
+   `tasks.md`, `state.yml` with `git -C <workspace_root>`.
 7. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: accepted findings
    the user may want to revisit, the verdict.
 

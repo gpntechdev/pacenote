@@ -4,10 +4,11 @@
 Usage: detect-repo [--from DIR]
 
 Reports: root, git facts (branches, remote host, ticket key convention), whether the
-project is greenfield or brownfield, languages by extension, manifests, project name and
-which docs already exist. A repo whose skeleton specd built (`.specd/spec/scaffold/state.yml`
-with `step: closed`) is brownfield whatever its file count; `scaffolded` says so.
-Git facts degrade to empty values outside a repository.
+project is greenfield or brownfield, languages by extension, manifests, project name,
+which docs already exist and `nested_repos` (immediate subfolders that are git repos of
+their own: wrapper candidates). A repo whose skeleton specd built
+(`.specd/spec/scaffold/state.yml` with `step: closed`) is brownfield whatever its file
+count; `scaffolded` says so. Git facts degrade to empty values outside a repository.
 Exit 1 when DIR cannot be read. Stdlib only.
 """
 import json
@@ -24,7 +25,7 @@ SOURCE_EXT = {
 }
 SKIP_DIRS = {
     ".git", "node_modules", "vendor", "dist", "build", "target", ".venv", "venv",
-    "__pycache__", ".specd", "coverage", ".next", ".idea", ".cache",
+    "__pycache__", ".specd", ".worktrees", "coverage", ".next", ".idea", ".cache",
 }
 MANIFESTS = [
     "package.json", "pyproject.toml", "setup.py", "requirements.txt", "go.mod", "Cargo.toml",
@@ -59,7 +60,9 @@ def has_shebang(path):
 def count_sources(root):
     languages = Counter()
     for dirpath, dirnames, filenames in os.walk(root, onerror=lambda e: None):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        # nested git repos (a wrapper's code folder) are not this repo's sources
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS
+                       and not os.path.exists(os.path.join(dirpath, d, ".git"))]
         for name in filenames:
             ext = name.rsplit(".", 1)[1].lower() if "." in name[1:] else ""
             if ext in SOURCE_EXT:
@@ -180,6 +183,8 @@ def main(argv):
         entries = []
     manifests += [e for e in entries if e.endswith((".csproj", ".sln"))]
     out["manifests"] = manifests
+    out["nested_repos"] = [e for e in entries if e not in SKIP_DIRS
+                           and os.path.exists(os.path.join(root, e, ".git"))]
     out["project_name"] = project_name(root)
     claude_md = os.path.join(root, "CLAUDE.md")
     out["existing"] = {

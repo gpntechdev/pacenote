@@ -30,6 +30,17 @@ is dirty, or no `WIP:` commit exists; `git.authority: none` never asks.
 that rejects the push (no permission, protected name) is reported verbatim and the run stops
 at G5 recorded; no retry with different flags.
 
+## Wrapper
+
+In wrapper mode the spec folder, and `docs/` unless it was sent into the code repo, live in
+the wrapper repo on a branch of the same name. The PR is the code repo's; the wrapper has
+no PR and no reviewers. The wrapper branch is pushed (`git -C <workspace_root> push -u
+origin <branch>`) only when the wrapper has an `origin` remote (`detect-repo --from
+<workspace_root>`) and `git.authority` is at least `push`; otherwise one line says the
+wrapper branch stays local. Inside a feature worktree `<workspace_root>` is the worktree,
+which is the same repo. `close` merges the wrapper branch into the wrapper's default branch
+once the feature is settled; nothing here does.
+
 ## Re-deliver
 
 After a feedback cycle the branch already tracks the remote: no squash is offered, the
@@ -52,7 +63,8 @@ CLI missing: print the command with the rendered body's path, as for a first del
 Paths in the PR body are rendered as links to the file on the branch, so a reviewer can open
 the spec or the record from the PR. `<path>` is relative to the root of the repo that holds
 the file, `<branch>` from `state.yml`; in wrapper mode a path in the wrapper repo links to the
-wrapper's remote when it has one.
+wrapper's remote when it has one and the branch was pushed there ("Wrapper" above), else it
+stays a plain path.
 
 | `git.pr_host` | Link |
 |---|---|

@@ -575,3 +575,99 @@ Consequences: `git log` and the PR tell the same story; the record is longer but
 design's picture, which was the only copy; AC ids and evidence live only in the spec folder
 and git history, so a fix reads the behaviour and greps the tests. `deliver` now reads
 `design.md` and the source snapshots' `origin` headers.
+
+## 2026-10-09 M4: the wrapper branches per feature; close merges the wrapper branch
+
+Context: PLAN 2 wants a branch per feature in both repos and PLAN 3.1 says the wrapper is
+invisible to the client; the brief asked what `deliver` pushes, where the PR goes and what
+becomes of the wrapper branch. The wrapper has no reviewers, so a PR there is pointless,
+but the spec history of a feature should stay grouped and `docs/` written on the branch
+must reach the always-loaded copy on the wrapper's default branch.
+Decision: `start` creates the same branch name in the code repo and in the wrapper (from
+each repo's current branch, or default branch when a worktree is placed); every spec and
+docs commit lands on the wrapper branch. `deliver` pushes the code branch and opens the PR
+there; the wrapper branch is pushed only when the wrapper has an `origin` remote and
+`git.authority` ≥ `push`, else it stays local and the run says so. `close`, after its
+removal commit, merges the wrapper branch into the wrapper's default branch (`--no-ff`),
+deletes the local branch and pushes the default branch under the same rule; a conflict
+stops the run with the files named. specd never merges the code repo. Without worktrees
+the wrapper is sequential like embedded: one feature checked out at a time.
+Consequences: the wrapper's default branch holds the complete spec history as merge
+commits; a second parallel feature needs worktrees (next entry), because one checkout can
+be on one branch. The 2026-09-24 M2 git entry now reads for two repos: "commit" means in
+the repo that contains the path (`paths.md`, "Rules"), never per mode.
+
+## 2026-10-09 M4: worktrees are opt-in; a feature worktree is a wrapper worktree with the code worktree inside
+
+Context: parallel features need two checkouts of the code and, with a wrapper branch per
+feature, two checkouts of the wrapper too. A worktree of the code repo alone would leave
+the spec folder on a wrapper branch that is not checked out.
+Decision: `git.worktrees: false` by default in `specd.yml`, wrapper mode only, switched
+with `/specd:config git.worktrees=true`; embedded ignores it (the spec folder lives on the
+feature branch inside the one checkout, a second checkout would hide it). When on, `start`
+runs `scripts/worktree add`, which creates `<wrapper>/.worktrees/<feature>/` as a worktree
+of the wrapper repo on the feature branch and, inside it at the code folder's relative
+path, a worktree of the code repo on the same branch. The worktree is therefore a complete
+wrapper layout; `resolve-paths` from inside it finds its own `specd.yml` first, so
+`code_root`, `docs_root` and `spec_root` are the worktree's with no special casing, and
+`docs_root` inside the code repo lands in the worktree too. `resolve-paths --feature NAME`
+resolves from the worktree when run at the wrapper root; `state find` and `state list`
+scan `--worktrees <wrapper_root>/.worktrees` so the root sees every feature; `state.yml`
+gains `worktree` (relative to the wrapper root; `start` sets it, `close` clears it on
+`keep`). `close` removes both worktrees before the merge. `.worktrees/` is gitignored by
+init and by the script. The code worktree is a fresh checkout: `start` tells the user to
+install dependencies there before `implement`, naming `<runner> install` when
+`detect-commands` reports one; `run-checks` and `detect-commands --from <code_root>`
+already resolve the worktree's toplevel and find `specd.yml` upward.
+Consequences: the assistant is launched in the wrapper root (name the feature, or let
+`state find` ask) or in a feature worktree (one session per feature; the feature resolves
+from the cwd by branch). Opt-in keeps the single-feature wrapper free of a dependency
+install per feature; the key is one `config` call away.
+
+## 2026-10-09 M4: the gate hook stays out
+
+Context: the 2026-09-24 M2 entry deferred the hook to M4, when a worktree path or the code
+repo's branch could identify the feature.
+Decision: no gate hook. Every skill runs `state check` before anything else, so the hook
+could only guard code written outside a skill; it would cost a process per Edit/Write and
+would deny the user's own hand edits on a feature branch before G3. Third and last
+amendment of the M0 hook entry; PLAN 3.9 "gate enforcement" is read as `state check`.
+Consequences: revisit only on an observed case of code landing before G3 through the
+flow; the branch → feature lookup the hook would need exists (`state find --branch`).
+
+## 2026-10-09 M4: wrapper init; docs default to the wrapper; the code repo sits inside
+
+Context: PLAN 3.5 limits the wrapper interview to where `docs/` lands; the assistant's file
+tools reach only the folder it runs in.
+Decision: `/specd:init --wrapper [<folder|url>]`, or proposed when the current folder has
+no source files and exactly one nested git repo (`detect-repo` `nested_repos`, which also
+stops counting a nested repo's files as the wrapper's). The code repo must be a folder
+directly inside the wrapper: a path outside is refused with the hint to move or clone it
+in; a URL is cloned. Detection runs on the code repo; the wrapper's own `detect-repo`
+answers only `git`. The interview is the embedded one minus private mode plus the docs
+question: wrapper (default; zero files in the client repo) or `<project>/docs` (ships with
+the code, rides the feature branch, committed there once by init so the client tree is
+clean). `init-workspace --mode wrapper --code NAME [--docs REL]` writes the same files at
+the wrapper root plus a `.gitignore` with `NAME/` and `.worktrees/`; the generated
+CLAUDE.md gets one line naming the code folder and the launch rule, dropped in embedded
+mode. Launching inside the code folder is unsupported: no `specd.yml` is found and the
+wrapper's settings do not apply.
+Consequences: one `init-workspace` with a layout prefix per mode, embedded output
+unchanged byte for byte; the client repo's own CLAUDE.md is still read by Claude Code
+when its files are touched, its hooks and settings are not.
+
+## 2026-10-09 M4: built, not done; the real wrapper run is the user's
+
+Context: PLAN 5 makes M4 done when two features run in parallel on a client-style repo with
+zero files added to it. As with M2, the plugin's own verification is headless.
+Decision: the milestone is marked built. The headless run on a scratch client repo covered
+wrapper init (client untouched, PLAN 3.1 layout), two quick features in worktrees carried
+through start, specify, implement, review and deliver with `git.authority: commit`, one
+driven from inside its worktree with no argument and one from the wrapper root by name,
+`status` from the root listing both, `close` removing the worktrees and merging the wrapper
+branch, a third feature started with worktrees off (both repos on one branch name), and
+the same quick flow in embedded mode with unchanged commits. Not exercised: push and PR
+(no remote), `feedback`, `docs` in the code repo, a `close` merge conflict, and a code
+repo that needs a dependency install per worktree.
+Consequences: the "done" mark follows the user's first wrapper around a real client repo;
+the parts to watch are the per-worktree install and the merge at `close`.

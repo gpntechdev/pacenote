@@ -27,7 +27,7 @@ signal fires). `rerun: true` clears G2..G5 on write; ask first.
 - `<docs_root>/project.md`, `architecture/overview.md` and the area files it names,
   `conventions.md`, `data-models/` when present.
 - `<workspace_root>/specd.yml`: `models.judgment`, `flow.critic`, `git.authority`.
-- [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md),
+- [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md),
   [`../_shared/critic.md`](../_shared/critic.md).
 - [`./references/sections.md`](./references/sections.md),
   [`./references/architect-prompt.md`](./references/architect-prompt.md), `./templates/design.md`.
@@ -39,7 +39,7 @@ signal fires). `rerun: true` clears G2..G5 on write; ask first.
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths`, `detect-repo`, `state find`, `state check --step design`
+1. **Resolve** per `paths.md` ("Resolving for a feature"), `state check --step design`
    per `gates.md`. Set `step=design`.
 2. **Select sections.** Read `spec.md` and apply the signal table in `sections.md`. Approach
    and decisions are always in. Show the selection in at most six lines, each section with

@@ -3,12 +3,13 @@
 
 Usage:
   state init     --file PATH --feature NAME --tier TIER [--retention R] [--step S] [--branch B]
+                 [--worktree REL]
   state get      --file PATH [key ...]
   state set      --file PATH key=value [key=value ...]
   state check    --file PATH --step STEP
   state escalate --file PATH --to TIER [--signal S]
-  state find     --spec-root DIR [--feature NAME] [--branch BRANCH]
-  state list     --spec-root DIR
+  state find     --spec-root DIR [--worktrees DIR] [--feature NAME] [--branch BRANCH]
+  state list     --spec-root DIR [--worktrees DIR]
 
 Keys are `top` or `section.key`. `set` patches lines in place (comments, order and unknown
 keys survive), may add missing `tasks.<id>` keys, accepts `now` as an ISO-8601 UTC timestamp
@@ -19,7 +20,10 @@ review and docs once a PR is recorded), always sets `updated`, and is all-or-not
 up), or needs a reproduction first (fix features); `--step feedback` passes whenever a PR is
 recorded and the feature is not closed. `escalate` raises the tier, rewinds `step` to the
 first step the old order lacked, clears the gates from there on and keeps every file and
-done task. `find` resolves the feature by name, then by branch, then as the only open one.
+done task. `find` resolves the feature by name, then by branch, then as the only open one;
+`list` reports every feature. Both also scan the feature worktrees under `--worktrees DIR`
+(`DIR/<name>/`, each a workspace of its own, resolved through resolve-paths), so the
+wrapper root sees features that live in worktrees; rows carry `worktree`.
 The step order per tier lives here and nowhere else.
 Every command prints JSON; refusals print one line on stderr and exit 1. Stdlib only.
 """
@@ -27,11 +31,13 @@ import glob
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REFERENCE = os.path.join(PLUGIN_ROOT, "skills", "_shared", "state-yml.md")
+RESOLVE_PATHS = os.path.join(PLUGIN_ROOT, "scripts", "resolve-paths")
 LINE = re.compile(r"^(\s*)([A-Za-z_][\w-]*):(\s*)(.*?)(\s*#.*)?$")
 BARE = re.compile(r"^(true|false|-?\d+|[a-z_]+|[A-Z]\d+)$")
 STEPS = ["start", "specify", "design", "tasks", "implement", "review", "verify", "docs",
@@ -260,7 +266,8 @@ def cmd_init(argv):
     with open(path, "w", encoding="utf-8") as f:
         f.write(reference_default())
     pairs = [("feature", feature), ("tier", tier), ("step", step), ("retention", retention),
-             ("branch", opt(argv, "--branch", "")), ("created", "now")]
+             ("branch", opt(argv, "--branch", "")), ("worktree", opt(argv, "--worktree", "")),
+             ("created", "now")]
     changes = patch(path, [(k, v) for k, v in pairs if v != "" or k == "retention"])
     patch(path, [("updated", "now")])
     return {"file": os.path.abspath(path), "created": True, "changes": changes}
@@ -403,19 +410,55 @@ def cmd_escalate(argv):
             "tasks_done": sum(1 for v in tasks.values() if v == "done"), "changes": changes}
 
 
-def features(spec_root):
-    out = []
-    for path in sorted(glob.glob(os.path.join(spec_root, "*", "state.yml"))):
+def spec_roots(root, worktrees):
+    """The main spec root, then the spec root of each worktree under WORKTREES."""
+    roots = [root]
+    if not worktrees or not os.path.isdir(worktrees):
+        return roots
+    for wt in sorted(glob.glob(os.path.join(os.path.abspath(worktrees), "*", ""))):
+        wt = wt.rstrip(os.sep)
         try:
-            data = load(path)
-        except ValueError as e:
-            out.append({"feature": os.path.basename(os.path.dirname(path)), "path": path,
-                        "error": str(e)})
-            continue
-        data["path"] = path
-        data.setdefault("feature", os.path.basename(os.path.dirname(path)))
-        out.append(data)
+            r = subprocess.run([sys.executable, RESOLVE_PATHS, "--from", wt],
+                               capture_output=True, text=True)
+            resolved = json.loads(r.stdout) if r.returncode == 0 else None
+        except (OSError, ValueError):
+            resolved = None
+        if resolved and resolved.get("workspace_root") == wt:
+            roots.append(resolved["spec_root"])
+    return roots
+
+
+def worktree_root(path):
+    """The `.worktrees/<name>` folder holding PATH, or "" when it is not in a worktree."""
+    d = os.path.dirname(os.path.abspath(path))
+    while True:
+        parent = os.path.dirname(d)
+        if parent == d:
+            return ""
+        if os.path.basename(parent) == ".worktrees":
+            return d
+        d = parent
+
+
+def features(root, worktrees=None):
+    out = []
+    for spec_root in spec_roots(root, worktrees):
+        for path in sorted(glob.glob(os.path.join(spec_root, "*", "state.yml"))):
+            row = {"feature": os.path.basename(os.path.dirname(path)), "path": path,
+                   "worktree": worktree_root(path)}
+            try:
+                data = load(path)
+            except ValueError as e:
+                row["error"] = str(e)
+                out.append(row)
+                continue
+            data.update(row)
+            out.append(data)
     return out
+
+
+def found(f, by):
+    return {"feature": f["feature"], "path": f["path"], "worktree": f.get("worktree", ""), "by": by}
 
 
 def cmd_find(argv):
@@ -423,21 +466,24 @@ def cmd_find(argv):
     if not root:
         raise ValueError("find needs --spec-root")
     name, branch = opt(argv, "--feature"), opt(argv, "--branch")
+    worktrees = opt(argv, "--worktrees")
     if name:
         name = name.strip("/").split("/")[-1]
-        path = os.path.join(root, name, "state.yml")
-        if not os.path.isfile(path):
-            raise ValueError("no feature %s under %s" % (name, root))
-        return {"feature": name, "path": path, "by": "argument"}
-    all_ = [f for f in features(root) if "error" not in f]
+        for spec_root in spec_roots(root, worktrees):
+            path = os.path.join(spec_root, name, "state.yml")
+            if os.path.isfile(path):
+                return found({"feature": name, "path": path, "worktree": worktree_root(path)},
+                             "argument")
+        raise ValueError("no feature %s under %s" % (name, root))
+    all_ = [f for f in features(root, worktrees) if "error" not in f]
     if branch:
         hits = [f for f in all_ if f.get("branch") == branch]
         if len(hits) == 1:
-            return {"feature": hits[0]["feature"], "path": hits[0]["path"], "by": "branch"}
+            return found(hits[0], "branch")
     open_ = [f for f in all_ if f.get("step") != "closed"]
     if len(open_) == 1:
-        return {"feature": open_[0]["feature"], "path": open_[0]["path"], "by": "only open"}
-    names = [f["feature"] for f in open_]
+        return found(open_[0], "only open")
+    names = [f["feature"] + (" (worktree)" if f.get("worktree") else "") for f in open_]
     print(json.dumps({"candidates": names}, indent=2))
     raise ValueError("no feature given and %d open: %s" % (len(names), ", ".join(names) or "none"))
 
@@ -447,7 +493,7 @@ def cmd_list(argv):
     if not root:
         raise ValueError("list needs --spec-root")
     out = []
-    for f in features(root):
+    for f in features(root, opt(argv, "--worktrees")):
         if "error" in f:
             out.append(f)
             continue
@@ -471,7 +517,7 @@ def cmd_list(argv):
             "feature": f["feature"], "tier": f.get("tier", ""), "step": step, "next": nxt,
             "escalated": triage.get("escalated", ""),
             "retention": f.get("retention", ""), "branch": f.get("branch", ""),
-            "pr": f.get("pr", ""),
+            "pr": f.get("pr", ""), "worktree": f.get("worktree", ""),
             "gates": {g: bool(str(gates.get(g, "")).strip()) for g in ("G1", "G2", "G3", "G4", "G5")},
             "tasks": counts,
             "review": {"round": review.get("round", 0), "open": review.get("open", 0)},

@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
-"""Create the embedded specd workspace in a repo. Idempotent; prints a JSON report.
+"""Create the specd workspace in a repo. Idempotent; prints a JSON report.
 
-Usage: init-workspace --root REPO [--private]
+Usage: init-workspace --root DIR [--mode embedded|wrapper] [--code NAME] [--docs REL] [--private]
 
-Creates .specd/ with its folders, .specd/specd.yml (copied from the plugin's reference),
-.specd/docs/lessons.md, merges the no-attribution setting into .claude/settings.json, adds
-Context7 to .mcp.json and inserts the pointer block into CLAUDE.md between the specd markers.
---private keeps everything out of the team's view: files go to CLAUDE.local.md and
-.claude/settings.local.json, .mcp.json is skipped and .specd/ is git-excluded.
+Embedded (default): creates .specd/ with its folders, .specd/specd.yml (copied from the
+plugin's reference), .specd/docs/lessons.md, merges the no-attribution setting into
+.claude/settings.json, adds Context7 to .mcp.json and inserts the pointer block into
+CLAUDE.md between the specd markers. --private keeps everything out of the team's view:
+files go to CLAUDE.local.md and .claude/settings.local.json, .mcp.json is skipped and
+.specd/ is git-excluded.
+Wrapper: the same files at the root of DIR (specd.yml, docs/, spec/, sources/), --code NAME
+names the code repo folder inside DIR, which is gitignored together with .worktrees/;
+--docs REL (default docs) puts the docs folder elsewhere, e.g. NAME/docs to ship them with
+the code. --private is refused: the wrapper is the user's own repo.
 Each artifact is reported as created, merged or skipped. Exit 1 on refusal. Stdlib only.
 """
 import json
@@ -16,15 +21,17 @@ import re
 import sys
 
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DOCS_REL = ".specd/docs"
-FOLDERS = [".specd", ".specd/docs", ".specd/docs/architecture", ".specd/docs/decisions",
-           ".specd/docs/data-models", ".specd/docs/features", ".specd/spec", ".specd/sources"]
+LAYOUT = {"embedded": ".specd/", "wrapper": ""}  # folder prefix of the workspace files
+SUBFOLDERS = ["", "docs", "docs/architecture", "docs/decisions", "docs/data-models",
+              "docs/features", "spec", "sources"]
 BEGIN, END = "<!-- specd:begin -->", "<!-- specd:end -->"
 CONTEXT7 = {"type": "http", "url": "https://mcp.context7.com/mcp"}
 MCP_HINT = "run: claude mcp add --transport http context7 https://mcp.context7.com/mcp"
 EXCLUDES = [".specd/", "CLAUDE.local.md", ".claude/settings.local.json"]
+WORKTREES = ".worktrees/"
 
-report = {"private": False, "created": [], "merged": [], "skipped": [], "warnings": []}
+report = {"mode": "embedded", "private": False, "created": [], "merged": [], "skipped": [],
+          "warnings": []}
 
 
 def fail(msg):
@@ -55,8 +62,15 @@ def skip(path, reason):
     report["skipped"].append({"path": path, "reason": reason})
 
 
-def ensure_folders(root):
-    for rel in FOLDERS:
+def ensure_folders(root, prefix, docs_rel):
+    for rel in SUBFOLDERS:
+        if rel.startswith("docs"):
+            rel = docs_rel + rel[len("docs"):]
+        else:
+            rel = prefix + rel
+        rel = rel.rstrip("/")
+        if not rel:
+            continue
         p = os.path.join(root, rel)
         if os.path.isdir(p):
             skip(p, "exists")
@@ -152,17 +166,12 @@ def git_dir(root):
     return None
 
 
-def ensure_excludes(root):
-    gd = git_dir(root)
-    if not gd or not os.path.isdir(gd):
-        report["warnings"].append("cannot resolve the git dir; add %s to .git/info/exclude by hand"
-                                  % ", ".join(EXCLUDES))
-        return
-    path = os.path.join(gd, "info", "exclude")
+def ensure_lines(path, lines, label):
+    """Append the missing LINES to the text file at PATH (created when absent)."""
     existing = read(path).splitlines() if os.path.exists(path) else []
-    missing = [x for x in EXCLUDES if x not in existing]
+    missing = [x for x in lines if x not in existing]
     if not missing:
-        skip(path, "excludes present")
+        skip(path, "%s present" % label)
         return
     text = "\n".join(existing + missing) + "\n"
     existed = os.path.exists(path)
@@ -170,15 +179,58 @@ def ensure_excludes(root):
     (report["merged"] if existed else report["created"]).append(path)
 
 
+def ensure_excludes(root):
+    gd = git_dir(root)
+    if not gd or not os.path.isdir(gd):
+        report["warnings"].append("cannot resolve the git dir; add %s to .git/info/exclude by hand"
+                                  % ", ".join(EXCLUDES))
+        return
+    ensure_lines(os.path.join(gd, "info", "exclude"), EXCLUDES, "excludes")
+
+
+def render_claude_md(template, docs_rel, code):
+    """Fill the placeholders; lines about the code folder exist only in wrapper mode."""
+    lines = [l for l in template.splitlines() if code or "{{code_root}}" not in l]
+    text = "\n".join(lines) + "\n"
+    return text.replace("{{docs_root}}", docs_rel).replace("{{code_root}}", code or "")
+
+
+def opt(argv, flag, default=None):
+    if flag in argv:
+        i = argv.index(flag)
+        if i + 1 >= len(argv) or argv[i + 1].startswith("--"):
+            raise ValueError("%s needs a value" % flag)
+        return argv[i + 1]
+    return default
+
+
 def main(argv):
     if "--help" in argv or "-h" in argv:
         print(__doc__.strip())
         return 0
-    if "--root" not in argv or argv.index("--root") + 1 >= len(argv):
-        return fail("--root REPO is required")
-    root = os.path.abspath(argv[argv.index("--root") + 1])
+    try:
+        root, mode = opt(argv, "--root"), opt(argv, "--mode", "embedded")
+        code, docs_rel = opt(argv, "--code"), opt(argv, "--docs")
+    except ValueError as e:
+        return fail(str(e))
+    if not root:
+        return fail("--root DIR is required")
+    if mode not in LAYOUT:
+        return fail("--mode must be embedded or wrapper")
+    root = os.path.abspath(root)
     private = "--private" in argv
-    report["private"] = private
+    report["mode"], report["private"] = mode, private
+    prefix = LAYOUT[mode]
+    if mode == "wrapper":
+        if private:
+            return fail("--private does not apply to a wrapper; it is your own repo")
+        if not code or os.sep in code or code in (".", ".."):
+            return fail("--code NAME (the code folder inside the wrapper) is required")
+        if not os.path.exists(os.path.join(root, code, ".git")):
+            return fail("%s is not a git repository inside %s" % (code, root))
+    elif code or docs_rel:
+        return fail("--code and --docs apply to --mode wrapper only")
+    docs_rel = docs_rel or prefix + "docs"
     if not os.path.isdir(root):
         return fail("no such directory: %s" % root)
     if not os.path.exists(os.path.join(root, ".git")):
@@ -191,9 +243,9 @@ def main(argv):
     except (OSError, ValueError, KeyError) as e:
         return fail("plugin files unreadable: %s" % e)
 
-    ensure_folders(root)
-    ensure_file(os.path.join(root, ".specd", "specd.yml"), config)
-    ensure_file(os.path.join(root, DOCS_REL, "lessons.md"), lessons)
+    ensure_folders(root, prefix, docs_rel)
+    ensure_file(os.path.join(root, prefix + "specd.yml"), config)
+    ensure_file(os.path.join(root, docs_rel, "lessons.md"), lessons)
     settings = ".claude/settings.local.json" if private else ".claude/settings.json"
     merge_settings(os.path.join(root, settings), attribution)
     if private:
@@ -202,9 +254,11 @@ def main(argv):
     else:
         merge_mcp(os.path.join(root, ".mcp.json"))
     target = "CLAUDE.local.md" if private else "CLAUDE.md"
-    insert_block(os.path.join(root, target), claude_md.replace("{{docs_root}}", DOCS_REL))
+    insert_block(os.path.join(root, target), render_claude_md(claude_md, docs_rel, code))
     if private:
         ensure_excludes(root)
+    if mode == "wrapper":
+        ensure_lines(os.path.join(root, ".gitignore"), [code + "/", WORKTREES], "ignores")
     path = os.path.join(root, target)
     if os.path.exists(path) and read(path).count("\n") > 60:
         report["warnings"].append("%s exceeds 60 lines; trim what is outside the specd markers" % path)

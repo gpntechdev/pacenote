@@ -35,7 +35,8 @@ A `state.yml` with another `step` means resume from that step.
   `## Testing strategy`. `<docs_root>/conventions.md` when present.
 - `<workspace_root>/specd.yml`: `project`, `flow.tdd`.
 - [`../_shared/principles.md`](../_shared/principles.md), read before writing any file.
-- [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md).
+- [`../_shared/paths.md`](../_shared/paths.md) (which repo commits what),
+  [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md).
 - `./templates/tasks.md`.
 
 ## Outputs
@@ -57,7 +58,7 @@ A `state.yml` with another `step` means resume from that step.
    in the stack's mainstream layout, then run its done-when command and flip the task to
    `done` in `state.yml`. Tooling versions: the ones `overview.md` names; when it names none,
    the latest stable that the package manager resolves, recorded in the manifest.
-4. **Prove it.** Run `"${CLAUDE_PLUGIN_ROOT}/scripts/detect-commands"`; run build, test and
+4. **Prove it.** Run `"${CLAUDE_PLUGIN_ROOT}/scripts/detect-commands" --from <code_root>`; run build, test and
    lint (and typecheck, format check when present). A failing command gets at most three
    repair attempts; after that, stop, leave `state.yml` at `implement`, and end with the
    handoff block naming the failing command and its last output.
@@ -66,8 +67,10 @@ A `state.yml` with another `step` means resume from that step.
 6. **Record.** Run `"${CLAUDE_PLUGIN_ROOT}/scripts/config-set" --file <config>` with each
    non-empty `commands.*`. Replace the `## Run, test, lint` and `## Layout` sections of
    `<docs_root>/project.md` with the real commands and tree. Set `step: closed`.
-7. **Commit.** `chore: scaffold project skeleton` in `<code_root>`, covering the skeleton, the
-   spec folder and the docs change (one repo in embedded mode), no attribution.
+7. **Commit.** `chore: scaffold project skeleton` with `git -C <code_root>` covering the
+   skeleton, and the spec folder and docs change with it when they are in the same repo
+   (embedded); in a wrapper those two go in a second commit of the same message with
+   `git -C <workspace_root>`. No attribution.
 8. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Next`: `/specd:start <feature>`;
    mention `/specd:toolsmith` as the later step for project skills and MCPs. Note that
    `<spec_root>/scaffold/` is a closed quick feature with `retention: clean`;

@@ -19,7 +19,8 @@ next. It is safe to run at any time and never asks a question.
 - `resolve-paths`, `detect-repo` (current branch), `"${CLAUDE_PLUGIN_ROOT}/scripts/state"
   list` and `state find`.
 - `<workspace_root>/specd.yml`: `flow.keep_days`.
-- [`../_shared/state-yml.md`](../_shared/state-yml.md) (step meanings).
+- [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/state-yml.md`](../_shared/state-yml.md)
+  (step meanings).
 
 ## Outputs
 
@@ -27,17 +28,20 @@ next. It is safe to run at any time and never asks a question.
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths` (no config: `run /specd:init first`), `detect-repo`.
-2. **List.** `state list --spec-root <spec_root>`. No features: say so, `Next:
+1. **Resolve.** `resolve-paths` (no config: `run /specd:init first`), `detect-repo --from
+   <code_root>` (`paths.md`).
+2. **List.** `state list --spec-root <spec_root> --worktrees <wrapper_root>/.worktrees`. No features: say so, `Next:
    /specd:start <feature>`. Otherwise print one table: feature, tier (`quick→full` when
    `escalated` is set), step, gates as `G1 G2 G3 G4 G5` with `x` for approved, `.`
    otherwise and `-` for a gate the tier never passes, tasks `done/total`, review
-   `round/open`, PR (`yes` or `-`), updated date. A feature the script reports with an
+   `round/open`, PR (`yes` or `-`), updated date, and a worktree column (`.worktrees/<name>`
+   or `-`) when any row has one. A feature the script reports with an
    `error` gets a row saying `state.yml unreadable: <reason>`.
 3. **Warn.** Every feature with `step: closed` whose `updated` is older than `flow.keep_days`
    days: one line, `<feature> kept for <n> days; /specd:close <feature> cleans
    it (spec-clean arrives with M7)`.
-4. **Point.** Resolve the feature: the argument, else `state find --branch <current>` (an
+4. **Point.** Resolve the feature: the argument, else `state find --branch <current>
+   --worktrees <wrapper_root>/.worktrees` (an
    ambiguous result is not an error here: skip this step and say `name a feature to see
    its next command`). For the resolved feature, `Next` is `/specd:<next> <feature>` with
    `next` from the list output (the script turns `start` into the tier's first step and

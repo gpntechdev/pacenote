@@ -41,7 +41,7 @@ signed-off section.
 ## Protocol
 
 1. **Resolve.** Run `resolve-paths`. No config: say `run /specd:init first` and stop. Run
-   `detect-repo`; state the kind in one line ("brownfield: 412 source files"). The user may
+   `detect-repo --from <code_root>`; state the kind in one line ("brownfield: 412 source files"). The user may
    override it in the same turn.
 2. **Pick the section.** With an argument, that section; its existing files are inputs and are
    re-drafted. Without one, the first in the order project, architecture, conventions,

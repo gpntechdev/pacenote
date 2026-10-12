@@ -92,11 +92,15 @@ revised task, `<commit line> (G4 edit)`, prefixed per the rule below.
   the first push. Once `pr` is set (fixes from `feedback`, or any later task), there is no
   prefix: those commits are pushed to the open PR as they are and stay in the history.
 - Message: the task's `commit:` line, verbatim, under the prefix rule. Files: the agent's `## Changed`
-  plus the files it named under `## Deviations`, plus `state.yml` with the task flipped to
-  `done`. Anything else `git status` shows stays unstaged and is mentioned in the handoff.
+  plus the files it named under `## Deviations`, committed with `git -C <code_root>`, plus
+  `state.yml` with the task flipped to `done` when it lives in the same repo (embedded). In
+  a wrapper the spec folder is another repo: `state.yml` is not committed per task; it rides
+  in the end-of-run `spec(<feature>): implement` commit below. Anything else `git status`
+  shows stays unstaged and is mentioned in the handoff.
 - The end-of-run repair commits as `fix(<scope>): make <check> pass` (same prefix rule), scope as in the
-  feature's tasks. G4 stamps and the final `step=next` ride in `spec(<feature>): implement`
-  when the run ends with `state.yml` dirty.
+  feature's tasks. G4 stamps, task flips not yet committed and the final `step=next` ride in
+  `spec(<feature>): implement` (`git -C <workspace_root>`) when the run ends with
+  `state.yml` dirty.
 - `git.authority: none`: no commit; the task still flips to `done` and the handoff says the
   tree holds uncommitted work.
 

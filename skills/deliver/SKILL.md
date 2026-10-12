@@ -27,8 +27,9 @@ every re-run after a feedback cycle.
 
 ## Inputs
 
-- `resolve-paths`, `detect-repo` (default branch, remote host, remote URL), `state find`,
-  `state check`, `run-checks`, `squash-wip`.
+- `resolve-paths`, `detect-repo` (default branch, remote host, remote URL of the code repo;
+  of the wrapper too, for its push and links), `state find`, `state check`, `run-checks`,
+  `squash-wip` ([`../_shared/paths.md`](../_shared/paths.md): the opening sequence).
 - `<spec_root>/<feature>/state.yml` (`tier`, `fix`), `spec.md`, `design.md` (Changes by
   area, Changed contracts, Risks), `review.md`, `tasks.md` (matrix, review-fix phases),
   each when present; `brief.md` (Sources; on trivial, the request itself) and the `origin`
@@ -48,8 +49,9 @@ every re-run after a feedback cycle.
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths`, `detect-repo`, `state find`, `state check --step deliver`
-   per `gates.md`.
+1. **Resolve** per `paths.md` ("Resolving for a feature"), `state check --step deliver` per
+   `gates.md`. Every git command below runs in `<code_root>`, the repo the PR is for,
+   unless it names the wrapper (`git.md`, "Wrapper").
 2. **Checks.** `"${CLAUDE_PLUGIN_ROOT}/scripts/run-checks" --from <code_root>`. Red: refuse
    with the failing tail, handoff `Next: /specd:implement <feature>`.
 3. **G5 view.** `git -C <code_root> log <default>..HEAD --oneline` (and, when the branch
@@ -58,8 +60,9 @@ every re-run after a feedback cycle.
    from `review.md`, the evidence (full: the matrix summary from `tasks.md`, ACs total, with
    test evidence, with a check, manual, accepted; quick: the last review round's AC table,
    covered / partial / missing counts; trivial: the brief's words and the checks that ran),
-   the docs written by `docs` or "none". Uncommitted changes in the tree: list them and
-   stop; they are committed by `implement` or by the user, never here.
+   the docs written by `docs` or "none". Uncommitted changes in `<code_root>` or in
+   `<workspace_root>`: list them and stop; they are committed by `implement` or by the
+   user, never here.
 4. **Change summary.** Draft it per `change-summary.md` from the tier's sources and the
    diff stat, print it in full under the G5 view (not a description of it) and write it to
    `<spec_root>/<feature>/change-summary.md`. It is what the squash commit and the PR will
@@ -79,15 +82,16 @@ every re-run after a feedback cycle.
    brief's words on trivial; the summary from `brief.md` or `spec.md`; what changed from
    the change summary; how to verify from the checks that ran and the evidence shown at G5;
    notes from `review.md`'s accepted findings and `design.md`'s open risks; links per
-   `git.md` "Links". `pr` not set and the choice was the draft: open it with the host's CLI.
-   `pr` already set: the push updates the open PR; say so with its URL, replace its
-   description per `git.md` "Re-deliver" and never open another. Record only, CLI missing
-   or `git.pr_host: none`: print the rendered body in full (the printout is the user's
-   copy), then the exact command and the compare URL when something was pushed. Delete the
-   rendered body and the summary file.
+   `git.md` "Links". `pr` not set and the choice was the draft: open it with the host's CLI,
+   run from `<code_root>`. `pr` already set: the push updates the open PR; say so with its
+   URL, replace its description per `git.md` "Re-deliver" and never open another. Record
+   only, CLI missing or `git.pr_host: none`: print the rendered body in full (the printout
+   is the user's copy), then the exact command and the compare URL when something was
+   pushed. Delete the rendered body and the summary file.
 7. **Record.** `state set gates.G5=now pr=<url or unchanged> step=close`, commit
-   `spec(<feature>): deliver`, push again when a push was chosen so the state commit is on
-   the remote.
+   `spec(<feature>): deliver` with `git -C <workspace_root>`; when a push was chosen, push
+   that repo too so the state commit is on the remote: the same push in embedded mode, the
+   wrapper rule of `git.md` "Wrapper" otherwise.
 8. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Produced`: the PR URL.
    `Review`: what the PR body claims; the `before` sha when a squash ran. `Next:
    /specd:close <feature>` once the PR is settled, then merge; second line

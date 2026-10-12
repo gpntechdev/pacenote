@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""Create, remove and list feature worktrees in a wrapper workspace, printed as JSON.
+
+Usage:
+  worktree add    --feature NAME --branch BRANCH [--from DIR]
+  worktree remove --feature NAME [--force] [--from DIR]
+  worktree list   [--from DIR]
+
+A feature worktree is `<wrapper>/.worktrees/NAME/`: a worktree of the wrapper repo on
+BRANCH, holding a worktree of the code repo on the same BRANCH at the code folder's
+relative path inside it, so the worktree is a complete wrapper layout (specd.yml, spec/,
+docs/, code). `add` creates BRANCH in each repo from its default branch when the branch
+does not exist yet, checks an existing branch out otherwise, is idempotent when the
+worktrees already exist, and keeps `.worktrees/` in the wrapper's .gitignore. `remove`
+removes the code worktree, then the wrapper worktree (git refuses a dirty tree unless
+--force) and prunes both repos; branches are left alone. Runs from the wrapper root only:
+refuses an embedded workspace and refuses to run from inside a worktree. Git errors are
+reported verbatim. Exit 1 on refusal. Stdlib only.
+"""
+import json
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+WORKTREES = ".worktrees"
+
+
+def opt(argv, flag, default=None):
+    if flag in argv:
+        i = argv.index(flag)
+        if i + 1 >= len(argv) or argv[i + 1].startswith("--"):
+            raise ValueError("%s needs a value" % flag)
+        return argv[i + 1]
+    return default
+
+
+def fail(msg):
+    print("specd: %s" % msg, file=sys.stderr)
+    return 1
+
+
+def script(name, *args):
+    r = subprocess.run([sys.executable, os.path.join(HERE, name)] + list(args),
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        raise ValueError((r.stderr or r.stdout).strip() or "%s failed" % name)
+    return json.loads(r.stdout)
+
+
+def git(root, *args):
+    p = subprocess.run(["git", "-C", root] + list(args), capture_output=True, text=True)
+    return p.returncode, (p.stdout or "").strip(), (p.stderr or "").strip()
+
+
+def wrapper(argv):
+    """The wrapper root, the code repo and the code folder's relative path; refuses otherwise."""
+    paths = script("resolve-paths", "--from", opt(argv, "--from", "."))
+    if paths["mode"] != "wrapper":
+        raise ValueError("worktrees need a wrapper workspace; this one is embedded")
+    if paths["worktree"]:
+        raise ValueError("run from the wrapper root %s, not from inside a worktree" % paths["wrapper_root"])
+    root, code = paths["workspace_root"], paths["code_root"]
+    rel = os.path.relpath(code, root)
+    if rel.startswith(".."):
+        raise ValueError("the code folder %s is outside the wrapper %s" % (code, root))
+    if not os.path.exists(os.path.join(code, ".git")):
+        raise ValueError("%s is not a git repository" % code)
+    return root, code, rel
+
+
+def branch_exists(repo, branch):
+    code, _, _ = git(repo, "rev-parse", "--verify", "--quiet", "refs/heads/" + branch)
+    return code == 0
+
+
+def add_one(repo, path, branch):
+    """Add the worktree of REPO at PATH on BRANCH; returns 'exists' or 'created'."""
+    if os.path.exists(os.path.join(path, ".git")):
+        return "exists"
+    if os.path.exists(path) and os.listdir(path):
+        raise ValueError("%s exists and is not a worktree; remove it first" % path)
+    if branch_exists(repo, branch):
+        args = ["worktree", "add", path, branch]
+    else:
+        base = script("detect-repo", "--from", repo).get("default_branch") or "HEAD"
+        args = ["worktree", "add", "-b", branch, path, base]
+    code, _, err = git(repo, *args)
+    if code != 0:
+        raise ValueError("git -C %s %s: %s" % (repo, " ".join(args), err))
+    return "created"
+
+
+def ensure_ignored(root):
+    path = os.path.join(root, ".gitignore")
+    lines = []
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    if WORKTREES + "/" in lines or WORKTREES in lines:
+        return False
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines + [WORKTREES + "/"]) + "\n")
+    return True
+
+
+def cmd_add(argv):
+    feature, branch = opt(argv, "--feature"), opt(argv, "--branch")
+    if not (feature and branch):
+        raise ValueError("add needs --feature and --branch")
+    if "/" in feature or feature in (".", ".."):
+        raise ValueError("feature must be a folder name")
+    root, code, rel = wrapper(argv)
+    path = os.path.join(root, WORKTREES, feature)
+    code_path = os.path.join(path, rel)
+    out = {"feature": feature, "branch": branch, "worktree": path, "code_root": code_path,
+           "relative": os.path.join(WORKTREES, feature)}
+    out["wrapper"] = add_one(root, path, branch)
+    out["code"] = add_one(code, code_path, branch)
+    out["gitignore"] = "added" if ensure_ignored(root) else "present"
+    return out
+
+
+def remove_one(repo, path, force):
+    if not os.path.exists(path):
+        return "absent"
+    args = ["worktree", "remove"] + (["--force"] if force else []) + [path]
+    code, _, err = git(repo, *args)
+    if code != 0:
+        raise ValueError("git -C %s %s: %s" % (repo, " ".join(args), err))
+    return "removed"
+
+
+def cmd_remove(argv):
+    feature = opt(argv, "--feature")
+    if not feature:
+        raise ValueError("remove needs --feature")
+    root, code, rel = wrapper(argv)
+    path = os.path.join(root, WORKTREES, feature)
+    code_path = os.path.join(path, rel)
+    force = "--force" in argv
+    out = {"feature": feature, "worktree": path}
+    out["code"] = remove_one(code, code_path, force)
+    out["wrapper"] = remove_one(root, path, force)
+    git(code, "worktree", "prune")
+    git(root, "worktree", "prune")
+    return out
+
+
+def cmd_list(argv):
+    root, code, rel = wrapper(argv)
+    base = os.path.join(root, WORKTREES)
+    out = []
+    _, text, _ = git(root, "worktree", "list", "--porcelain")
+    entry = {}
+    for line in text.splitlines() + [""]:
+        if not line:
+            path = entry.get("worktree", "")
+            if path.startswith(base + os.sep):
+                out.append({"feature": os.path.basename(path), "worktree": path,
+                            "branch": entry.get("branch", "").replace("refs/heads/", ""),
+                            "code_root": os.path.join(path, rel),
+                            "code": os.path.exists(os.path.join(path, rel, ".git"))})
+            entry = {}
+            continue
+        key, _, value = line.partition(" ")
+        entry[key] = value
+    return out
+
+
+COMMANDS = {"add": cmd_add, "remove": cmd_remove, "list": cmd_list}
+
+
+def main(argv):
+    if not argv or "--help" in argv or "-h" in argv:
+        print(__doc__.strip())
+        return 0 if argv else 2
+    cmd = argv[0]
+    if cmd not in COMMANDS:
+        return fail("unknown command %s; one of %s" % (cmd, ", ".join(COMMANDS)))
+    try:
+        result = COMMANDS[cmd](argv[1:])
+    except (ValueError, OSError) as e:
+        return fail(str(e))
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

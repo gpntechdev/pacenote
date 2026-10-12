@@ -5,6 +5,8 @@
 
 This repo uses specd, a spec-driven workflow. Project knowledge lives in `{{docs_root}}/`
 and is maintained by the workflow, not by hand in this file.
+The code is the repository in `{{code_root}}/`; this folder wraps it. Launch the assistant
+here (or in a feature worktree under `.worktrees/`), never inside `{{code_root}}/`.
 
 Always loaded:
 

@@ -26,7 +26,7 @@ review's AC table stands as evidence, trivial has no acceptance criteria).
 - `resolve-paths`, `state find`, `state check`, `run-checks`.
 - `<spec_root>/<feature>/tasks.md` (matrix), `spec.md` (AC text), `state.yml`.
 - `<workspace_root>/specd.yml`: `git.authority`.
-- [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md).
+- [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md).
 
 ## Outputs
 
@@ -36,8 +36,8 @@ review's AC table stands as evidence, trivial has no acceptance criteria).
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths`, `state find`, `state check --step verify` per `gates.md`.
-   Set `step=verify`.
+1. **Resolve** per `paths.md` ("Resolving for a feature"), `state check --step verify` per
+   `gates.md`. Set `step=verify`.
 2. **Run.** `"${CLAUDE_PLUGIN_ROOT}/scripts/run-checks" --from <code_root>`. Any red check:
    stop, show its tail, handoff `Next: /specd:implement <feature>`.
 3. **Automated evidence.** For each matrix row whose Test names a test case: `grep` the
@@ -51,7 +51,7 @@ review's AC table stands as evidence, trivial has no acceptance criteria).
    `tasks.md` under `Verify fixes`, `state set tasks.T<k>=todo step=implement`, handoff to
    `/specd:implement`) or to accept it with a reason written into the cell. All rows filled:
    `state set step=next` (`docs`, or `deliver` when `pr` is set: the record was written
-   before the PR), then commit.
+   before the PR), then commit with `git -C <workspace_root>`.
 6. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: manual and
    accepted rows. `Next: /specd:<step> <feature>` with the step reported; when it is
    `deliver` on a PR, one line: run `/specd:docs` first if the fixes changed what the

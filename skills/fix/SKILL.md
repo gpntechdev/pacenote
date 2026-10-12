@@ -25,8 +25,8 @@ feature, so no spec and no code can get ahead of it.
 - `<docs_root>/project.md`, `architecture/overview.md`, `conventions.md` when present.
 - `<workspace_root>/specd.yml`: `git.authority`, `git.ticket_key`, `models.cheap`,
   `models.execution`.
-- [`../start/SKILL.md`](../start/SKILL.md) steps 2–3 (intake, brief) and 6–7 (branch, commit),
-  followed as written; [`../_shared/state-yml.md`](../_shared/state-yml.md),
+- [`../start/SKILL.md`](../start/SKILL.md) steps 2 (place: the worktree), 3–4 (intake, brief)
+  and 7–8 (branch, commit), followed as written; [`../_shared/paths.md`](../_shared/paths.md); [`../_shared/state-yml.md`](../_shared/state-yml.md),
   [`../_shared/no-attribution.md`](../_shared/no-attribution.md) (branch `fix/<slug>`),
   [`../_shared/principles.md`](../_shared/principles.md) (path for the implementer).
 - [`./references/reproduce.md`](./references/reproduce.md): explorer prompt, test-only
@@ -42,17 +42,19 @@ feature, so no spec and no code can get ahead of it.
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths` (no config: `run /specd:init first`), `detect-repo`,
-   `detect-commands`. Feature name as in `start`. The folder exists: `fix.symptom` set and
+1. **Resolve.** `resolve-paths` (no config: `run /specd:init first`), `detect-repo --from
+   <code_root>`, `detect-commands --from <code_root>`. Feature name as in `start`. The folder exists: `fix.symptom` set and
    `fix.reproduced` empty → resume at step 4 (the brief is on disk); otherwise `already
    started; run /specd:status` and the handoff.
-2. **Intake and brief** per `start` steps 2–3. The brief's "Not said" must name expected
+2. **Place, intake and brief** per `start` steps 2–4 (the worktree, when `git.worktrees`
+   is on, exists before the brief is written). The brief's "Not said" must name expected
    behaviour and actual behaviour when the input gives only one of them; ask for the
    missing one before writing, in a single question.
 3. **State and branch.** `"${CLAUDE_PLUGIN_ROOT}/scripts/state" init --file <state.yml>
    --feature <feature> --tier quick --retention clean --branch <fix/<slug> or
    <KEY>-<n>-<slug>>`, then `state set triage.proposed=quick fix.symptom="<one line, no
-   double quotes>"`. Branch and commit per `start` steps 6–7, message `spec(<feature>): fix`.
+   double quotes>"`. Branch and commit per `start` steps 7–8 (`--worktree` on `state init` when step 2
+   placed one), message `spec(<feature>): fix`.
 4. **Localise** per `reproduce.md`: one `explorer` run at `models.cheap`; show at most ten
    lines of candidates, nearest tests and the test convention.
 5. **Reproduce** per `reproduce.md`: ask test or command; dispatch the test-only

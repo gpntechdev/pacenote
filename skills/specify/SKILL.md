@@ -31,8 +31,8 @@ before continuing.
   when the brief cites them.
 - `<workspace_root>/specd.yml`: `flow.critic`, `flow.tdd`, `models.judgment`, `git.authority`,
   `layers.*` (quick: the `layer` vocabulary for tasks).
-- [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md),
-  [`../_shared/critic.md`](../_shared/critic.md).
+- [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/gates.md`](../_shared/gates.md),
+  [`../_shared/state-yml.md`](../_shared/state-yml.md), [`../_shared/critic.md`](../_shared/critic.md).
 - `./templates/spec.md`, [`./references/interview.md`](./references/interview.md),
   [`./references/lite.md`](./references/lite.md) (quick: re-triage, tasks, the gate).
 
@@ -44,9 +44,9 @@ before continuing.
 
 ## Protocol
 
-1. **Resolve.** Run `resolve-paths`, `detect-repo`, then `"${CLAUDE_PLUGIN_ROOT}/scripts/state"
-   find --spec-root <spec_root> [--feature <arg>] --branch <current branch>` and `state check
-   --file <state.yml> --step specify` per `gates.md`. Set `step=specify` when it was `start`.
+1. **Resolve** per `paths.md` ("Resolving for a feature": `resolve-paths`, `state find`,
+   `detect-repo --from <code_root>`) and `state check --file <state.yml> --step specify`
+   per `gates.md`. Set `step=specify` when it was `start`.
 2. **Draft to disk first.** Copy `./templates/spec.md` to `<spec_root>/<feature>/spec.md`
    (draft marker on line 1) and fill what the brief already answers: problem, scope, out of
    scope, acceptance criteria, open questions (start with the brief's "Not said" list),

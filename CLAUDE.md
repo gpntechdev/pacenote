@@ -15,7 +15,7 @@ skills/_shared/   blocks referenced by many skills: handoff, gate protocol, prin
 agents/           subagent definitions
 hooks/            gate enforcement, secrets guardrail
 scripts/          deterministic helpers: validate, resolve-paths, detect-*, config-set,
-                  init-workspace, state, run-checks, squash-wip, pr-comments
+                  init-workspace, state, worktree, run-checks, squash-wip, pr-comments
 docs/             PLAN.md, DECISIONS.md, AUTHORING.md
 ```
 

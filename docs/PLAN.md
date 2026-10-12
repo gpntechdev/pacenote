@@ -2,7 +2,7 @@
 
 Name: **specd** (read "spec'd": spec-driven). Command prefix `/specd:`, config `specd.yml`, embedded folder `.specd/`.
 
-Status: v4, updated 2026-10-06. v2 reworked modes, folders, flow and init; v3 split init into commands and restructured `docs/`; v4 settles the remaining open questions (section 6). Progress: M0 and M1 done, M2 built and run on real features (DECISIONS 2026-10-05/06 record the amendments), M3 built and awaiting its week of mixed tasks (section 5). Git model amended by DECISIONS 2026-09-24: branch at `start`, commits per step. Light flows amended by DECISIONS 2026-10-06 M3: the step order per tier lives in `scripts/state`, specify-lite writes `spec.md` and `tasks.md`, trivial has G4 and G5.
+Status: v4, updated 2026-10-09. v2 reworked modes, folders, flow and init; v3 split init into commands and restructured `docs/`; v4 settles the remaining open questions (section 6). Progress: M0 and M1 done, M2 built and run on real features (DECISIONS 2026-10-05/06 record the amendments), M3 built and awaiting its week of mixed tasks, M4 built (section 5). Git model amended by DECISIONS 2026-09-24: branch at `start`, commits per step. Light flows amended by DECISIONS 2026-10-06 M3: the step order per tier lives in `scripts/state`, specify-lite writes `spec.md` and `tasks.md`, trivial has G4 and G5. Wrapper mode amended by DECISIONS 2026-10-09 M4: the wrapper branch is merged by `close`, worktrees are opt-in and hold the wrapper and the code, the gate hook stays out.
 
 ## 1. Goal and non-goals
 
@@ -56,10 +56,12 @@ my-project-ai/               # wrapper git repo
     auth/                    # one folder per feature: slug or ticket key
     TICKET-123/
   <project-name>/            # the code repo (gitignored); name from init
-  .worktrees/<feature>/      # gitignored; one worktree per parallel feature
+  .worktrees/<feature>/      # gitignored; opt-in (`git.worktrees`): a worktree of the wrapper
+                             # on the feature branch, holding a worktree of the code repo on
+                             # the same branch at <project-name>/ inside it
 ```
 
-Agents commit to two repos: code changes to the code repo (`git -C <code_root>`), spec and docs changes to the wrapper repo, with the same branch name per feature in both, so a feature's code and its spec history line up. At init you choose where `docs/` lands: in the wrapper (default, invisible to the client) or in the project repo (`docs_root` points there, the docs ship with the code). Both repos commit without AI attribution: the generated settings turn off Claude Code's co-author line, and the `deliver` skill forbids AI mentions in commit messages and PR bodies. Commit messages follow Conventional Commits; branch names carry the ticket key when the project uses one.
+Agents commit to two repos: code changes to the code repo (`git -C <code_root>`), spec and docs changes to the wrapper repo, with the same branch name per feature in both, so a feature's code and its spec history line up. The PR is the code repo's; `close` merges the wrapper branch into the wrapper's default branch and removes the worktree (DECISIONS 2026-10-09 M4). A feature worktree is a complete wrapper layout, so resolving paths from inside it needs no special case, and the assistant runs either in the wrapper root or in a worktree, one session per parallel feature. At init you choose where `docs/` lands: in the wrapper (default, invisible to the client) or in the project repo (`docs_root` points there, the docs ship with the code). Both repos commit without AI attribution: the generated settings turn off Claude Code's co-author line, and the `deliver` skill forbids AI mentions in commit messages and PR bodies. Commit messages follow Conventional Commits; branch names carry the ticket key when the project uses one.
 
 **Embedded mode.** Same layout minus the code folder: `specd.yml`, `docs/` and `spec/` live under `<repo>/.specd/`. If the team wants agent-maintained docs to be the real project docs, `docs_root` can point at the repo's existing `docs/`. Keeping the folder out of git for a team that shouldn't see it is a `.git/info/exclude` flag at init, not a separate mode.
 
@@ -221,7 +223,7 @@ Go into `docs/AUTHORING.md`; a validator script enforces the mechanical ones.
 - Subagents return a bounded summary with file:line pointers, never file dumps.
 - Deterministic work (command detection, static audit, state validation) is a script, not a prompt.
 - The generated CLAUDE.md stays under ~60 lines and only points to `docs/`.
-- Hooks are few: gate enforcement, and a secrets guardrail that denies reading or editing `.env`, key and credential files; `intake` redacts secret-looking strings when snapshotting external docs.
+- Hooks are few: a secrets guardrail that denies reading or editing `.env`, key and credential files; `intake` redacts secret-looking strings when snapshotting external docs. Gate enforcement is `state check` in every skill, not a hook (DECISIONS 2026-10-09 M4).
 
 ## 4. Repo layout (this folder)
 
@@ -246,7 +248,7 @@ Each milestone ends in something you use on a real task; findings go to `DECISIO
 | M1 | Init + onboard (embedded) | `init` (detection, `specd.yml`, CLAUDE.md, Context7), `onboard` with knowledge checklist, per-section state and resume, brownfield scans + gap interview, greenfield interviews + `scaffold` | Onboard on one real brownfield repo gives docs you'd sign off without context overflow; greenfield init + onboard + scaffold yields a project that builds and tests | done 2026-09-24; `config` skill added (see DECISIONS) |
 | M2 | Full flow | start (intake local/paste + triage), specify, design, tasks (+ test plan), implement, review (base), verify, deliver, close (`distill`/`clean`/`keep`), `status` | One real feature shipped as a draft PR; resume after `/clear` works. **MVP** | built 2026-09-24; awaiting the real-feature run (see DECISIONS) |
 | M3 | Light flows + critic | trivial, quick, `fix`, escalation, `critic` at gates, `critique` on demand | A week of mixed tasks without wanting to bypass the flow | built 2026-10-06; the week of mixed tasks is the user's (see DECISIONS) |
-| M4 | Wrapper + parallel | Wrapper init, two-repo commits, worktrees per feature | Two features in parallel on a client-style repo with zero files added to it | |
+| M4 | Wrapper + parallel | Wrapper init, two-repo commits, worktrees per feature | Two features in parallel on a client-style repo with zero files added to it | built 2026-10-09; headless smoke run of two parallel features on a scratch client repo (see DECISIONS) |
 | M5 | Sources | `url` adapter, first MCP adapter, snapshot + refresh | A ticket becomes an approved spec without copy-paste | |
 | M6 | Toolsmith + audit | `toolsmith` command, allowlist search, quarantine, two-stage audit, `skills.lock`, generation fallback, specialist reviewers, MCP recommendations | Audit catches a seeded malicious test skill; one community skill installed via the pipeline | |
 | M7 | Utils | research, analyze, docs-clean, spec-clean, lessons-prune, runtime-verify | — | |
@@ -260,4 +262,4 @@ All previously open questions are now decisions (see the v4 rows in section 2): 
 
 ## 7. Next step
 
-M3 is built; its done-when is a week of mixed tasks (trivial, quick, fixes, one escalation) on a real repo without wanting to bypass the flow. Findings go to `DECISIONS.md` first; the triage table (`skills/start/references/triage.md`) and the escalation signals are the parts most likely to need tuning. Then M4: wrapper mode, two-repo commits, worktrees per feature, and the gate hook revisited with worktrees.
+M3's week of mixed tasks (trivial, quick, fixes, one escalation) on a real repo continues on the user's side; findings go to `DECISIONS.md` first, the triage table (`skills/start/references/triage.md`) and the escalation signals being the parts most likely to need tuning. M4 is built: the first real wrapper around a client repo, with `git.worktrees` on for two features at once, is the run that closes it (dependency install per worktree and the `close` merge are the parts to watch). Then M5: the `url` adapter, the first MCP adapter, snapshot and refresh, with the isolating intake agent the 2026-09-24 sources entry deferred.

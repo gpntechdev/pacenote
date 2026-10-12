@@ -26,7 +26,7 @@ number of `## PR round` sections already in `review.md`, plus one.
 - `resolve-paths`, `detect-repo`, `state find`, `state check`, `pr-comments`.
 - `<spec_root>/<feature>/state.yml` (`pr`), `review.md`, `tasks.md`, `spec.md`.
 - `<workspace_root>/specd.yml`: `git.authority`.
-- [`../_shared/state-yml.md`](../_shared/state-yml.md),
+- [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/state-yml.md`](../_shared/state-yml.md),
   [`./references/comments.md`](./references/comments.md), [`../review/SKILL.md`](../review/SKILL.md)
   (step 5, how a finding becomes a task).
 
@@ -39,7 +39,7 @@ number of `## PR round` sections already in `review.md`, plus one.
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths`, `detect-repo`, `state find`, `state check --step
+1. **Resolve** per `paths.md` ("Resolving for a feature"), `state check --step
    feedback`. Round n as above; `since` = the date of the last `## PR round`, or none.
 2. **Fetch.** `"${CLAUDE_PLUGIN_ROOT}/scripts/pr-comments" --pr <pr> --from <code_root>
    [--since <date>]`. The script refuses (no CLI, unknown host): ask the user to paste the
@@ -61,7 +61,7 @@ number of `## PR round` sections already in `review.md`, plus one.
    /specd:implement <feature>`, then `verify` and `deliver` follow by themselves (`pr`
    being set routes them). No fixes: `state set review.open=0`, `step` unchanged, `Next:
    /specd:close <feature>` once the thread is settled. Commit `review.md`, `tasks.md`,
-   `state.yml`.
+   `state.yml` with `git -C <workspace_root>`.
 7. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: every reply,
    each under its comment URL, ready to post; skipped comments in one line.
 

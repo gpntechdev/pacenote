@@ -3,8 +3,8 @@
 Spec-driven development workflow for AI coding assistants, packaged as a Claude Code plugin.
 Read "spec'd". Stack-agnostic; lives inside a code repo (`.specd/`) or wraps around it.
 
-Status: M3 (light flows, escalation, `fix`, the critic) is built and awaiting a week of
-mixed tasks. See `docs/PLAN.md` for the plan of record and milestones.
+Status: M4 (wrapper mode, two-repo commits, feature worktrees) is built; M3's week of
+mixed tasks continues. See `docs/PLAN.md` for the plan of record and milestones.
 
 ## Install
 
@@ -34,6 +34,8 @@ brew install gh && gh auth login          # once per machine (glab for GitLab)
 cd <repo> && claude --plugin-dir /path/to/specd
 
 /specd:init                               # mechanical setup, one short interview
+/specd:init --wrapper <folder|url>        # or: your own repo around a client repo that
+                                          # must get no files; launch the assistant here
 /specd:onboard                            # one docs section per run: project, architecture,
                                           # conventions, data-models, decisions
 /specd:scaffold                           # greenfield only
@@ -68,6 +70,12 @@ escalates by hand and carries the work over.
 host, critic, model roles). `git.authority` in `specd.yml` caps what the flow may do with
 git: `none`, `commit`, `push` or `draft_pr` (default).
 
+In wrapper mode the spec folder and docs commit to the wrapper on a branch of the same
+name as the code branch; the PR is the code repo's and `close` merges the wrapper branch.
+`/specd:config git.worktrees=true` makes each `start` open the feature in
+`.worktrees/<feature>/` (wrapper and code worktrees together), so features run in
+parallel, one session per worktree or all from the wrapper root with the feature named.
+
 ## Layout
 
 ```
@@ -77,7 +85,7 @@ skills/_shared/   blocks referenced by many skills: gates, handoff, state, paths
 agents/           explorer, researcher, architect, critic, implementer, reviewer
 hooks/            secrets guardrail
 scripts/          deterministic helpers: validate, resolve-paths, detect-repo,
-                  detect-commands, config-set, init-workspace, state, run-checks, squash-wip,
+                  detect-commands, config-set, init-workspace, state, worktree, run-checks, squash-wip,
                   pr-comments
 docs/             PLAN.md, DECISIONS.md, AUTHORING.md
 ```

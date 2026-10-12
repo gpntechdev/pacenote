@@ -19,6 +19,8 @@ step: start                  # start | specify | design | tasks | implement | re
 retention: ""                # distill | clean | keep; empty = project default for the tier
 branch: ""                   # git branch created by start; empty when git.authority is none
 pr: ""                       # draft PR or MR URL written by deliver
+worktree: ""                 # wrapper mode with git.worktrees: ".worktrees/<feature>", relative to
+                             # the wrapper root; the feature's spec, docs and code live there
 
 gates:                       # ISO-8601 UTC timestamp when approved, empty otherwise
   G1: ""                     # spec approved
@@ -51,15 +53,21 @@ updated: ""                  # ISO-8601 UTC; every writer sets it
 
 ```
 state init     --file PATH --feature NAME --tier TIER [--retention R] [--step S] [--branch B]
+               [--worktree REL]
 state get      --file PATH [key ...]        # JSON of the whole file or the named keys
 state set      --file PATH key=value ...    # patch in place; `now` = current UTC timestamp;
                                             # `step=next` = the step after the current one
 state check    --file PATH --step STEP      # may STEP run? exit 1 with run_first otherwise
                                             # STEP feedback: ok when pr is set and not closed
 state escalate --file PATH --to TIER [--signal S]   # raise the tier, rewind step, clear gates
-state find     --spec-root DIR [--feature NAME] [--branch BRANCH]
-state list     --spec-root DIR              # every feature: step, next, gates, task counts
+state find     --spec-root DIR [--worktrees DIR] [--feature NAME] [--branch BRANCH]
+state list     --spec-root DIR [--worktrees DIR]    # every feature: step, next, gates, tasks
 ```
+
+`--worktrees DIR` makes `find` and `list` also scan the feature worktrees under `DIR`
+(`<wrapper_root>/.worktrees`); each is a workspace of its own and its features are
+reported with their `worktree` root. Outside wrapper mode the folder does not exist and the
+flag changes nothing.
 
 `set` may add `tasks.<id>` keys that do not exist yet; every other key must already be in
 the file. All-or-nothing: a refused key leaves the file untouched.
@@ -81,12 +89,16 @@ outside the tier's flow and names the escalation command.
 
 ## Finding the feature
 
-Every step takes an optional feature argument. Resolve it with `state find`, in this order:
+Every step takes an optional feature argument. Resolve it with `state find` (the full
+opening sequence is in [`paths.md`](./paths.md), "Resolving for a feature"), in this order:
 
-1. The argument, when given; it must name an existing folder under `<spec_root>`.
-2. The current git branch (from `detect-repo`), when exactly one feature's `branch` equals it.
-3. The only feature whose `step` is not `closed`.
-4. Otherwise the script lists the open candidates; ask the user which one and re-run.
+1. The argument, when given; it must name an existing folder under `<spec_root>` or under a
+   worktree's spec root.
+2. The current git branch of `<code_root>` (from `detect-repo`), when exactly one feature's
+   `branch` equals it. Inside a feature worktree this is always its feature.
+3. The only feature whose `step` is not `closed`, across the main root and the worktrees.
+4. Otherwise the script lists the open candidates (worktree ones marked); ask the user which
+   one and re-run.
 
 ## Rules for readers
 
@@ -104,8 +116,9 @@ Every step takes an optional feature argument. Resolve it with `state find`, in 
   `tasks.md` is approved; `implement` flips each to `done` as it lands, `skipped` with a
   reason in `tasks.md`; `review` appends ids for review fixes.
 - `updated` is set by the script on every write.
-- Owners: `branch`, `triage.proposed`, `triage.signals` by `start`; `triage.escalated` by
-  `state escalate` (run from `start --tier`, `specify` or `implement`); `pr` by `deliver`;
-  `review.*` by `review` (`review.open` also by `feedback`); `fix.*` by `fix`. A set `pr`
-  routes the fix loop through `step=next`: `review` and `docs` are skipped. Later
-  milestones add keys here and record them in `docs/DECISIONS.md`.
+- Owners: `branch`, `worktree`, `triage.proposed`, `triage.signals` by `start`;
+  `triage.escalated` by `state escalate` (run from `start --tier`, `specify` or
+  `implement`); `pr` by `deliver`; `review.*` by `review` (`review.open` also by
+  `feedback`); `fix.*` by `fix`; `worktree` is cleared by `close` when the folder is kept.
+  A set `pr` routes the fix loop through `step=next`: `review` and `docs` are skipped.
+  Later milestones add keys here and record them in `docs/DECISIONS.md`.

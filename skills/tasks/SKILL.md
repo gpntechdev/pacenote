@@ -27,7 +27,7 @@ clears G3..G5 on write; tasks already `done` stay `done`.
 - `<docs_root>/conventions.md` (test layout, naming, commit scopes), `project.md` (commands).
 - `<workspace_root>/specd.yml`: `flow.tdd`, `flow.gate_granularity`, `git.authority`,
   `layers.*` (the `layer` vocabulary).
-- [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md).
+- [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md).
 - `./templates/tasks.md`, [`./references/breakdown.md`](./references/breakdown.md).
 
 ## Outputs
@@ -38,7 +38,7 @@ clears G3..G5 on write; tasks already `done` stay `done`.
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths`, `detect-repo`, `state find`, `state check --step tasks` per
+1. **Resolve** per `paths.md` ("Resolving for a feature"), `state check --step tasks` per
    `gates.md`. Set `step=tasks`.
 2. **Draft.** Copy `./templates/tasks.md` to `<spec_root>/<feature>/tasks.md` and fill it
    per `breakdown.md` (a `tasks.md` that already exists, from a quick feature escalated to

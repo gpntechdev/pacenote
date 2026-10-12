@@ -31,7 +31,8 @@ that `state check` allows whenever a PR is recorded. Light tiers have fewer gate
 3. On **approve**: `state set gates.G<n>=now step=next` (the script picks the step after
    this one for the tier; its output names it, and that name is the handoff's `Next`),
    remove the artifact's draft marker, then commit the artifact when `git.authority` is not
-   `none`, then continue.
+   `none`, in the repo that contains it (`git -C <workspace_root>` for spec files, see
+   [`paths.md`](./paths.md) "Rules"), then continue.
 4. On **edit**: apply the change to the artifact on disk, then go back to step 1.
 5. On **reject**: leave `gates.G<n>` empty, set nothing else, and end with the handoff block
    (`Next` names this same command).
