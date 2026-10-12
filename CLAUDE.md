@@ -13,9 +13,10 @@ anything in this file. Record changes to decisions in `docs/DECISIONS.md`, not i
 skills/<name>/    SKILL.md (spine) + references/ + templates/
 skills/_shared/   blocks referenced by many skills: handoff, gate protocol, principles
 agents/           subagent definitions
-hooks/            gate enforcement, secrets guardrail
+hooks/            secrets guardrail, source guard
 scripts/          deterministic helpers: validate, resolve-paths, detect-*, config-set,
-                  init-workspace, state, worktree, run-checks, squash-wip, pr-comments
+                  init-workspace, state, worktree, run-checks, squash-wip, pr-comments,
+                  redact, fetch-source, refresh-source
 docs/             PLAN.md, DECISIONS.md, AUTHORING.md
 ```
 

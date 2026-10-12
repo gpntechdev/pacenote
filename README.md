@@ -40,7 +40,8 @@ cd <repo> && claude --plugin-dir /path/to/specd
                                           # conventions, data-models, decisions
 /specd:scaffold                           # greenfield only
 
-/specd:start <feature> --from <file>      # or paste the ticket text; brief + triage, you confirm
+/specd:start <feature> --from <file|url|PROJ-123>
+                                          # or paste the ticket text; brief + triage, you confirm
                                           # the tier (or pass --tier), branch
 /specd:specify <feature>                  # spec.md, critic pass, gate G1 (quick: tasks.md too, G1+G3)
 /specd:design <feature>                   # design.md by the architect agent, critic pass, gate G2
@@ -58,6 +59,7 @@ cd <repo> && claude --plugin-dir /path/to/specd
 /specd:fix <feature> "<symptom>"          # a bug: brief, reproduction first (failing test or a
                                           # command), then specify -> implement -> review -> deliver
 /specd:critique <path>                    # the critic over any spec, design or document, on demand
+/specd:refresh <feature>                  # re-fetch its sources, report what changed, name the gate
 ```
 
 Three tiers, proposed by triage at `start` and confirmed by you: **trivial** (`start →
@@ -67,7 +69,9 @@ that trips a signal mid-flow is offered an escalation; `/specd:start <feature> -
 escalates by hand and carries the work over.
 
 `/specd:config key=value` changes a setting later (gate granularity, TDD, retention, PR
-host, critic, model roles). `git.authority` in `specd.yml` caps what the flow may do with
+host, critic, model roles). `sources.mcp=atlassian` installs the Atlassian MCP server so a
+ticket key fetches the Jira issue and up to five linked pages; fetched pages are redacted
+before they are saved and summarised by an agent that cannot act on them. `git.authority` in `specd.yml` caps what the flow may do with
 git: `none`, `commit`, `push` or `draft_pr` (default).
 
 In wrapper mode the spec folder and docs commit to the wrapper on a branch of the same
@@ -82,11 +86,11 @@ parallel, one session per worktree or all from the wrapper root with the feature
 .claude-plugin/   plugin.json, marketplace.json
 skills/<name>/    SKILL.md spine + references/ + templates/
 skills/_shared/   blocks referenced by many skills: gates, handoff, state, paths, sources, critic
-agents/           explorer, researcher, architect, critic, implementer, reviewer
-hooks/            secrets guardrail
+agents/           explorer, intake, researcher, architect, critic, implementer, reviewer
+hooks/            secrets guardrail, source guard
 scripts/          deterministic helpers: validate, resolve-paths, detect-repo,
                   detect-commands, config-set, init-workspace, state, worktree, run-checks, squash-wip,
-                  pr-comments
+                  pr-comments, redact, fetch-source, refresh-source
 docs/             PLAN.md, DECISIONS.md, AUTHORING.md
 ```
 
