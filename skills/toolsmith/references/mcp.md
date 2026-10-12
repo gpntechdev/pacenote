@@ -1,6 +1,6 @@
 # MCP recommendations
 
-Read by `toolsmith` step 10. Context7 is installed by `init`. Everything else is proposed
+Read by `toolsmith` step 11. Context7 is installed by `init`. Everything else is proposed
 here from the stack and the sources, and installed only on the user's yes, by
 `init-workspace --add-mcp` (wrapper: the wrapper's `.mcp.json`; private mode: no file, a
 `claude mcp add` line to run instead).

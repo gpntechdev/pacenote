@@ -33,6 +33,13 @@ At most three, from what the code and docs actually use, most valuable first:
 - `<docs_root>/conventions.md` already answering a need in full is a reason to drop it:
   the implementer reads that file anyway.
 
+## Search query
+
+Each confirmed need gets one query for `skill-fetch find`: the framework or language
+plus the need's topic, two to five words, lower case, no project names, no code, no paths
+(`flutter state management`, `react testing library`, `express error handling`). The
+query is sent to skills.sh, so it says nothing the public could not see.
+
 ## The question
 
 Print one line per need, `layer · need`, numbered, then ask once: confirm all, edit the
