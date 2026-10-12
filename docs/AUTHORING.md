@@ -103,7 +103,7 @@ context-engineering rules in `docs/PLAN.md` section 3.9. Each rule is tagged `[v
 
 ## 12. Definition of done for a change to this repo
 
-- `scripts/validate`, `tests/test-audit` and `claude plugin validate .` pass.
+- `scripts/validate`, every `tests/test-*` and `claude plugin validate .` pass.
 - A changed convention or a new decision is recorded in `docs/DECISIONS.md`, not in chat and
   not in commit messages alone.
 - Commits follow Conventional Commits and carry no AI attribution line.

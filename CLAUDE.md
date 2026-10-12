@@ -17,7 +17,7 @@ hooks/            secrets guardrail, source guard (snapshots, skill quarantine)
 scripts/          deterministic helpers: validate, resolve-paths, detect-*, config-set,
                   init-workspace, state, worktree, run-checks, squash-wip, pr-comments,
                   redact, fetch-source, refresh-source, audit-static, skill-fetch, skill-lock
-tests/            test-audit + fixtures (seeded malicious skill, clean skill)
+tests/            test-audit, test-skill-find + fixtures
 docs/             PLAN.md, DECISIONS.md, AUTHORING.md
 ```
 
@@ -45,5 +45,5 @@ task has a verifiable done-when.
 
 - Naming: prefix `/specd:`, config `specd.yml`, embedded folder `.specd/`.
 - Use plan mode for anything that sets a convention others will copy.
-- Run `scripts/validate`, `tests/test-audit` and `claude plugin validate .` before finishing a task.
+- Run `scripts/validate`, `tests/test-*` and `claude plugin validate .` before finishing a task.
 - Commits: Conventional Commits, no AI attribution lines.

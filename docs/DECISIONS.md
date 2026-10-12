@@ -1047,3 +1047,69 @@ Not exercised:
 Consequences: "done" is the user's call, after a toolsmith run on a real repo. Watch how
 often the static stage blocks a wanted skill, and whether generated skills stay grounded
 in the code.
+
+## 2026-10-12 M6: candidates are discovered in the skills.sh index; the allowlist stays the boundary
+
+Context: on the user's Flutter test app, toolsmith found nothing and generated three
+mobile skills, although `flutter/agent-plugins` (the Flutter org's own repo, BSD-3,
+about 30 skills) exists. The allowlist held only `anthropics/skills`, so search never
+left it. The user asked for find-skills to find candidates and for the existing pipeline
+to do the rest.
+Research:
+- `find-skills` (vercel-labs/skills) is a prose skill around `npx skills find`. It vets
+  by installs (≥1K), source reputation and stars (≥100), then installs with `npx skills
+  add <repo@skill> -g -y`. That install follows the branch head and does not audit the
+  content.
+- `skills find` (skills 1.7.2, `src/find.ts`) is a thin wrapper over
+  `GET https://skills.sh/api/search?q=&limit=20[&owner=]`, sorted by installs, printing
+  ANSI text.
+- skills.sh shows Gen, Socket and Snyk audits on its HTML pages only; there is no API for
+  them.
+- claudemarketplaces.com is an HTML directory with no API.
+Decision:
+- `skill-fetch find` calls that same endpoint with stdlib urllib.
+  - It groups hits by GitHub repo, marks the allowlisted ones and drops non-GitHub
+    sources and archived repos.
+  - It adds stars, license and last push for at most 8 other repos.
+  - It returns names and numbers only.
+  - Shelling out to `npx skills find` would add Node and an unpinned npm package to
+    every run and would mean parsing coloured text, for the same results; it would also
+    break the stdlib-only rule (2026-09-22 M0).
+- toolsmith gains a Discover step (3):
+  - one query per need, built from framework plus topic, never code or names;
+  - one multi-select question over the repos not yet allowlisted, pre-selected only at
+    find-skills' thresholds (≥1K installs, ≥100 stars, a push in the last 12 months);
+  - `config-set --add skills.allowlist=<repo>` for each yes;
+  - the researcher then ranks only the folders the index hit, falling back to the full
+    listing at the pinned commit when a hit names no folder. The index can lag:
+    `flutter-managing-state` is still indexed but gone from the repo.
+- Fetch, both audit stages, the decision rule and install are unchanged. The report adds
+  the skills.sh page as further reading. Installing through `npx skills` is an
+  anti-pattern.
+- `skills.discovery: skills.sh | off` (default `skills.sh`; a missing key means
+  `skills.sh`). With `off`, search stays inside the allowlist. The queries are the only
+  thing sent to skills.sh.
+- GitHub API calls go anonymous first, then with `GITHUB_TOKEN`/`GH_TOKEN` (sent to
+  api.github.com only), then through `gh api`, as the skills CLI does. The smoke run
+  exhausted the anonymous 60 requests an hour, and a discovery run with three needs can
+  too.
+Calibration: `audit-static` over all 31 skills of `flutter/agent-plugins`@`0ef3972`:
+15 clean, 16 warn (doc URLs, one bundled script), 0 block.
+Headless smoke on a scratch Flutter app (Riverpod 3, go_router):
+- Needs were derived from the code.
+- Discovery offered six of 35 non-allowlisted repos: `flutter/agent-plugins` (named as
+  official), `affaan-m/ecc` and `jeffallan/claude-skills` pre-selected, the other three
+  marked low signal or unlicensed.
+- With "1 only", the repo was added. Both audit stages ran on `flutter-add-widget-test`
+  (clean/pass) and `flutter-setup-declarative-routing` (warn/pass; the auditor flagged a
+  `flutter create` step as beyond purpose). The first was installed at `0ef3972…` under
+  `layers.mobile` and committed.
+- The main thread made no quarantine reads.
+- With `skills.discovery=off`, no index call was made and the allowlist-only search found
+  nothing, which reproduces the user's original run.
+Not exercised: a repo with an expired or missing license chosen by the user; `--owner`;
+a token from the environment (the run used the `gh` fallback).
+Consequences: amends the "GitHub tarballs" entry. Search is wide and trust is narrow:
+the allowlist grows only by the user's yes, and every skill from any repo is still
+fetched at a commit and audited. Pre-selection leans on install counts, which skills.sh
+computes and which can be gamed; the audit, not the count, decides.
