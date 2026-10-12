@@ -2,7 +2,7 @@
 
 Name: **specd** (read "spec'd": spec-driven). Command prefix `/specd:`, config `specd.yml`, embedded folder `.specd/`.
 
-Status: v4, updated 2026-10-12. v2 reworked modes, folders, flow and init; v3 split init into commands and restructured `docs/`; v4 settles the remaining open questions (section 6). Progress: M0 and M1 done, M2 built and run on real features (DECISIONS 2026-10-05/06 record the amendments), M3 built and awaiting its week of mixed tasks, M4 built, M5 done (section 5). Git model amended by DECISIONS 2026-09-24: branch at `start`, commits per step. Light flows amended by DECISIONS 2026-10-06 M3: the step order per tier lives in `scripts/state`, specify-lite writes `spec.md` and `tasks.md`, trivial has G4 and G5. Wrapper mode amended by DECISIONS 2026-10-09 M4: the wrapper branch is merged by `close`, worktrees are opt-in and hold the wrapper and the code, the gate hook stays out. Sources amended by DECISIONS 2026-10-12 M5: adapters follow the input's shape, `sources.mcp` is one flat key, fetched text reaches the main thread only through the `intake` agent, redaction is a script run by a hook.
+Status: v4, updated 2026-10-12. v2 reworked modes, folders, flow and init; v3 split init into commands and restructured `docs/`; v4 settles the remaining open questions (section 6). Progress: M0 and M1 done, M2 built and run on real features (DECISIONS 2026-10-05/06 record the amendments), M3 built and awaiting its week of mixed tasks, M4 built, M5 done, M6 built (section 5). Git model amended by DECISIONS 2026-09-24: branch at `start`, commits per step. Light flows amended by DECISIONS 2026-10-06 M3: the step order per tier lives in `scripts/state`, specify-lite writes `spec.md` and `tasks.md`, trivial has G4 and G5. Wrapper mode amended by DECISIONS 2026-10-09 M4: the wrapper branch is merged by `close`, worktrees are opt-in and hold the wrapper and the code, the gate hook stays out. Sources amended by DECISIONS 2026-10-12 M5: adapters follow the input's shape, `sources.mcp` is one flat key, fetched text reaches the main thread only through the `intake` agent, redaction is a script run by a hook. Toolsmith amended by DECISIONS 2026-10-12 M6: skills land in the workspace's `.claude/skills/` (private: `.specd/skills/`), candidates are GitHub tarballs at a full commit, `skills.lock` is flat YAML written by a script, a stage-1 `block` or a stage-2 `refuse` cannot be overridden, `source-guard` fences the quarantine, specialists are one agent with four lens files switched by `flow.specialists`.
 
 ## 1. Goal and non-goals
 
@@ -234,7 +234,8 @@ ai-workflow/
   skills/_shared/
   agents/
   hooks/
-  scripts/               validate, detect-commands, audit-static
+  scripts/               validate, detect-commands, audit-static, skill-fetch, skill-lock, …
+  tests/                 test-audit + fixtures
   docs/                  PLAN.md, DECISIONS.md, AUTHORING.md
 ```
 
@@ -250,7 +251,7 @@ Each milestone ends in something you use on a real task; findings go to `DECISIO
 | M3 | Light flows + critic | trivial, quick, `fix`, escalation, `critic` at gates, `critique` on demand | A week of mixed tasks without wanting to bypass the flow | built 2026-10-06; the week of mixed tasks is the user's (see DECISIONS) |
 | M4 | Wrapper + parallel | Wrapper init, two-repo commits, worktrees per feature | Two features in parallel on a client-style repo with zero files added to it | built 2026-10-09; headless smoke run of two parallel features on a scratch client repo (see DECISIONS) |
 | M5 | Sources | `url` adapter, first MCP adapter, snapshot + refresh | A ticket becomes an approved spec without copy-paste | done 2026-10-12; headless smoke run on URL, injection, refresh, paste and wrapper paths; live Atlassian fetch not exercised (see DECISIONS) |
-| M6 | Toolsmith + audit | `toolsmith` command, allowlist search, quarantine, two-stage audit, `skills.lock`, generation fallback, specialist reviewers, MCP recommendations | Audit catches a seeded malicious test skill; one community skill installed via the pipeline | |
+| M6 | Toolsmith + audit | `toolsmith` command, allowlist search, quarantine, two-stage audit, `skills.lock`, generation fallback, specialist reviewers, MCP recommendations | Audit catches a seeded malicious test skill; one community skill installed via the pipeline | built 2026-10-12; headless smoke run: seeded skill refused by both stages, `anthropics/skills` `frontend-design` installed and pinned, generation fallback, `dbhub` MCP, one specialist pass (see DECISIONS) |
 | M7 | Utils | research, analyze, docs-clean, spec-clean, lessons-prune, runtime-verify | — | |
 | M8 | Portability + team | `install.sh` for Codex/Cursor, team-sharing guide, evals for key skills | Full flow runs on a second assistant | |
 
@@ -262,4 +263,4 @@ All previously open questions are now decisions (see the v4 rows in section 2): 
 
 ## 7. Next step
 
-M3's week of mixed tasks and M4's first real wrapper run continue on the user's side; findings go to `DECISIONS.md` first. M5 is done; the first authorised Jira ticket (`/specd:config sources.mcp=atlassian`, `/mcp` once, then `/specd:start <feature> --from PROJ-123`) is the run to watch for the Atlassian tool names in `agents/intake.md` and the five-page cap. Next is M6: `toolsmith` (allowlist search, quarantine, `skills.lock`, generation fallback), the two-stage `skill-audit` (a deterministic static script, then a `skill-auditor` agent with read-only tools and no network, reusing the data-not-instructions pattern of the `intake` agent and its guard), specialist reviewers and MCP recommendations. It is done when the audit catches a seeded malicious test skill and one community skill is installed through the pipeline.
+M3's week of mixed tasks and M4's first real wrapper run continue on the user's side; findings go to `DECISIONS.md` first. M6 is built: `/specd:toolsmith` on a real repo is the run to watch, in particular how often the static audit refuses a skill the user wanted (the calibration on `anthropics/skills` is in DECISIONS), whether generated skills stay grounded in the codebase, and `--update` once an allowlisted repo moves. Marking M6 done is the user's call. Next is M7: the utils (`research`, `analyze`, `docs-clean`, `spec-clean`, `lessons-prune`, `runtime-verify`); `runtime-verify` can lean on the `playwright` server toolsmith now proposes.

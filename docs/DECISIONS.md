@@ -805,3 +805,245 @@ still unexercised.
 Consequences: the Atlassian tool names in `agents/intake.md` and the five-page cap are
 checked on the first real ticket, and a mismatch goes here as a fix, not as a reopened
 milestone. PLAN section 7 now points to M6.
+
+## 2026-10-12 M6: skills live in the workspace's `.claude/skills/`; private mode keeps them in `.specd/skills/`
+
+Context: PLAN 3.1 puts generated project skills in the wrapper's `.claude/`, and `layers`
+paths are relative to `code_root`. The brief asked where installed and generated skills
+land in each mode. The user chose in the M6 question round.
+Decision: the skill home is derived by `scripts/skill-lock`, never asked or tested by a
+skill. Embedded: `<repo>/.claude/skills/<name>/`, committed, and also loaded by Claude
+Code. Wrapper: `<wrapper>/.claude/skills/<name>/`, so the client repo gets no files; its
+`layers` path is `../.claude/skills/...`. Private (`.specd/` in `.git/info/exclude`):
+`<workspace_root>/skills/<name>/`, excluded, reached only through `layers`.
+Consequences: a feature worktree carries the wrapper's skills, because they are committed
+in the wrapper. In private mode the skills do not auto-load in the main thread; the
+implementer and reviewer still read them first.
+
+## 2026-10-12 M6: candidates are GitHub tarballs at a full commit; the quarantine ignores itself
+
+Context: stdlib only (2026-09-22 M0). The quarantine must stay out of git and out of every
+folder Claude Code loads skills from. The user chose urllib over `git` in a subprocess.
+Decision: `scripts/skill-fetch`.
+- `list` resolves a ref to a commit and lists the folders holding a `SKILL.md`, from the
+  GitHub tree API. It returns names only, no content.
+- `fetch` takes only a 40-hex commit. It downloads `codeload` `tar.gz` and extracts only
+  the skill folder into `<workspace_root>/.quarantine/<name>-<sha7>/`. Links, devices,
+  absolute paths and `..` are never extracted; they are listed under `links`, and any
+  listed link refuses the install. Caps are 300 files and 10 MiB.
+- `stage` copies a local folder the same way.
+- `clean` empties the quarantine.
+- `.quarantine/` holds its own `*` `.gitignore`, so `init` writes nothing new.
+- `list` and `fetch` refuse any repo not in `skills.allowlist`. That is the enforcement;
+  the researcher's restriction to pinned raw URLs is prompt-level only.
+Consequences: GitHub only. Another forge is a new adapter in the script. The researcher
+(`mode: skill-search`) ranks candidates from the listed folders and fetches only
+`raw.githubusercontent.com/<repo>/<commit>/<folder>/SKILL.md`.
+
+## 2026-10-12 M6: `skills.lock` is flat YAML written by `skill-lock`; the hash covers the installed files
+
+Context: the flat parser (2026-09-22 M0) reads two levels with scalar values. A lock must
+pin the source and notice drift.
+Decision: `<workspace_root>/skills.lock` has one section per skill. The keys are
+`source` (`repo` | `local` | `generated`), `repo`, `path`, `commit`, `sha256`, `dir`
+(relative to `workspace_root`), `layer`, `verdict` and `audited`.
+- `sha256` hashes the sorted `(file sha256, path)` list of the installed folder.
+- `scripts/skill-lock` is the only writer:
+  - `install` copies from the quarantine. It refuses a `block` verdict, a source outside
+    the quarantine, and an existing unlocked folder (the user's own skill).
+  - `record` handles generated skills.
+  - `verify` reports `ok | modified | missing` per entry.
+  - `where` and `discard` serve generation (entry below).
+- Updates (`/specd:toolsmith --update`) follow a table in
+  `skills/toolsmith/references/audit.md`:
+  - an upstream move is re-fetched at the new commit and re-audited;
+  - a modified third-party skill is restored, or re-audited and re-pinned as `local`;
+  - a modified generated skill is re-pinned without an audit.
+Consequences: `layers` and the lock are separate on purpose. `layers` is what agents
+read; the lock is provenance. A skill removed from `layers` keeps its lock section until
+its name is installed again.
+
+## 2026-10-12 M6: audit severities, calibrated on `anthropics/skills`; refusals are final
+
+Context: PLAN 3.6 lists the static checks but not what a hit means. The first
+calibration run over the 20 folders of `anthropics/skills`@`dbd4588` blocked 7 of them,
+mostly on environment-variable names in docs (`$ANTHROPIC_API_KEY`, `process.env.PORT`)
+and a decoder call.
+Decision: `scripts/audit-static` has two severities.
+- `block`:
+  - hidden or bidi Unicode;
+  - long base64 or hex runs, escape runs, non-asset binaries;
+  - a download piped or substituted into a shell;
+  - bundled hooks, settings, plugin or MCP manifests, or a `hooks:` frontmatter key;
+  - env files, key files, credential stores and environment dumps;
+  - symlinks.
+- `warn`:
+  - URLs and network calls (LICENSE files exempt);
+  - bundled scripts;
+  - broad `allowed-tools`;
+  - a single env-var read;
+  - a decoder call;
+  - images and fonts.
+- Blocking findings sort first, before the 60-item cap. Matches are ASCII-escaped and
+  capped at 80 characters, because they reach the main thread.
+- The install is refused on any `block`, any extracted link, or a stage-2 `refuse` (an
+  unreadable answer counts as `refuse`).
+- No override inside specd. A user who still wants the skill installs it by hand, and
+  toolsmith does not record it.
+- After calibration, 3 of the 20 folders block: `claude-api` (a `curl | sh` line and
+  references to `.ssh/id_rsa`, `.env`), `skill-creator` (environment iteration in a
+  script) and `web-artifacts-builder` (a bundled `.tar.gz`). 12 warn and 5 are clean,
+  `frontend-design` among them.
+Consequences: a strict false positive pushes the need to generation, which is the safe
+direction. The real-repo signal to watch is how often a wanted skill blocks.
+
+## 2026-10-12 M6: the skill-auditor reads only the quarantine, and the quarantine only through it
+
+Context: PLAN 3.6 says stage two is an agent with read-only tools and no network that
+treats content as data. M5 showed that prose alone did not keep the main thread out of a
+fetched snapshot. The user chose a hook fence over tool restriction alone.
+Decision:
+- `agents/skill-auditor.md` has `Read, Grep, Glob` and runs at the judgment role. Its
+  answer is shaped like `intake`'s: `Status`, `Purpose`, `Files`, `Flagged` (`override |
+  exfiltrate | beyond-purpose | other` · `path:line` · one quoted line · "not followed")
+  and `Verdict: pass | refuse`. It refuses on any `override` or `exfiltrate`.
+- `hooks/source-guard` gains a fourth rule:
+  - a Read under `.quarantine/` is denied to everyone but `skill-auditor`;
+  - the auditor may Read nothing outside the quarantine;
+  - a tool Write into `.quarantine/` is denied to everyone, because only `skill-fetch`
+    fills it.
+- `scripts/validate` adds `skill-auditor` to `NO_ACT_AGENTS` (no WebFetch or WebSearch
+  means no network) and `specialist` to the read-only set.
+- Both stages always run, even when stage one already blocks. The report then shows what
+  each stage caught.
+Consequences: this is a new fence in an existing hook, as AUTHORING 9 requires an entry
+for. Grep and Bash on the quarantine are not inspected, the same boundary as the M5
+entry; the auditor's own Grep and Glob are scoped by its prompt. The auditor's quoted
+lines are the only fetched text the main thread sees.
+
+## 2026-10-12 M6: generated skills are drafted in `.drafts/` and moved into the home on approval
+
+Context: the first headless run wrote the generated skill straight into
+`.claude/skills/`. Claude Code treats that folder as protected, and the write needed an
+approval that `-p` could not give. Writing an unapproved draft where skills auto-load was
+also wrong on its own terms.
+Decision: `skill-lock where` creates an empty `<workspace_root>/.drafts/<name>/`. The
+folder holds a `*` `.gitignore`. The main thread writes the draft from
+`templates/project-skill.md`; the draft is grounded in an `explorer` map at the cheap role
+and cited `researcher`/Context7 facts at the judgment role. `audit-static` runs on the
+draft, and a `block` is fixed before the draft is shown. On approval, `skill-lock record
+--from <draft>` moves it into the home and pins it as `generated`; `discard` drops it.
+Generated skills get no stage-two audit: they are the project's own text, written from
+its code.
+Consequences: every write into a skill home is a script's (`install`, `record`). The
+anti-patterns in the spine forbid writing there directly.
+
+## 2026-10-12 M6: `config-set --add` / `--remove` edit list keys; `layers.<name>` opens on first add
+
+Context: M1 made `config-set` refuse list keys. The 2026-10-06 entry left `layers` and
+`skills.allowlist` to be edited by hand until toolsmith.
+Decision: `config-set --file F --add key=item ...` appends `- item` under a list key and
+skips an item that is already there; `--remove` deletes one. Under the `layers` section a
+missing key is created, so a new layer needs no hand edit. Scalars keep `key=value` and
+are refused with `--add`. The config skill's line "edited by hand until M6" becomes these
+two flags. The flat shape is unchanged: a layer is still a second-level key with a simple
+list.
+Consequences: toolsmith and `/specd:config` share one writer for lists. Amends the
+2026-09-22 M1 config-set entry and the 2026-10-06 layers entry.
+
+## 2026-10-12 M6: one `specialist` agent with four lens files; `flow.specialists: ask | off`
+
+Context: PLAN 3.4 names `security`, `performance`, `accessibility` and `tests` reviewers,
+run after the base reviewer in fresh context and routed by the main thread. The user chose
+"proposed from the diff, asked" over a fixed list or per-tier automation.
+Decision:
+- One read-only `agents/specialist.md` (judgment role). The lens checklist and its
+  severity scale live in `skills/review/references/specialists/<lens>.md`. Four agent
+  files would have repeated the same scope, answer shape and rules (AUTHORING 3).
+- `review` step 4: with `flow.specialists: ask` (the default; a missing key means `ask`),
+  the main thread proposes lenses from diff signals (`references/specialist-prompt.md`),
+  asks once with multi-select, and dispatches one fresh run per picked lens,
+  sequentially. Each run gets the base reviewer's findings as settled.
+- Findings carry the lens prefixes `SEC`, `PERF`, `A11Y` and `TEST`, with the lens as
+  `Ref`, in the same table and resolution loop. A specialist `blocker` makes the round
+  `fix first`.
+- Round 2 onwards proposes only the lenses whose signal fires on the fix tasks' files.
+Consequences: on `off` the review is unchanged. A per-lens agent with its own tools (a
+browser for accessibility) stays the escalation path from the 2026-10-06 entry.
+
+## 2026-10-12 M6: the MCP catalog grows to browser and database servers
+
+Context: PLAN 3.8 proposes browser/DevTools for frontend, a database server for backend
+and tracker/wiki servers for sources, installed only on confirmation. The reference
+`@modelcontextprotocol/server-postgres` is deprecated on npm.
+Decision: `init-workspace --add-mcp` adds four servers to its catalog.
+- `playwright` (`@playwright/mcp`) is the default browser server.
+- `chrome-devtools` (`chrome-devtools-mcp`) is the alternative.
+- `dbhub` (`@bytebase/dbhub`) covers PostgreSQL, MySQL, MariaDB, SQL Server, Oracle and
+  SQLite. Its connection comes from `env: {DSN: "${DATABASE_URL}"}`, never a literal.
+- `atlassian` is unchanged.
+- Private mode prints `claude mcp add` for stdio servers too, with the env var expanded
+  by the user's shell.
+- `skills/toolsmith/references/mcp.md` maps stack signals to servers and states the
+  follow-up for each, such as setting `DATABASE_URL` to a development database.
+Consequences: the servers run `@latest`, like Context7's URL. Pinning a version is the
+user's edit, which the handoff mentions. A stack outside the catalog gets no proposal; a
+new server is a script change.
+
+## 2026-10-12 M6: a local folder is a candidate too (`--from`)
+
+Context: the seeded malicious skill had to fail the full install path. It must not be
+published to GitHub, and a user may also be handed a skill folder by a colleague.
+Decision: `/specd:toolsmith --from <folder>` stages the folder with `skill-fetch stage`
+and runs both audit stages, the report and the decision exactly as for a fetched
+candidate. On approval it installs with `source: local` and no commit pin.
+Consequences: the allowlist governs search and fetch, not a folder the user hands over
+themselves; the audit and the approval still apply.
+
+## 2026-10-12 M6: built; smoke-tested headless
+
+Context: PLAN 5 makes M6 done when the audit catches a seeded malicious skill and one
+community skill is installed through the pipeline. As for M2 to M5, the plugin's own
+verification is headless (memory: headless smoke testing).
+Decision: the milestone is marked built. `tests/test-audit` checks every static
+category against `tests/fixtures/malicious-skill/` and finds nothing in the prose-only
+injection file or the clean fixture. The headless runs, logged as `stream-json`, used a
+scratch embedded repo (React 19 `web/`, Express 5 + `pg` `api/`):
+- `toolsmith --from` the seeded skill:
+  - stage 1 `block` (six blocking findings in five categories, three warn);
+  - stage 2 `refuse`, flagging the precedence override, the exfiltration through the
+    final answer and PR body, the "do not mention" line, the `.env` read and the hidden
+    reversed text;
+  - the prose-only `references/style.md` was flagged by stage 2 alone;
+  - nothing installed, lock and config untouched, no commit;
+  - every quarantine Read came from the `specd:skill-auditor` subagent.
+- A direct main-thread Read of a quarantined file was denied by the hook. The injected
+  text appears nowhere in that log.
+- `toolsmith` on the stack:
+  - Needs were derived from the code; there was no architecture overview. The user cut
+    them to two.
+  - The researcher fetched only pinned raw `SKILL.md` URLs of `anthropics/skills`.
+  - `frontend-design` audited `clean`/`pass` and was installed on yes at `dbd4588…`
+    with a tree hash, under `layers.frontend`.
+  - The backend need had no candidate, so `backend-express` was generated from an
+    explorer map and Context7 Express 5 facts: draft, `warn` (doc URLs), approved,
+    `source: generated`, `layers.backend`.
+  - Of the proposed `playwright` and `dbhub`, `dbhub` was accepted.
+  - One `chore(skills): …` commit holds six files. That run found the protected-folder
+    issue the drafts entry above fixes.
+- `review` on a quick feature with an injectable search endpoint:
+  - the base reviewer read both layer skills;
+  - all four lenses were proposed with their signals;
+  - `accessibility` was picked and returned `A11Y1-3` without repeating the base F6.
+Not exercised:
+- `--update` against a moved upstream, and the restore and re-pin paths through the skill
+  (`skill-lock verify` was checked at script level);
+- wrapper and private skill homes through the skill (the private `claude mcp add` hint
+  was checked at script level);
+- installing a third-party skill with `warn` findings;
+- a refusal caused by extracted links;
+- more than one lens in a round, and round-2 lens proposals;
+- `playwright` and `chrome-devtools` installs, and a live `DATABASE_URL` connection.
+Consequences: "done" is the user's call, after a toolsmith run on a real repo. Watch how
+often the static stage blocks a wanted skill, and whether generated skills stay grounded
+in the code.
