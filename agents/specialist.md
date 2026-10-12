@@ -30,7 +30,7 @@ Return exactly these two sections and nothing else, at most 40 lines.
 
 ```
 ## Findings
-- S<n> · blocker|major|minor · `path:line` · <lens> · <one-sentence finding> · fix: <one sentence>
+- <prefix><n> · blocker|major|minor · `path:line` · <lens> · <one-sentence finding> · fix: <one sentence>
   (at most 10, most severe first; "none" when clean)
 
 ## Verdict
@@ -39,6 +39,7 @@ ship | fix first — <one line>
 
 ## Rules
 
+- Number findings with the prefix and starting number the prompt gives.
 - Every finding carries a `path:line` in the diff (or the line the diff reaches) and a fix.
   No pointer, no finding.
 - Severity as the lens file defines it; without a definition: blocker is exploitable, data
