@@ -23,6 +23,11 @@ SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 PLUGIN_ROOT_REF = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\s\"'\\\\]+)")
 READ_ONLY_AGENTS = {"explorer", "researcher", "critic", "reviewer", "skill-auditor"}
 WRITE_TOOLS = re.compile(r"\b(Write|Edit|MultiEdit|NotebookEdit|Bash)\b")
+# Agents that read external content: they may Write (fenced by hooks/source-guard) but get no
+# other way to act, and MCP tools only when the tool name is a read verb.
+NO_ACT_AGENTS = {"intake"}
+ACT_TOOLS = re.compile(r"\b(Edit|MultiEdit|NotebookEdit|Bash|WebSearch|WebFetch|Agent|Task)\b")
+MCP_READ = re.compile(r"^mcp__\w+?__(get|search|fetch|lookup)\w*$")
 GENERATED_CLAUDE_MD = "skills/init/templates/CLAUDE.md"
 
 failures = []
@@ -159,6 +164,11 @@ def check_agents():
         if name in READ_ONLY_AGENTS:
             m = WRITE_TOOLS.search(tools)
             check(not m, "agents/%s is read-only" % name, m.group(0) if m else "")
+        if name in NO_ACT_AGENTS:
+            m = ACT_TOOLS.search(tools)
+            check(not m, "agents/%s cannot act on what it reads" % name, m.group(0) if m else "")
+            bad = [t for t in re.split(r"[,\s]+", tools) if t.startswith("mcp__") and not MCP_READ.match(t)]
+            check(not bad, "agents/%s has MCP read tools only" % name, ", ".join(bad))
         check_links(path, text)
         check_text_rules(path, text)
 
