@@ -3,7 +3,8 @@ name: config
 description: >
   Invoke whenever the user asks to change, set, show or check a specd setting (gate
   granularity, TDD, retention, PR host, ticket key, model roles, project commands, the
-  ticket-source MCP server) or runs `/specd:config [key=value ...]`. It reads `specd.yml`, shows the current value of the keys
+  ticket-source MCP server, specialist review passes, the skills allowlist and layers) or
+  runs `/specd:config [key=value ...] [--add|--remove key=item]`. It reads `specd.yml`, shows the current value of the keys
   named (or the whole file when none), asks for the new values, patches them in place with
   `config-set` and shows `old -> new`. Not for creating the workspace; that is `/specd:init`.
 ---
@@ -33,19 +34,21 @@ documented form.
    from `specd-yml.md` and stop.
 3. **Ask.** For each key without a value, ask for one, listing the documented values from the
    `Key semantics` table. Refuse a value outside that list before touching the file.
-   `skills.allowlist` is a list: say it is edited by hand until M6 and stop. `sources.mcp`
+   List keys (`skills.allowlist`, `layers.<name>`) take `--add` or `--remove` with one
+   item each, as `key=item`; a new layer name opens a new key. `sources.mcp`
    unknown to `config-set` (a file from before M5): show the by-hand replacement from
    `specd-yml.md` and stop.
 4. **Patch.** Run `"${CLAUDE_PLUGIN_ROOT}/scripts/config-set" --file <config>` with every
-   `key=value` in one call. Show its `old -> new` list verbatim. On refusal, show the
+   `key=value` in one call (list items: a second call with `--add` or `--remove`). Show its
+   `old -> new` list verbatim. On refusal, show the
    script's message and stop; never repair the file by hand. `sources.mcp=atlassian`: ask
    whether to install the server into `.mcp.json`; on yes run
    `"${CLAUDE_PLUGIN_ROOT}/scripts/init-workspace" --root <root> --add-mcp atlassian`
    (root: `wrapper_root` from `resolve-paths`, or the repo holding `.specd/`) and show its
    report; say that `/mcp` authorises it once, interactively.
-5. **Say when it applies.** `flow.gate_granularity`, `flow.critic`, `flow.tdd` and
-   `models.*` take effect at the next step that reads them; a step already running keeps
-   its values. `git.*` and `commands.*` apply immediately.
+5. **Say when it applies.** `flow.gate_granularity`, `flow.critic`, `flow.specialists`,
+   `flow.tdd`, `models.*` and `layers.*` take effect at the next step that reads them; a step
+   already running keeps its values. `git.*` and `commands.*` apply immediately.
 6. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md): `Produced` is the config
    path, `Next` is whatever the user was doing.
 
