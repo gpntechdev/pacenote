@@ -25,6 +25,8 @@ fetch: downloads the repo tarball at exactly that 40-hex commit and extracts onl
 stage: copies a local skill folder (no links followed) into W/.quarantine/<name>-local/,
        for auditing a folder the user names or a skill already installed.
 clean: removes one quarantine folder, or the whole quarantine.
+GitHub API calls go anonymous first, then with GITHUB_TOKEN or GH_TOKEN when set, then
+through `gh api` on a rate-limit refusal; the token goes to api.github.com only.
 The quarantine holds a `.gitignore` of `*` and sits outside every folder Claude Code loads
 skills from. Prints one JSON object; exit 1 with a one-line message on refusal. Stdlib only.
 """
@@ -33,13 +35,15 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tarfile
 import urllib.error
 import urllib.parse
 import urllib.request
 
-API = "https://api.github.com/repos/%s"
+API_ROOT = "https://api.github.com/"
+API = API_ROOT + "repos/%s"
 SEARCH = "https://skills.sh/api/search?%s"
 SEARCH_LIMIT = "20"
 META_REPOS = 8
@@ -106,13 +110,39 @@ def check_repo(workspace, repo):
                       % (repo, ", ".join(allowed) or "empty"))
 
 
-def get(url, accept="application/vnd.github+json", limit=MAX_TARBALL):
-    req = urllib.request.Request(url, headers={"Accept": accept, "User-Agent": "specd-skill-fetch"})
+def via_gh(url, accept, limit):
+    """Retry a GitHub API call through `gh api`, which uses the CLI's own stored login."""
+    if not shutil.which("gh"):
+        return None
+    path = url[len(API_ROOT):]
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        r = subprocess.run(["gh", "api", "-H", "Accept: " + accept, path], capture_output=True,
+                           timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode != 0 or len(r.stdout) > limit:
+        return None
+    return r.stdout
+
+
+def get(url, accept="application/vnd.github+json", limit=MAX_TARBALL):
+    """Fetch URL. For api.github.com: anonymous first, a GITHUB_TOKEN or GH_TOKEN from the
+    environment when set (sent to api.github.com only, never printed), then `gh api` on a
+    403 or 429, as the skills CLI does."""
+    headers = {"Accept": accept, "User-Agent": "specd-skill-fetch"}
+    github_api = url.startswith(API_ROOT)
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if github_api and token:
+        headers["Authorization"] = "Bearer " + token
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as r:
             data = r.read(limit + 1)
     except urllib.error.HTTPError as e:
-        raise Refused("%s returned HTTP %d" % (url, e.code))
+        data = via_gh(url, accept, limit) if github_api and e.code in (403, 429) else None
+        if data is None:
+            hint = "; GitHub's anonymous rate limit: set GITHUB_TOKEN or run `gh auth login`" \
+                if github_api and e.code in (403, 429) else ""
+            raise Refused("%s returned HTTP %d%s" % (url, e.code, hint))
     except (urllib.error.URLError, OSError) as e:
         raise Refused("cannot reach %s (%s)" % (url, getattr(e, "reason", e)))
     if len(data) > limit:
