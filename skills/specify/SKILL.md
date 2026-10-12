@@ -28,7 +28,8 @@ before continuing.
 - `resolve-paths`, `detect-repo` (current branch), `state find`, `state check`.
 - `<spec_root>/<feature>/brief.md` and `state.yml` (tier, triage signals, `fix.*`).
 - `<docs_root>/project.md`, `<docs_root>/conventions.md` when present; `sources/<feature>-*.md`
-  when the brief cites them.
+  when the brief cites them and their header says `via="file"` or `"paste"` (fetched ones
+  reach specify only through the brief, per [`../_shared/sources.md`](../_shared/sources.md)).
 - `<workspace_root>/specd.yml`: `flow.critic`, `flow.tdd`, `models.judgment`, `git.authority`,
   `layers.*` (quick: the `layer` vocabulary for tasks).
 - [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/gates.md`](../_shared/gates.md),
