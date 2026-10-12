@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""Redact secret-looking strings in a source snapshot and count them.
+
+Usage: redact --file PATH        rewrite PATH in place; print {file, count, kinds}
+       redact --stdin            read text on stdin; print {count, kinds, text}
+
+The value is replaced with [redacted] and the key is kept (`api_key=[redacted]`). The
+first line of a snapshot, its `<!-- specd:source ... -->` header, is never redacted; its
+`redactions=` is set to the number of [redacted] markers in the result, so a second run
+counts the same and changes nothing. Header attributes are sanitised (no quotes, no
+comment terminators, title at most 60 characters). Also imported by fetch-source,
+refresh-source and hooks/source-guard. Stdlib only.
+"""
+import json
+import re
+import sys
+
+MARK = "[redacted]"
+PATTERNS = [
+    ("private_key", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?(?:-----END [A-Z ]*PRIVATE KEY-----|\Z)", re.S), None),
+    ("assignment", re.compile(r"(?i)\b((?:api[_-]?key|secret|token|password|passwd|authorization|bearer)\s*[:=]\s*)"
+                              r"((?:bearer\s+)?(?!\[redacted\])[^\s\"'<>,;]+)"), 1),
+    ("aws_key", re.compile(r"\bAKIA[0-9A-Z]{16}\b"), None),
+    ("slack_token", re.compile(r"\bxox[abp]-[\w-]+"), None),
+    ("github_token", re.compile(r"\b(?:ghp_|github_pat_)\w+"), None),
+    ("openai_style_key", re.compile(r"\bsk-[A-Za-z0-9_-]{20,}"), None),
+]
+HEADER = re.compile(r"^<!-- specd:source (.*?) -->$")
+ATTR = re.compile(r'(\w+)=(?:"([^"]*)"|(\S+))')
+ORDER = ["origin", "via", "title", "captured", "section", "redactions"]
+
+
+def redact(text):
+    """Return (text, kinds) with every pattern's value replaced by MARK."""
+    kinds = {}
+    for name, rx, keep in PATTERNS:
+        def sub(m, name=name, keep=keep):
+            kinds[name] = kinds.get(name, 0) + 1
+            return (m.group(keep) if keep else "") + MARK
+        text = rx.sub(sub, text)
+    return text, kinds
+
+
+def clean(value, limit=None):
+    value = re.sub(r"[\x00-\x1f\"<>]|--", " ", str(value))
+    value = re.sub(r"\s+", " ", value).strip()
+    return value[:limit].rstrip() if limit else value
+
+
+def parse_header(line):
+    m = HEADER.match(line.rstrip("\n"))
+    if not m:
+        return None
+    return {k: q or b for k, q, b in ATTR.findall(m.group(1))}
+
+
+def render_header(attrs):
+    attrs = dict(attrs)
+    attrs["title"] = clean(attrs.get("title", ""), 60)
+    attrs["origin"] = clean(attrs.get("origin", ""))
+    keys = [k for k in ORDER if k in attrs] + [k for k in attrs if k not in ORDER]
+    parts = []
+    for k in keys:
+        v = attrs[k]
+        parts.append("%s=%s" % (k, v) if k == "redactions" else '%s="%s"' % (k, clean(v)))
+    return "<!-- specd:source %s -->" % " ".join(parts)
+
+
+def process(text):
+    """Redact a snapshot (or plain text). Return (text, count, kinds)."""
+    lines = text.split("\n", 1)
+    attrs = parse_header(lines[0])
+    if attrs is None:
+        out, kinds = redact(text)
+        return out, out.count(MARK), kinds
+    body, kinds = redact(lines[1] if len(lines) > 1 else "")
+    count = body.count(MARK)
+    attrs["redactions"] = str(count)
+    return render_header(attrs) + "\n" + body, count, kinds
+
+
+def main(argv):
+    if "--help" in argv or "-h" in argv or not argv:
+        print(__doc__.strip())
+        return 0 if argv else 2
+    if argv[0] == "--stdin":
+        out, count, kinds = process(sys.stdin.read())
+        print(json.dumps({"count": count, "kinds": kinds, "text": out}))
+        return 0
+    if argv[0] == "--file" and len(argv) > 1:
+        path = argv[1]
+        try:
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+        except OSError as e:
+            print("specd: %s" % e, file=sys.stderr)
+            return 1
+        out, count, kinds = process(text)
+        if out != text:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(out)
+        print(json.dumps({"file": path, "count": count, "kinds": kinds}, indent=2))
+        return 0
+    print("specd: expected --file PATH or --stdin", file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
