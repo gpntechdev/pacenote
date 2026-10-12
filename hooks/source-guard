@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse hook on Write: redact source snapshots and fence the intake agent.
+"""PreToolUse hook on Read and Write: keep fetched text away from everyone but intake.
 
 Usage: source-guard [--help]   (reads the hook JSON on stdin)
 
@@ -10,6 +10,11 @@ Usage: source-guard [--help]   (reads the hook JSON on stdin)
    scripts/redact before it reaches disk: the hook returns `updatedInput` with the
    redacted content and the header's `redactions=` count. If redaction fails, the write
    is denied rather than let through unredacted.
+3. A Read, by anyone but the intake agent, of a fetched snapshot (a sources/<name>.md whose
+   header says via="http" or via="mcp:...") is denied unless it reads line 1 only
+   (limit 1, no offset past it); a Read of a refresh diff (*.diff under spec/ or sources/
+   named source-refresh-* or .refresh-*) is denied outright. Fetched text reaches the main
+   thread only as the intake agent's summary. Bash and Grep are not inspected.
 Anything else, including unreadable input, exits 0. Stdlib only.
 """
 import importlib.util
@@ -22,6 +27,8 @@ from importlib.machinery import SourceFileLoader
 SCRIPTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
 HEADER = "<!-- specd:source "
 SNAPSHOT = re.compile(r"(^|/)sources/[^/]+\.md$")
+DIFF = re.compile(r"(^|/)(source-refresh-[^/]*|\.refresh-[^/]*)\.diff$")
+FETCHED = re.compile(r'^<!-- specd:source .*\bvia="(http|mcp:[^"]*)"')
 
 
 def deny(msg):
@@ -37,6 +44,29 @@ def load_redact():
     return module
 
 
+def check_read(path, tool_input):
+    if DIFF.search(path):
+        return deny("%s is a refresh diff of fetched text; only the intake agent reads it" % path)
+    if not SNAPSHOT.search(path):
+        return 0
+    try:
+        with open(path, encoding="utf-8") as f:
+            first = f.readline()
+    except OSError:
+        return 0
+    if not FETCHED.match(first):
+        return 0
+    limit, offset = tool_input.get("limit"), tool_input.get("offset") or 0
+    try:
+        header_only = limit is not None and int(limit) <= 1 and int(offset) <= 1
+    except (TypeError, ValueError):
+        header_only = False
+    if header_only:
+        return 0
+    return deny("%s is a fetched snapshot: read line 1 only (limit 1) for its header; its "
+                "content reaches you through the intake agent's answer" % path)
+
+
 def main(argv):
     if "--help" in argv or "-h" in argv:
         print(__doc__.strip())
@@ -46,14 +76,19 @@ def main(argv):
         tool_input = data.get("tool_input") or {}
     except (ValueError, AttributeError):
         return 0
-    if data.get("tool_name") != "Write" or not isinstance(tool_input, dict):
+    if not isinstance(tool_input, dict):
         return 0
     path = str(tool_input.get("file_path", "")).replace("\\", "/")
+    agent = str(data.get("agent_type") or "")
+    intake = agent == "intake" or agent.endswith(":intake")
+    if data.get("tool_name") == "Read":
+        return 0 if intake else check_read(path, tool_input)
+    if data.get("tool_name") != "Write":
+        return 0
     content = tool_input.get("content")
     content = content if isinstance(content, str) else ""
-    agent = str(data.get("agent_type") or "")
     is_snapshot = content.startswith(HEADER)
-    if agent == "intake" or agent.endswith(":intake"):
+    if intake:
         if not SNAPSHOT.search(path) or not is_snapshot:
             return deny("the intake agent may only write sources/<name>.md snapshots with "
                         "a specd:source header; refused %s" % (path or "a write without a path"))

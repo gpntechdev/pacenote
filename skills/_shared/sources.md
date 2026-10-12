@@ -74,6 +74,9 @@ and `redactions`. The artifact is written from the agent's answer:
 - `Not fetched` stays a list of links.
 
 Files and pastes are the user's own text: the main thread reads those snapshots directly.
+`hooks/source-guard` enforces the rest: a Read of a fetched snapshot past line 1, or of a
+refresh diff, by anyone but `intake` is denied. Bash and Grep are not inspected; do not use
+them on `sources/`.
 
 ## Use
 

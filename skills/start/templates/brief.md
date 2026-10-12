@@ -11,7 +11,8 @@ Captured: {{date}}
 
 ## Sources
 
-<!-- One line each: `sources/<feature>-<slug>.md` — title — captured date; or "paste, <date>"; or "none".
+<!-- One line each: `sources/<feature>-<slug>.md` — title — captured date — via (http, mcp:atlassian,
+     file or paste); or "paste, <date>"; or "none".
      Then "Not fetched:" with the links the intake agent listed (over the cap, other sites), if any. -->
 
 ## Not said
