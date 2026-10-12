@@ -1,0 +1,232 @@
+#!/usr/bin/env python3
+"""Stage one of the skill audit: a static scan of a skill folder. Executes nothing.
+
+Usage: audit-static --dir DIR
+
+Walks DIR without following symlinks and prints one JSON object: dir, files, verdict
+(block | warn | clean), counts per category, and findings (at most 60, blocking ones first) of the form
+{category, severity, file, line, match}. `match` is the matched text with every
+non-printable or non-ASCII character escaped, capped at 80 characters, so hostile text
+never reaches the reader as it was written.
+
+Categories, severity in brackets:
+  hidden-unicode [block]  bidi controls, zero-width and tag characters
+  encoded-blob   [block]  long base64 or hex runs, escape sequences, binary files
+                          (decoder calls, images and fonts: warn)
+  pipe-to-shell  [block]  a download piped or substituted into a shell or interpreter
+  bundled-hook   [block]  hooks, settings, MCP or plugin manifests, a `hooks:` key in
+                          SKILL.md frontmatter
+  secrets        [block]  env files, keys, credential stores, environment dumps
+                          (a single environment variable read: warn)
+  symlink        [block]  any symbolic link
+  network        [warn]   URLs and network calls (LICENSE files exempt)
+  bundled-script [warn]   scripts and executables shipped with the skill
+  allowed-tools  [warn]   SKILL.md `allowed-tools` with unrestricted Bash, wildcards,
+                          web, write or MCP tools
+Exit 0 after a scan, 1 when DIR is missing. Stdlib only.
+"""
+import json
+import os
+import re
+import stat
+import sys
+
+MAX_FINDINGS = 60
+MAX_FILE_BYTES = 1024 * 1024
+SEVERITY = {
+    "hidden-unicode": "block", "encoded-blob": "block", "pipe-to-shell": "block",
+    "bundled-hook": "block", "secrets": "block", "symlink": "block",
+    "network": "warn", "bundled-script": "warn", "allowed-tools": "warn",
+}
+HIDDEN = re.compile("[؜᠎​-‏‪-‮⁠-⁤⁦-⁩﻿"
+                    "\U000e0000-\U000e007f]")
+BLOBS = [
+    re.compile(r"[A-Za-z0-9+/]{120,}={0,2}"),
+    re.compile(r"(?:[0-9a-fA-F]{2}){60,}"),
+    re.compile(r"(?:\\x[0-9a-fA-F]{2}){16,}|(?:\\u[0-9a-fA-F]{4}){12,}"),
+]
+DECODE = re.compile(r"(?i)\b(?:base64\s+(?:-d|--decode)|atob\(|b64decode|frombase64string)")
+FETCH = r"(?:curl|wget|iwr|invoke-webrequest|irm|invoke-restmethod)\b"
+SHELLS = r"(?:sudo\s+)?(?:sh|bash|zsh|dash|python3?|node|perl|ruby|iex|invoke-expression)\b"
+PIPES = [
+    re.compile(r"(?i)" + FETCH + r"[^\n|]*\|\s*" + SHELLS),
+    re.compile(r"(?i)(?:bash|sh|zsh|source|\.)\s+<\(\s*" + FETCH),
+    re.compile(r"(?i)\beval\s+[\"']?\$\(\s*" + FETCH),
+]
+NETWORK = re.compile(r"(?i)(?:https?|ftp|wss?)://\S+|\b(?:curl|wget|netcat|ncat|invoke-webrequest|"
+                     r"urllib|http\.client|requests\.(?:get|post|put)|axios|xmlhttprequest|websocket|"
+                     r"fetch\s*\(|socket\.(?:socket|connect))\b|\bnc\s+-")
+SECRETS = re.compile(r"(?i)(?:^|[\s\"'`(/=])\.env(?!\.(?:example|sample|template)\b)(?:\.[\w-]+)?\b|"
+                     r"\bid_(?:rsa|dsa|ecdsa|ed25519)\b|~?/?\.ssh/|\.aws/credentials|\.netrc\b|"
+                     r"\.npmrc\b|\.pypirc\b|\.git-credentials\b|credentials\.json\b|\.pem\b|"
+                     r"\bkeychain\b|security\s+find-generic-password|"
+                     r"\bprintenv\b|(?:^|[;&|]\s*)env\s*(?:\||>|$)|os\.environ\.(?:items|keys|values)\(|"
+                     r"(?:JSON\.stringify|Object\.(?:entries|keys|values))\(\s*process\.env\s*\)")
+ENV_REFS = re.compile(r"\bos\.environ\b|\bos\.getenv\b|\bprocess\.env\b|"
+                      r"\$\{?[A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY|PRIVATE_KEY)\b")
+SCRIPT_EXT = {".sh", ".bash", ".zsh", ".fish", ".py", ".js", ".mjs", ".cjs", ".ts", ".rb", ".pl",
+              ".php", ".ps1", ".psm1", ".bat", ".cmd", ".exe", ".bin", ".so", ".dylib", ".dll",
+              ".jar", ".wasm", ".applescript", ".scpt"}
+HOOK_NAMES = {"hooks.json", "settings.json", "settings.local.json", ".mcp.json", "plugin.json",
+              "marketplace.json", ".claude-plugin"}
+ASSET_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".svg", ".ttf", ".otf", ".woff",
+             ".woff2", ".pdf"}
+BROAD_TOOLS = re.compile(r"(?:^|[,\s])(?:\*|Bash(?:\(\s*\*[^)]*\))?(?=[,\s]|$)|WebFetch|WebSearch|"
+                         r"Write|Edit|MultiEdit|NotebookEdit|mcp__\S*)")
+
+findings = []
+counts = {}
+worst = {"block": False}
+
+
+def escape(text):
+    out = []
+    for ch in text:
+        if 32 <= ord(ch) < 127:
+            out.append(ch)
+        else:
+            out.append(ch.encode("unicode_escape").decode("ascii"))
+    s = "".join(out).strip()
+    return s if len(s) <= 80 else s[:77] + "..."
+
+
+def add(category, rel, line, match, severity=None):
+    severity = severity or SEVERITY[category]
+    counts[category] = counts.get(category, 0) + 1
+    worst["block"] = worst["block"] or severity == "block"
+    findings.append({"category": category, "severity": severity, "file": rel,
+                     "line": line, "match": escape(match)})
+
+
+def frontmatter(lines):
+    """Return [(line number, text)] of the leading --- block, or []."""
+    if not lines or lines[0].strip() != "---":
+        return []
+    out = []
+    for n, line in enumerate(lines[1:], 2):
+        if line.strip() == "---":
+            return out
+        out.append((n, line))
+    return []
+
+
+def scan_frontmatter(rel, lines):
+    block, key = frontmatter(lines), None
+    for n, line in block:
+        m = re.match(r"^([A-Za-z][\w-]*):\s*(.*)$", line)
+        if m:
+            key = m.group(1)
+            value = m.group(2)
+            if key == "hooks":
+                add("bundled-hook", rel, n, line)
+        else:
+            value = line.strip().lstrip("- ")
+        if key == "allowed-tools" and BROAD_TOOLS.search(" " + value):
+            add("allowed-tools", rel, n, line)
+
+
+def scan_text(rel, text, is_license):
+    lines = text.split("\n")
+    if os.path.basename(rel) == "SKILL.md":
+        scan_frontmatter(rel, lines)
+    for n, line in enumerate(lines, 1):
+        if n == 1 and line.startswith("﻿"):
+            line = line[1:]
+        m = HIDDEN.search(line)
+        if m:
+            start = max(0, m.start() - 20)
+            add("hidden-unicode", rel, n, line[start:m.end() + 20])
+        for rx in BLOBS:
+            m = rx.search(line)
+            if m:
+                add("encoded-blob", rel, n, m.group(0))
+                break
+        else:
+            m = DECODE.search(line)
+            if m:
+                add("encoded-blob", rel, n, m.group(0), "warn")
+        if is_license:
+            continue
+        for rx in PIPES:
+            m = rx.search(line)
+            if m:
+                add("pipe-to-shell", rel, n, m.group(0))
+                break
+        m = SECRETS.search(line)
+        if m:
+            add("secrets", rel, n, line[max(0, m.start() - 20):m.end() + 20])
+        else:
+            m = ENV_REFS.search(line)
+            if m:
+                add("secrets", rel, n, line[max(0, m.start() - 20):m.end() + 20], "warn")
+        m = NETWORK.search(line)
+        if m:
+            add("network", rel, n, m.group(0))
+
+
+def scan(root):
+    nfiles = 0
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+        dirnames.sort()
+        for d in list(dirnames):
+            full = os.path.join(dirpath, d)
+            rel = os.path.relpath(full, root)
+            if os.path.islink(full):
+                add("symlink", rel, 0, rel)
+                dirnames.remove(d)
+            elif d in ("hooks", ".claude-plugin", ".claude"):
+                add("bundled-hook", rel + "/", 0, rel + "/")
+        for name in sorted(filenames):
+            full = os.path.join(dirpath, name)
+            rel = os.path.relpath(full, root)
+            nfiles += 1
+            if os.path.islink(full):
+                add("symlink", rel, 0, rel)
+                continue
+            ext = os.path.splitext(name)[1].lower()
+            if name in HOOK_NAMES:
+                add("bundled-hook", rel, 0, rel)
+            mode = os.stat(full).st_mode
+            with open(full, "rb") as f:
+                data = f.read(MAX_FILE_BYTES + 1)
+            if ext in SCRIPT_EXT or mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH) \
+                    or data.startswith(b"#!"):
+                add("bundled-script", rel, 0, rel)
+            if len(data) > MAX_FILE_BYTES:
+                add("encoded-blob", rel, 0, "file over 1 MiB: " + rel)
+                continue
+            try:
+                text = data.decode("utf-8")
+                binary = "\x00" in text
+            except UnicodeDecodeError:
+                binary = True
+            if binary:
+                if ext in ASSET_EXT:
+                    add("encoded-blob", rel, 0, "binary asset: " + rel, "warn")
+                else:
+                    add("encoded-blob", rel, 0, "binary file: " + rel)
+                continue
+            is_license = name.upper().startswith(("LICENSE", "LICENCE", "COPYING", "NOTICE"))
+            scan_text(rel, text, is_license)
+    return nfiles
+
+
+def main(argv):
+    if "--help" in argv or "-h" in argv or "--dir" not in argv:
+        print(__doc__.strip())
+        return 0 if argv else 2
+    i = argv.index("--dir")
+    root = argv[i + 1] if i + 1 < len(argv) else ""
+    if not os.path.isdir(root):
+        print("specd: no such directory: %s" % root, file=sys.stderr)
+        return 1
+    nfiles = scan(os.path.abspath(root))
+    verdict = "block" if worst["block"] else ("warn" if counts else "clean")
+    shown = sorted(findings, key=lambda f: f["severity"] != "block")[:MAX_FINDINGS]
+    print(json.dumps({"dir": os.path.abspath(root), "files": nfiles, "verdict": verdict,
+                      "counts": counts, "findings": shown}, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

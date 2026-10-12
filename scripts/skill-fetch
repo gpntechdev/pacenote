@@ -1,0 +1,264 @@
+#!/usr/bin/env python3
+"""Fetch third-party skill candidates into the quarantine folder. Never runs what it fetches.
+
+Usage: skill-fetch list  --workspace W --repo OWNER/REPO [--ref REF]
+       skill-fetch fetch --workspace W --repo OWNER/REPO --path PATH --commit SHA
+       skill-fetch stage --workspace W --dir DIR [--name NAME]
+       skill-fetch clean --workspace W [--dir QUARANTINE_DIR]
+
+W is workspace_root (the folder holding specd.yml). `list` and `fetch` refuse a repo that
+is not in specd.yml `skills.allowlist`; GitHub repos only.
+list:  resolves REF (default: the default branch) to a commit and prints the folders that
+       hold a SKILL.md: {repo, commit, skills: [{name, path}]}. Names and paths only, no
+       file content.
+fetch: downloads the repo tarball at exactly that 40-hex commit and extracts only PATH
+       into W/.quarantine/<name>-<sha7>/. Links, devices, absolute paths and `..` are never
+       extracted (links are listed under `links`); caps: 300 files, 10 MiB unpacked.
+stage: copies a local skill folder (no links followed) into W/.quarantine/<name>-local/,
+       for auditing a folder the user names or a skill already installed.
+clean: removes one quarantine folder, or the whole quarantine.
+The quarantine holds a `.gitignore` of `*` and sits outside every folder Claude Code loads
+skills from. Prints one JSON object; exit 1 with a one-line message on refusal. Stdlib only.
+"""
+import io
+import json
+import os
+import re
+import shutil
+import sys
+import tarfile
+import urllib.error
+import urllib.request
+
+API = "https://api.github.com/repos/%s"
+CODELOAD = "https://codeload.github.com/%s/tar.gz/%s"
+QUARANTINE = ".quarantine"
+MAX_FILES = 300
+MAX_BYTES = 10 * 1024 * 1024
+MAX_TARBALL = 200 * 1024 * 1024
+REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+SHA = re.compile(r"^[0-9a-f]{40}$")
+SAFE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+class Refused(Exception):
+    pass
+
+
+def opt(argv, flag, default=None):
+    if flag in argv:
+        i = argv.index(flag)
+        if i + 1 >= len(argv) or argv[i + 1].startswith("--"):
+            raise Refused("%s needs a value" % flag)
+        return argv[i + 1]
+    return default
+
+
+def allowlist(workspace):
+    """Read skills.allowlist from W/specd.yml (flat subset: section, key, `- item` lines)."""
+    path = os.path.join(workspace, "specd.yml")
+    if not os.path.isfile(path):
+        raise Refused("no specd.yml in %s" % workspace)
+    items, section, key = [], None, None
+    with open(path, encoding="utf-8") as f:
+        for raw in f:
+            line = raw.split("#", 1)[0].rstrip()
+            if not line.strip():
+                continue
+            m = re.match(r"^(\s*)([A-Za-z_][\w]*):\s*(.*)$", line)
+            if m:
+                if not m.group(1):
+                    section, key = m.group(2), None
+                else:
+                    key = m.group(2)
+                continue
+            item = re.match(r"^\s+-\s+(.+)$", line)
+            if item and section == "skills" and key == "allowlist":
+                items.append(item.group(1).strip().strip("\"'"))
+    return items
+
+
+def check_repo(workspace, repo):
+    if not repo or not REPO.match(repo):
+        raise Refused("--repo must be OWNER/REPO")
+    allowed = [a.lower() for a in allowlist(workspace)]
+    if repo.lower() not in allowed:
+        raise Refused("%s is not in skills.allowlist (%s); add it with /specd:config first"
+                      % (repo, ", ".join(allowed) or "empty"))
+
+
+def get(url, accept="application/vnd.github+json", limit=MAX_TARBALL):
+    req = urllib.request.Request(url, headers={"Accept": accept, "User-Agent": "specd-skill-fetch"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            data = r.read(limit + 1)
+    except urllib.error.HTTPError as e:
+        raise Refused("%s returned HTTP %d" % (url, e.code))
+    except (urllib.error.URLError, OSError) as e:
+        raise Refused("cannot reach %s (%s)" % (url, getattr(e, "reason", e)))
+    if len(data) > limit:
+        raise Refused("%s is larger than %d bytes" % (url, limit))
+    return data
+
+
+def quarantine(workspace):
+    q = os.path.join(workspace, QUARANTINE)
+    os.makedirs(q, exist_ok=True)
+    ignore = os.path.join(q, ".gitignore")
+    if not os.path.exists(ignore):
+        with open(ignore, "w", encoding="utf-8") as f:
+            f.write("*\n")
+    return q
+
+
+def fresh(path):
+    if os.path.lexists(path):
+        shutil.rmtree(path)
+    os.makedirs(path)
+
+
+def cmd_list(workspace, argv):
+    repo, ref = opt(argv, "--repo"), opt(argv, "--ref")
+    check_repo(workspace, repo)
+    if not ref:
+        ref = json.loads(get(API % repo)).get("default_branch", "main")
+    commit = get(API % repo + "/commits/" + ref, accept="application/vnd.github.sha").decode().strip()
+    if not SHA.match(commit):
+        raise Refused("cannot resolve %s@%s to a commit" % (repo, ref))
+    tree = json.loads(get(API % repo + "/git/trees/%s?recursive=1" % commit))
+    skills = []
+    for entry in tree.get("tree", []):
+        p = entry.get("path", "")
+        if entry.get("type") == "blob" and (p == "SKILL.md" or p.endswith("/SKILL.md")):
+            folder = os.path.dirname(p)
+            skills.append({"name": SAFE.sub("-", os.path.basename(folder) or repo.split("/")[1]),
+                           "path": folder})
+    return {"repo": repo, "ref": ref, "commit": commit, "truncated": bool(tree.get("truncated")),
+            "skills": skills}
+
+
+def cmd_fetch(workspace, argv):
+    repo, path, commit = opt(argv, "--repo"), opt(argv, "--path", ""), opt(argv, "--commit", "")
+    check_repo(workspace, repo)
+    if not SHA.match(commit):
+        raise Refused("--commit must be a full 40-hex commit (from `list`), not a branch or tag")
+    path = path.strip("/")
+    if ".." in path.split("/"):
+        raise Refused("--path may not contain ..")
+    name = SAFE.sub("-", os.path.basename(path) or repo.split("/")[1])
+    dest = os.path.join(quarantine(workspace), "%s-%s" % (name, commit[:7]))
+    data = get(CODELOAD % (repo, commit), accept="application/octet-stream")
+    fresh(dest)
+    files, total, links = 0, 0, []
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
+        for m in tar:
+            parts = m.name.split("/", 1)
+            if len(parts) < 2:
+                continue
+            rel = parts[1]
+            if path:
+                if not (rel == path or rel.startswith(path + "/")):
+                    continue
+                rel = rel[len(path):].lstrip("/")
+            if not rel:
+                continue
+            if rel.startswith("/") or ".." in rel.split("/"):
+                links.append(rel)
+                continue
+            if m.issym() or m.islnk():
+                links.append(rel)
+                continue
+            target = os.path.join(dest, rel)
+            if m.isdir():
+                os.makedirs(target, exist_ok=True)
+                continue
+            if not m.isfile():
+                links.append(rel)
+                continue
+            files += 1
+            total += m.size
+            if files > MAX_FILES or total > MAX_BYTES:
+                shutil.rmtree(dest)
+                raise Refused("%s exceeds the caps (%d files, %d bytes)" % (path, MAX_FILES, MAX_BYTES))
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            with tar.extractfile(m) as src, open(target, "wb") as out:
+                shutil.copyfileobj(src, out)
+            if m.mode & 0o111:
+                os.chmod(target, 0o755)
+    if files == 0:
+        shutil.rmtree(dest)
+        raise Refused("%s has no files at %s in %s" % (path or "/", commit[:7], repo))
+    return {"status": "ok", "repo": repo, "path": path, "commit": commit, "name": name,
+            "dir": dest, "files": files, "bytes": total, "links": links}
+
+
+def cmd_stage(workspace, argv):
+    src = opt(argv, "--dir")
+    if not src or not os.path.isdir(src) or os.path.islink(src):
+        raise Refused("--dir must be an existing folder")
+    src = os.path.abspath(src)
+    name = SAFE.sub("-", opt(argv, "--name") or os.path.basename(src))
+    dest = os.path.join(quarantine(workspace), "%s-local" % name)
+    if os.path.commonpath([src, dest]) == src:
+        raise Refused("cannot stage a folder that contains the quarantine")
+    fresh(dest)
+    files, total, links = 0, 0, []
+    for dirpath, dirnames, filenames in os.walk(src, followlinks=False):
+        rel_dir = os.path.relpath(dirpath, src)
+        for d in list(dirnames):
+            if os.path.islink(os.path.join(dirpath, d)):
+                links.append(os.path.normpath(os.path.join(rel_dir, d)))
+                dirnames.remove(d)
+        for fn in filenames:
+            full = os.path.join(dirpath, fn)
+            rel = os.path.normpath(os.path.join(rel_dir, fn))
+            if os.path.islink(full) or not os.path.isfile(full):
+                links.append(rel)
+                continue
+            files += 1
+            total += os.path.getsize(full)
+            if files > MAX_FILES or total > MAX_BYTES:
+                shutil.rmtree(dest)
+                raise Refused("%s exceeds the caps (%d files, %d bytes)" % (src, MAX_FILES, MAX_BYTES))
+            os.makedirs(os.path.join(dest, rel_dir), exist_ok=True)
+            shutil.copy2(full, os.path.join(dest, rel))
+    return {"status": "ok", "source": src, "name": name, "dir": dest, "files": files,
+            "bytes": total, "links": links}
+
+
+def cmd_clean(workspace, argv):
+    q = os.path.join(workspace, QUARANTINE)
+    target = opt(argv, "--dir")
+    if target:
+        target = os.path.abspath(target)
+        if os.path.dirname(target) != q:
+            raise Refused("%s is not a quarantine folder" % target)
+    else:
+        target = q
+    existed = os.path.isdir(target)
+    if existed:
+        shutil.rmtree(target)
+    return {"removed": target if existed else ""}
+
+
+COMMANDS = {"list": cmd_list, "fetch": cmd_fetch, "stage": cmd_stage, "clean": cmd_clean}
+
+
+def main(argv):
+    if not argv or argv[0] in ("--help", "-h") or argv[0] not in COMMANDS:
+        print(__doc__.strip())
+        return 0 if argv and argv[0] in ("--help", "-h") else 2
+    try:
+        workspace = opt(argv, "--workspace")
+        if not workspace or not os.path.isdir(workspace):
+            raise Refused("--workspace W (the folder holding specd.yml) is required")
+        result = COMMANDS[argv[0]](os.path.abspath(workspace), argv[1:])
+    except Refused as e:
+        print("specd: %s" % e, file=sys.stderr)
+        return 1
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
