@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""PreToolUse hook on Read and Write: keep fetched text away from everyone but intake.
+"""PreToolUse hook on Read and Write: keep fetched text away from everyone but intake, and
+quarantined skills away from everyone but the skill-auditor.
 
 Usage: source-guard [--help]   (reads the hook JSON on stdin)
 
@@ -15,6 +16,11 @@ Usage: source-guard [--help]   (reads the hook JSON on stdin)
    (limit 1, no offset past it); a Read of a refresh diff (*.diff under spec/ or sources/
    named source-refresh-* or .refresh-*) is denied outright. Fetched text reaches the main
    thread only as the intake agent's summary. Bash and Grep are not inspected.
+4. A Read of a file under a `.quarantine/` folder (third-party skill candidates fetched
+   by scripts/skill-fetch) is denied to everyone but the `skill-auditor` agent, and the
+   skill-auditor may Read nothing outside it. A Write into `.quarantine/` is denied to
+   everyone: only the scripts fill it. Quarantined text reaches the main thread only as
+   the auditor's answer and audit-static's escaped findings.
 Anything else, including unreadable input, exits 0. Stdlib only.
 """
 import importlib.util
@@ -29,6 +35,7 @@ HEADER = "<!-- specd:source "
 SNAPSHOT = re.compile(r"(^|/)sources/[^/]+\.md$")
 DIFF = re.compile(r"(^|/)(source-refresh-[^/]*|\.refresh-[^/]*)\.diff$")
 FETCHED = re.compile(r'^<!-- specd:source .*\bvia="(http|mcp:[^"]*)"')
+QUARANTINE = re.compile(r"(^|/)\.quarantine(/|$)")
 
 
 def deny(msg):
@@ -81,10 +88,21 @@ def main(argv):
     path = str(tool_input.get("file_path", "")).replace("\\", "/")
     agent = str(data.get("agent_type") or "")
     intake = agent == "intake" or agent.endswith(":intake")
+    auditor = agent == "skill-auditor" or agent.endswith(":skill-auditor")
+    quarantined = bool(QUARANTINE.search(path))
     if data.get("tool_name") == "Read":
+        if auditor:
+            return 0 if quarantined else deny("the skill-auditor reads only the quarantine "
+                                              "folder it was given; refused %s" % path)
+        if quarantined:
+            return deny("%s is a quarantined skill candidate; its content reaches you only "
+                        "through the skill-auditor agent and audit-static" % path)
         return 0 if intake else check_read(path, tool_input)
     if data.get("tool_name") != "Write":
         return 0
+    if quarantined or auditor:
+        return deny("nothing writes into .quarantine/ but scripts/skill-fetch; refused %s"
+                    % (path or "a write without a path"))
     content = tool_input.get("content")
     content = content if isinstance(content, str) else ""
     is_snapshot = content.startswith(HEADER)
