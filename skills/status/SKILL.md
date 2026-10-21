@@ -20,6 +20,7 @@ next. It is safe to run at any time and never asks a question.
   list` and `state find`.
 - `<workspace_root>/specd.yml`: `flow.keep_days`, `docs.lessons_max_lines`.
 - `"${CLAUDE_PLUGIN_ROOT}/scripts/lessons" scan --file <docs_root>/lessons.md` (counts only).
+- `"${CLAUDE_PLUGIN_ROOT}/scripts/spec-clean" scan` (kept folders by age).
 - [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/state-yml.md`](../_shared/state-yml.md)
   (step meanings).
 
@@ -38,9 +39,9 @@ next. It is safe to run at any time and never asks a question.
    `round/open`, PR (`yes` or `-`), updated date, and a worktree column (`.worktrees/<name>`
    or `-`) when any row has one. A feature the script reports with an
    `error` gets a row saying `state.yml unreadable: <reason>`.
-3. **Warn.** Every feature with `step: closed` whose `updated` is older than `flow.keep_days`
-   days: one line, `<feature> kept for <n> days; /specd:close <feature> cleans
-   it (spec-clean arrives with M7)`. Then `lessons scan --file <docs_root>/lessons.md --max
+3. **Warn.** `spec-clean scan --spec-root <spec_root> --docs-root <docs_root> --worktrees
+   <wrapper_root>/.worktrees --days <flow.keep_days>`: one line per `old` row, `<feature>
+   kept for <age_days> days`, then once `/specd:spec-clean` when there was any. Then `lessons scan --file <docs_root>/lessons.md --max
    <docs.lessons_max_lines>`; when `over`: `lessons.md has <lines>/<max> lines;
    /specd:lessons-prune`.
 4. **Point.** Resolve the feature: the argument, else `state find --branch <current>

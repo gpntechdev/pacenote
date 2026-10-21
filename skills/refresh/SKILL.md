@@ -21,7 +21,7 @@ behalf: what the spec does about the change is for the re-opened gate.
 
 ## Inputs
 
-- `resolve-paths`, `state find` (the opening sequence in
+- `resolve-paths`, `detect-repo --from <workspace_root>` (branch rule), `state find` (the opening sequence in
   [`../_shared/paths.md`](../_shared/paths.md); no `state check`, refresh is not a flow step).
 - The argument: a feature, a snapshot path, or nothing (the feature `state find` resolves).
 - `<workspace_root>/sources/<feature>-*.md`, header line only; `<spec_root>/<feature>/
@@ -35,7 +35,8 @@ behalf: what the spec does about the change is for the re-opened gate.
 - The changed snapshots, overwritten with `captured` bumped and `redactions` recounted.
 - `brief.md` only when the user accepts the patch; never `spec.md`, never `state.yml`.
 - One commit `spec(<feature>): refresh sources` in `<workspace_root>` (authority ≠ `none`);
-  `docs: refresh sources for <section>` for onboard snapshots.
+  `docs: refresh sources for <section>` for onboard snapshots; never on a default branch
+  (a `chore/refresh-<date>` branch is created first, per `utils.md` "Branch").
 
 ## Protocol
 
@@ -74,7 +75,8 @@ behalf: what the spec does about the change is for the re-opened gate.
    - the captured date in Sources.
 
    Ask apply / skip. Apply only on yes.
-6. **Commit.** `git -C <workspace_root>`: stage the overwritten snapshots and, when
+6. **Commit** on a branch per [`../_shared/utils.md`](../_shared/utils.md) "Branch" (a
+   feature's snapshot is normally on its feature branch already). `git -C <workspace_root>`: stage the overwritten snapshots and, when
    patched, `brief.md`; commit as in Outputs, no attribution. Nothing changed: no commit.
 7. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: what changed
    and the gate. `Next`: the command from step 4, or whatever the user was doing.

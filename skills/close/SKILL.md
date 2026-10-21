@@ -7,7 +7,7 @@ description: >
   feature record; then delete the spec folder), clean (delete the spec folder) or keep
   (mark closed and leave it), commits and pushes so the open PR carries the result; in a
   wrapper it also removes the feature worktree and merges the wrapper branch into the
-  wrapper's default branch. Not for closing the PR itself; merging the code is yours, after
+  wrapper's default branch, unless the wrapper branch has its own PR (`git.wrapper_pr`). Not for closing the PR itself; merging the code is yours, after
   this push.
 ---
 
@@ -17,7 +17,8 @@ Ends the feature's working set. The durable knowledge was written by `docs` befo
 the spec folder is ephemeral and leaves here, once nobody needs it: run it when the PR has
 no open comments left, then merge. Git history is the archive. The default policy comes
 from the tier and `flow.retention`; the user confirms it per feature. In a wrapper the
-feature also leaves its branch: the wrapper has no PR, so this step merges it.
+feature also leaves its branch: this step merges it, or, when the wrapper branch has its own
+PR (`git.wrapper_pr: true`), pushes it and leaves the merge to that PR.
 
 ## Gate
 
@@ -31,7 +32,8 @@ again to clean it). A merged PR is refused: the folder is already on the default
   ([`../_shared/paths.md`](../_shared/paths.md): the opening sequence, which repo holds what).
 - `<spec_root>/<feature>/state.yml` (`retention`, `tier`, `pr`, `branch`, `worktree`).
 - `<docs_root>/features/<feature>.md` (must exist for `distill`).
-- `<workspace_root>/specd.yml`: `flow.retention`, `git.authority`, `git.pr_host`.
+- `<workspace_root>/specd.yml`: `flow.retention`, `git.authority`, `git.pr_host`,
+  `git.wrapper_pr`.
 - [`../_shared/state-yml.md`](../_shared/state-yml.md),
   [`../deliver/references/git.md`](../deliver/references/git.md) ("Wrapper": the push rule).
 
@@ -41,7 +43,7 @@ again to clean it). A merged PR is refused: the folder is already on the default
 - One commit `docs(<feature>): close (<policy>)` in the repo holding the spec folder, pushed
   when authority ≥ `push` and the branch is on the remote.
 - Wrapper: the worktree removed when there was one; the wrapper branch merged into the
-  wrapper's default branch and deleted locally.
+  wrapper's default branch and deleted locally, or (`git.wrapper_pr: true`) pushed for its PR.
 
 ## Protocol
 
@@ -56,7 +58,7 @@ again to clean it). A merged PR is refused: the folder is already on the default
    `git -C <workspace_root> rm -r <spec_root>/<feature>`.
 3. **clean.** `git -C <workspace_root> rm -r <spec_root>/<feature>`.
 4. **keep.** `state set step=closed retention=keep worktree=`. The folder stays; `status`
-   warns after `flow.keep_days`.
+   warns after `flow.keep_days` and `/specd:spec-clean` clears it in a batch.
 5. **Commit** `docs(<feature>): close (<policy>)` with `git -C <workspace_root>`; push when
    authority ≥ `push` and `branch` is set: the same push as `deliver` in embedded mode, the
    `git.md` "Wrapper" rule when the wrapper is a second repo.
@@ -66,7 +68,11 @@ again to clean it). A merged PR is refused: the folder is already on the default
    <wrapper_root>` and stop before anything is removed. Then
    `"${CLAUDE_PLUGIN_ROOT}/scripts/worktree" remove --feature <feature> --from
    <wrapper_root>`; a refusal (dirty code tree) is printed as is and the run stops here,
-   everything above is already committed. Then, in `<wrapper_root>`, which must be on
+   everything above is already committed. `git.wrapper_pr: true` and the wrapper has an
+   `origin`: the removal commit is already pushed with step 5's rule; say that the wrapper
+   PR now carries it and that merging it is the user's, and skip the merge below. Without
+   an `origin` the wrapper PR cannot exist: say so in one line and merge as below.
+   Otherwise, in `<wrapper_root>`, which must be on
    its default branch with a clean tree (else say which branch or files block and stop):
    `git merge --no-ff <branch>` with the message `docs(<feature>): merge <branch>`, then
    `git branch -d <branch>`; push the default branch under the `git.md` "Wrapper" rule.
@@ -78,7 +84,8 @@ again to clean it). A merged PR is refused: the folder is already on the default
    or the closed marker; the merge, when one ran. `Review`: none. `Next: /specd:status`;
    say that merging the PR (from `pr`, if any) is the user's call: in embedded mode the PR
    now carries the removal; in a wrapper the spec history is on the wrapper's default
-   branch and the PR is unchanged.
+   branch (or on the wrapper PR's branch until the user merges it) and the code PR is
+   unchanged.
 
 ## Anti-patterns
 
