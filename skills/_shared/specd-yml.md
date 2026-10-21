@@ -30,6 +30,8 @@ git:
   ticket_key: ""             # prefix such as "PROJ-"; empty = no ticket convention
   worktrees: false           # wrapper only: start opens each feature in .worktrees/<feature>/
                              # (wrapper + code worktrees on the feature branch) for parallel work
+  wrapper_pr: false          # wrapper only: true = deliver opens a draft PR for the wrapper branch
+                             # too and close leaves its merge to that PR; false = close merges it
 
 flow:
   gate_granularity: phase    # task | phase | end: where implement stops for G4
@@ -83,6 +85,7 @@ layers:                      # layer -> files implement and review add to "Read 
 | `git.pr_host` | `github`, `gitlab`, `none` | deliver picks the PR command |
 | `git.ticket_key` | prefix string | start (branch names), deliver |
 | `git.worktrees` | bool | start (`scripts/worktree add`), close (remove); wrapper mode only, embedded ignores it |
+| `git.wrapper_pr` | bool | deliver (wrapper draft PR), close (merge locally or leave it to the PR); wrapper mode only; a missing key means `false`. A file from before M7 lacks it: add the two lines above under `git:` by hand |
 | `flow.gate_granularity` | `task`, `phase`, `end` | implement; risky tasks always stop |
 | `flow.tdd` | bool | tasks (tests block), implement (tests first) |
 | `flow.critic` | `gates` (before G1 and G2 on the full tier), `always` (quick's G1 too), `off` | specify, design; `critique` runs regardless |

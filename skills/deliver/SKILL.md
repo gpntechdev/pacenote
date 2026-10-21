@@ -36,7 +36,8 @@ every re-run after a feedback cycle.
   header of each `<workspace_root>/sources/<feature>-*.md` it lists.
 - `<docs_root>/features/<feature>.md` and the `decisions/NNNN-*.md` files it names, when
   `docs` wrote them.
-- `<workspace_root>/specd.yml`: `git.authority`, `git.pr_host`, `git.ticket_key`.
+- `<workspace_root>/specd.yml`: `git.authority`, `git.pr_host`, `git.ticket_key`,
+  `git.wrapper_pr`.
 - [`../_shared/no-attribution.md`](../_shared/no-attribution.md),
   [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md).
 - `./templates/pr-body.md`, [`./references/change-summary.md`](./references/change-summary.md),
@@ -87,7 +88,8 @@ every re-run after a feedback cycle.
    URL, replace its description per `git.md` "Re-deliver" and never open another. Record
    only, CLI missing or `git.pr_host: none`: print the rendered body in full (the printout
    is the user's copy), then the exact command and the compare URL when something was
-   pushed. Delete the rendered body and the summary file.
+   pushed. In a wrapper with `git.wrapper_pr: true`, the wrapper's draft PR follows per
+   `git.md` "Wrapper". Delete the rendered body and the summary file.
 7. **Record.** `state set gates.G5=now pr=<url or unchanged> step=close`, commit
    `spec(<feature>): deliver` with `git -C <workspace_root>`; when a push was chosen, push
    that repo too so the state commit is on the remote: the same push in embedded mode, the

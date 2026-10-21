@@ -63,3 +63,5 @@ knowledge folder`, on its current branch, so the client tree is clean; say so in
   folder finds no `specd.yml` and the wrapper's settings do not apply there.
 - "Parallel features: `/specd:config git.worktrees=true`, then each `/specd:start` opens a
   worktree under `.worktrees/`."
+- "A team sharing this wrapper through a remote: `/specd:config git.wrapper_pr=true` gives
+  each feature's wrapper branch its own draft PR; otherwise `close` merges it locally."

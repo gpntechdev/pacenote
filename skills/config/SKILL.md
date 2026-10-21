@@ -37,8 +37,8 @@ documented form.
    `Key semantics` table. Refuse a value outside that list before touching the file.
    List keys (`skills.allowlist`, `layers.<name>`) take `--add` or `--remove` with one
    item each, as `key=item`; a new layer name opens a new key. `sources.mcp`
-   unknown to `config-set` (a file from before M5): show the by-hand replacement from
-   `specd-yml.md` and stop.
+   unknown to `config-set` (a file from before M5) or `git.wrapper_pr` (before M7): show the
+   by-hand edit from `specd-yml.md` and stop.
 4. **Patch.** Run `"${CLAUDE_PLUGIN_ROOT}/scripts/config-set" --file <config>` with every
    `key=value` in one call (list items: a second call with `--add` or `--remove`). Show its
    `old -> new` list verbatim. On refusal, show the

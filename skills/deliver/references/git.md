@@ -33,13 +33,24 @@ at G5 recorded; no retry with different flags.
 ## Wrapper
 
 In wrapper mode the spec folder, and `docs/` unless it was sent into the code repo, live in
-the wrapper repo on a branch of the same name. The PR is the code repo's; the wrapper has
-no PR and no reviewers. The wrapper branch is pushed (`git -C <workspace_root> push -u
-origin <branch>`) only when the wrapper has an `origin` remote (`detect-repo --from
-<workspace_root>`) and `git.authority` is at least `push`; otherwise one line says the
-wrapper branch stays local. Inside a feature worktree `<workspace_root>` is the worktree,
-which is the same repo. `close` merges the wrapper branch into the wrapper's default branch
-once the feature is settled; nothing here does.
+the wrapper repo on a branch of the same name. The PR `pr` records is always the code
+repo's. Whether the wrapper branch gets a PR of its own is the user's choice,
+`git.wrapper_pr` (missing = `false`): a team that shares the wrapper through a remote
+reviews spec and docs there; a single user does not need to.
+
+- The wrapper branch is pushed (`git -C <workspace_root> push -u origin <branch>`) only
+  when the wrapper has an `origin` remote (`detect-repo --from <workspace_root>`) and
+  `git.authority` is at least `push`; otherwise one line says the wrapper branch stays
+  local.
+- `git.wrapper_pr: true`, the user chose push + draft PR, and the wrapper branch was
+  pushed: open a draft PR in the wrapper with the CLI of its own `remote_host` (`gh pr
+  create --draft` / `glab mr create --draft`, run in `<workspace_root>`, base its default
+  branch), titled like the code PR, body one line linking the code PR. The CLI says one
+  already exists on a re-deliver: say so, never a second. CLI missing: print the command
+  and the compare URL. The wrapper PR's URL is printed in the handoff, not stored.
+- Inside a feature worktree `<workspace_root>` is the worktree, which is the same repo.
+- Merging the wrapper branch is `close`'s (`false`) or the wrapper PR's (`true`); nothing
+  here merges.
 
 ## Re-deliver
 
