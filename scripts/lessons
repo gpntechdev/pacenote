@@ -1,0 +1,212 @@
+#!/usr/bin/env python3
+"""Scan lessons.md against its cap, or apply an approved pruning plan, printed as JSON.
+
+Usage: lessons scan  --file F [--max N] [--today YYYY-MM-DD]
+       lessons apply --file F --plan PATH|- [--max N]
+
+A lesson is one line `YYYY-MM-DD — context — rule` (` - ` is accepted for the dashes).
+`lines` counts the whole file, header included, because the whole file is loaded every
+session; `over` is true when `lines` > N (default 80, the `docs.lessons_max_lines` default).
+
+scan prints `lines`, `max`, `over`, `lessons` (line, date, age_days, context, rule),
+`malformed` (non-blank lines outside the header comment that are not lessons or headings)
+and `duplicates` (pairs of lesson lines whose rule words overlap, Jaccard >= 0.5 after
+lowercasing, dropping stopwords and cutting words to five letters, with the score). A
+missing file scans as empty.
+
+apply reads a JSON list of `{line, expect, action, text}` from PATH or stdin: `action` is
+`delete` or `replace`, `expect` must equal the current text of `line` exactly, and a
+replacement `text` must be a well-formed lesson. Any mismatch refuses the whole plan with
+one line on stderr and exit 1, and the file is left untouched. Otherwise every change is
+written at once and `before`, `after`, `deleted`, `replaced`, `max` and `over` are printed.
+Stdlib only.
+"""
+import datetime
+import json
+import os
+import re
+import sys
+
+DEFAULT_MAX = 80
+LESSON = re.compile(r"^(\d{4}-\d{2}-\d{2})\s+(?:—|-{1,2})\s+(.+?)\s+(?:—|-{1,2})\s+(.+)$")
+WORD = re.compile(r"[a-z0-9]+")
+STOPWORDS = set(
+    "a an and are as at be before by do does for from has have if in into is it its never not "
+    "of on or so that the then this to use when with without always must should you your".split()
+)
+DUP_THRESHOLD = 0.5
+
+
+def opt(argv, flag, default=None):
+    if flag in argv:
+        i = argv.index(flag)
+        if i + 1 >= len(argv):
+            print("specd: %s needs a value" % flag, file=sys.stderr)
+            sys.exit(2)
+        return argv[i + 1]
+    return default
+
+
+def refuse(msg):
+    print("specd: %s" % msg, file=sys.stderr)
+    return 1
+
+
+def read_lines(path):
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8") as f:
+        return f.read().splitlines()
+
+
+def parse_lesson(text):
+    m = LESSON.match(text.strip())
+    if not m:
+        return None
+    try:
+        datetime.date.fromisoformat(m.group(1))
+    except ValueError:
+        return None
+    return {"date": m.group(1), "context": m.group(2).strip(), "rule": m.group(3).strip()}
+
+
+def words(text):
+    # A five-letter prefix is a crude stem: "commit" and "committing" count as one word.
+    return {w[:5] for w in WORD.findall(text.lower()) if w not in STOPWORDS}
+
+
+def jaccard(a, b):
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def scan(lines, max_lines, today):
+    lessons, malformed = [], []
+    in_comment = False
+    for n, raw in enumerate(lines, 1):
+        text = raw.strip()
+        if in_comment:
+            in_comment = "-->" not in text
+            continue
+        if text.startswith("<!--"):
+            in_comment = "-->" not in text
+            continue
+        if not text or text.startswith("#"):
+            continue
+        lesson = parse_lesson(text)
+        if lesson is None:
+            malformed.append({"line": n, "text": raw})
+            continue
+        age = (today - datetime.date.fromisoformat(lesson["date"])).days
+        lessons.append(dict(line=n, age_days=age, **lesson))
+    duplicates = []
+    bags = [(l["line"], words(l["rule"])) for l in lessons]
+    for i, (la, wa) in enumerate(bags):
+        for lb, wb in bags[i + 1:]:
+            score = jaccard(wa, wb)
+            if score >= DUP_THRESHOLD:
+                duplicates.append({"lines": [la, lb], "score": round(score, 2)})
+    return {
+        "lines": len(lines),
+        "max": max_lines,
+        "over": len(lines) > max_lines,
+        "lessons": lessons,
+        "malformed": malformed,
+        "duplicates": duplicates,
+    }
+
+
+def check_plan(lines, plan):
+    """Return an error string, or None when every step of the plan holds."""
+    if not isinstance(plan, list):
+        return "plan must be a JSON list"
+    seen = set()
+    for step in plan:
+        if not isinstance(step, dict):
+            return "each plan step must be an object"
+        n, action = step.get("line"), step.get("action")
+        if not isinstance(n, int) or not 1 <= n <= len(lines):
+            return "line %r is outside the file (%d lines)" % (n, len(lines))
+        if n in seen:
+            return "line %d appears twice in the plan" % n
+        seen.add(n)
+        if action not in ("delete", "replace"):
+            return "line %d: action must be delete or replace, got %r" % (n, action)
+        if step.get("expect") != lines[n - 1]:
+            return "line %d changed since the scan; re-run scan" % n
+        if action == "replace":
+            text = step.get("text")
+            if not isinstance(text, str) or "\n" in text or parse_lesson(text) is None:
+                return "line %d: replacement is not a lesson line `YYYY-MM-DD — context — rule`" % n
+    return None
+
+
+def apply_plan(lines, plan):
+    by_line = {s["line"]: s for s in plan}
+    out = []
+    for n, text in enumerate(lines, 1):
+        step = by_line.get(n)
+        if step is None:
+            out.append(text)
+        elif step["action"] == "replace":
+            out.append(step["text"].strip())
+    return out
+
+
+def main(argv):
+    if len(argv) < 2 or "--help" in argv or "-h" in argv:
+        print(__doc__.strip())
+        return 0 if len(argv) >= 2 else 2
+    cmd = argv[1]
+    path = opt(argv, "--file")
+    if not path:
+        return refuse("--file is required")
+    try:
+        max_lines = int(opt(argv, "--max", DEFAULT_MAX))
+    except ValueError:
+        return refuse("--max must be an integer")
+    lines = read_lines(path)
+
+    if cmd == "scan":
+        try:
+            today = datetime.date.fromisoformat(opt(argv, "--today", datetime.date.today().isoformat()))
+        except ValueError:
+            return refuse("--today must be YYYY-MM-DD")
+        print(json.dumps(scan(lines, max_lines, today), indent=2, ensure_ascii=False))
+        return 0
+
+    if cmd == "apply":
+        src = opt(argv, "--plan")
+        if not src:
+            return refuse("--plan is required (a path, or - for stdin)")
+        if not os.path.exists(path):
+            return refuse("%s does not exist" % path)
+        try:
+            raw = sys.stdin.read() if src == "-" else open(src, encoding="utf-8").read()
+            plan = json.loads(raw)
+        except (OSError, ValueError) as e:
+            return refuse("cannot read the plan: %s" % e)
+        err = check_plan(lines, plan)
+        if err:
+            return refuse(err)
+        out = apply_plan(lines, plan)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write("\n".join(out) + ("\n" if out else ""))
+        os.replace(tmp, path)
+        print(json.dumps({
+            "before": len(lines),
+            "after": len(out),
+            "deleted": sum(1 for s in plan if s["action"] == "delete"),
+            "replaced": sum(1 for s in plan if s["action"] == "replace"),
+            "max": max_lines,
+            "over": len(out) > max_lines,
+        }, indent=2))
+        return 0
+
+    return refuse("unknown command %r; use scan or apply" % cmd)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
