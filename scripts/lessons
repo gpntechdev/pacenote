@@ -19,7 +19,8 @@ apply reads a JSON list of `{line, expect, action, text}` from PATH or stdin: `a
 replacement `text` must be a well-formed lesson. Any mismatch refuses the whole plan with
 one line on stderr and exit 1, and the file is left untouched. Otherwise every change is
 written at once and `before`, `after`, `deleted`, `replaced`, `max` and `over` are printed.
-Stdlib only.
+A plan read from PATH is consumed: the file is deleted after a successful apply, and kept on
+a refusal so it can be rewritten. Stdlib only.
 """
 import datetime
 import json
@@ -195,6 +196,8 @@ def main(argv):
         with open(tmp, "w", encoding="utf-8") as f:
             f.write("\n".join(out) + ("\n" if out else ""))
         os.replace(tmp, path)
+        if src != "-":
+            os.remove(src)
         print(json.dumps({
             "before": len(lines),
             "after": len(out),
