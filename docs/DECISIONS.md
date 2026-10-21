@@ -1196,3 +1196,75 @@ through the skill (script-level only); `git.authority: none`; wrapper mode with 
 in the code repo; an under-cap run.
 Consequences: "done" for M7 is the user's call after Task 6. Watch whether proposals keep
 over-promoting single lessons; if they do, tighten `proposals.md` to require recurrence.
+
+## 2026-10-21 M7: spec-clean lists by script, distills inline, branches off the default branch
+
+Context: PLAN 3.1 says `status` warns about kept folders older than `flow.keep_days` and
+`spec-clean` distills or deletes them in batch. A kept folder reaches the default branch when
+its PR merges (embedded) or when `close` merges the wrapper branch, and from then on neither
+`close` (it refuses a merged PR) nor `docs` (it refuses a closed feature) runs for it. The user
+chose in the question round where the commit goes and what distill means.
+Decision:
+- `scripts/spec-clean scan` reads the features through `state list` (one parser) and reports
+  closed features as `old` (older than `--days` by the date of `updated`, with `record` when
+  `<docs_root>/features/<feature>.md` exists), `fresh`, `blocked` (still inside a worktree:
+  `close` stopped, so it goes back to `close`) and `errors`. At exactly `keep_days` a folder is
+  fresh, matching the lessons cap rule. `status` now calls it instead of computing ages itself.
+- `scripts/spec-clean apply` takes `[{feature, updated}]` from a plan file, refuses the whole
+  plan when a folder is missing, reopened, in a worktree or has a changed `updated`, removes
+  the folders from the filesystem only and consumes the plan. No git command, so
+  `git.authority: none` holds; the skill stages with `git add -A --`.
+- `/specd:spec-clean` proposes per folder `delete` (default when the record exists), `distill`
+  (default for a full-tier folder without a record) or `skip` (`delete` is the default for a
+  record-less trivial or quick folder: their policy never wrote one), with the design's
+  `### D<n>` blocks judged decision or notes in the same table, so one question covers it.
+- Distill runs `docs`' write protocol inline, per `skills/spec-clean/references/distill.md`:
+  the record and its README row (inserted by date), the approved decisions. No architecture or
+  data-model deltas, since the code has moved on; planned paths are checked against the
+  current tree and missing ones are dropped and counted in Notes. `Shipped` is the `updated`
+  date and an empty `pr` reads `unknown`.
+- Branch (user's choice): commit on the checked-out branch, except when a changed repo is on
+  its default branch (`detect-repo` `default_branch`); then `chore/spec-clean-<date>` is
+  created first. This holds for every repo touched, the wrapper included. No branch on
+  `git.authority: none`.
+- Commit per `utils.md`: `spec(spec-clean): distill d, delete c` in the repo holding the spec
+  root (docs files included when the same repo holds them; each removed folder counts once),
+  `docs(spec-clean): distill d` in a separate docs repo.
+Consequences: the util's commit never lands on a default branch, so a team that protects it
+gets a branch to push and review. Whether the other utils adopt the same default-branch rule
+(`utils.md` says "the branch that is checked out") is open; `lessons-prune` is unchanged.
+The user also corrected a premise: a wrapper has its own branches and may have a team remote,
+so it can have PRs. The `close` spine ("the wrapper has no PR, so this step merges it") and
+the 2026-10-09 M4 entry ("a PR there is pointless") rest on the opposite assumption; that is
+recorded here for a later fix, not changed in this task.
+
+## 2026-10-21 M7: spec-clean built; smoke-tested headless
+
+Context: this task's done-when was "in a scratch repo with three kept features (one fresh, one
+old with a record, one old without), the old ones are distilled or deleted on the user's
+choice, the fresh one is untouched, and `status` no longer warns". As for M2 to M6, the
+plugin's own verification is headless (memory: headless smoke testing).
+Decision: built. `tests/test-spec-clean` covers the age split and its edge, `--days`, record
+detection, unreadable state and a missing date, a closed feature inside a worktree, removal
+with the plan consumed, and every apply refusal (changed `updated`, reopened, missing, bad and
+repeated names, empty plan). Headless runs in a scratch embedded repo on `main`
+(`git.authority=commit`, `keep_days` 30), logged as `stream-json`:
+- `status` warned `old-bare kept for 93 days`, `old-recorded kept for 81 days`, then
+  `/specd:spec-clean`.
+- The proposal: `old-bare` distill (full, no record), `old-recorded` delete (record exists),
+  `fresh-one` reported as younger and left out; D1 judged decision, D2 notes; the branch named.
+- On "apply all": `chore/spec-clean-2026-10-21` was created before any write; the record (two
+  planned paths that no longer exist dropped and noted), its README row, `decisions/0001-…` and
+  a new decisions README were written; `apply` removed both folders; one commit `spec(spec-clean):
+  distill 1, delete 1`; `fresh-one` untouched. The run also noticed that the current code no
+  longer does what the spec said and flagged it in Review.
+- `status` afterwards: only `fresh-one`, no warning.
+- With `git.authority=none`, on the chore branch, two more old folders: the adjust round
+  (`old-full2 delete, old-quick skip`) was reprinted and asked again; apply removed one folder,
+  no branch, no commit, the deletion left unstaged.
+Not exercised: wrapper mode (wrapper on its default branch, `docs_root` in the code repo, two
+commits); a `blocked` row and a stale-plan refusal through the skill (script-level only); a
+distill with a `review.md` or sequences to copy; a name collision on the chore branch.
+Consequences: "done" for M7 is the user's call after Task 6. Watch whether inline distills of
+old folders write records worth keeping, or mostly drift notes; if the latter, `delete` should
+become the default for every tier.
