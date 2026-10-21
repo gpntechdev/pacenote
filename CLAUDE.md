@@ -11,13 +11,14 @@ anything in this file. Record changes to decisions in `docs/DECISIONS.md`, not i
 ```
 .claude-plugin/   plugin.json, marketplace.json
 skills/<name>/    SKILL.md (spine) + references/ + templates/
-skills/_shared/   blocks referenced by many skills: handoff, gate protocol, principles
+skills/_shared/   blocks referenced by many skills: handoff, gate protocol, principles, utils
 agents/           subagent definitions
 hooks/            secrets guardrail, source guard (snapshots, skill quarantine)
 scripts/          deterministic helpers: validate, resolve-paths, detect-*, config-set,
                   init-workspace, state, worktree, run-checks, squash-wip, pr-comments,
-                  redact, fetch-source, refresh-source, audit-static, skill-fetch, skill-lock
-tests/            test-audit, test-skill-find + fixtures
+                  redact, fetch-source, refresh-source, audit-static, skill-fetch, skill-lock,
+                  lessons
+tests/            test-audit, test-skill-find, test-lessons + fixtures
 docs/             PLAN.md, DECISIONS.md, AUTHORING.md
 ```
 

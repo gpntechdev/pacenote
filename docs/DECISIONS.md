@@ -1113,3 +1113,86 @@ Consequences: amends the "GitHub tarballs" entry. Search is wide and trust is na
 the allowlist grows only by the user's yes, and every skill from any repo is still
 fetched at a commit and audited. Pre-selection leans on install counts, which skills.sh
 computes and which can be gamed; the audit, not the count, decides.
+
+## 2026-10-21 M7: utils share one block; nothing changes without a yes; one commit form
+
+Context: M7 adds five utils (`lessons-prune`, `spec-clean`, `docs-clean`, `research`,
+`analyze`) that are not flow steps. `refresh` (2026-10-12 M5) and `critique` already set the
+pattern without writing it down: no `state check`, a script for the mechanics, the user
+decides. The user picked the commit form in the M7 question round.
+Decision: `skills/_shared/utils.md` holds the conventions every util spine links:
+- a util is a skill with a spine, never a flow step; no `state check`, never sets `step` or a
+  gate; it opens with `resolve-paths`, plus `state find` when it acts on one feature;
+- its deterministic part is a script in `scripts/` printing JSON;
+- it drafts one proposal (a row per item with action and reason, plus the exact text it
+  would write) and asks once: apply all, adjust, cancel; only approved rows are written,
+  through the script when the script owns the file, so a file that moved since the scan
+  refuses the plan;
+- one commit per run, on the checked-out branch, in the repo holding the path, as
+  `<type>(<util>): <counts>`: type by area (`docs` for `<docs_root>`, `spec` for spec
+  folders), counts in the util's own verbs, e.g. `docs(lessons-prune): promote 1, delete 2`;
+  no commit on `git.authority: none` or when nothing was written;
+- handoff `State: <util>`.
+`runtime-verify` is a flow step (PLAN 3.3) and does not follow this block.
+Consequences: later utils state only their delta. The commit lands on whatever branch is
+checked out, as `onboard`'s `docs:` commits do; on a feature branch it rides that PR.
+
+## 2026-10-21 M7: lessons-prune is a scan/apply script plus a judging spine; status warns
+
+Context: PLAN 3.1 caps `lessons.md` (`docs.lessons_max_lines`, 80) and gives pruning to a
+util. The user chose in the question round that `status` points to it when the file is over
+the cap, and that no step handoff does.
+Decision:
+- `scripts/lessons scan` counts the whole file (header included, since the whole file loads
+  every session), parses `YYYY-MM-DD — context — rule` lines with age, lists malformed lines,
+  and flags candidate duplicates: rule-word Jaccard ≥ 0.5 after dropping stopwords and cutting
+  words to five letters (a crude stem; "commit" and "committing" are one word). At the cap is
+  not over.
+- `scripts/lessons apply` takes a plan of `{line, expect, action: delete|replace, text}`;
+  every `expect` must match the current line and every replacement must be a lesson line,
+  else nothing is written. The plan is a file the skill Writes to
+  `<workspace_root>/.lessons-plan.json` and the script deletes on success: the first smoke run
+  showed that JSON passed inline through a heredoc trips Claude Code's Bash obfuscation check.
+- `/specd:lessons-prune` proposes keep, promote (to a `conventions.md` section, or to a
+  decision file from the shared template when the rule needs its reason), merge (newest
+  date, stricter wording), rewrite (malformed) or delete, per
+  `skills/lessons-prune/references/proposals.md`. Promotions are written in the main
+  thread; an approved decision drops the draft marker, since the yes is the sign-off. It
+  never deletes just to fit: when the proposal leaves the file over the cap it says so and
+  lists the five oldest kept lessons.
+- `status` runs `lessons scan` and prints `lessons.md has <n>/<max> lines;
+  /specd:lessons-prune` when over.
+- Gap recorded, not fixed (user's choice): no skill appends lessons today, although the
+  `lessons.md` template says "appended by any step the user corrects". The user appends by
+  hand until a writer is decided.
+Consequences: `lessons.md` is written only by the user and by the script. Duplicate flags
+are candidates; the proposal judges meaning.
+
+## 2026-10-21 M7: lessons-prune built; smoke-tested headless
+
+Context: M7's done-when is still open in PLAN; this task's was "an over-cap `lessons.md` in a
+scratch repo is brought under the cap, with one lesson promoted and one deleted, all on the
+user's answers". As for M2 to M6, the plugin's own verification is headless (memory:
+headless smoke testing).
+Decision: built. `tests/test-lessons` covers parsing, ages, malformed lines, duplicate pairs,
+the cap edge, apply's refusals (stale `expect`, bad replacement, out-of-range and repeated
+lines) and the consumed plan file. Headless runs in a scratch embedded repo
+(`docs.lessons_max_lines=20`, `git.authority=commit`, 20 seeded lessons: 26 lines, two
+duplicate pairs, one lesson already in `conventions.md`, one about a removed module), logged
+as `stream-json`:
+- `status` warned `lessons.md has 26/20 lines; /specd:lessons-prune`.
+- The first proposal covered every line, found both pairs and the lesson already stated in
+  `conventions.md`, and drafted rule lines and one decision file. It promoted generously (9
+  conventions lines from mostly single lessons), which the adjust round corrects.
+- Adjusted answers: one pair promoted to `Git and PR rules`, the money pair merged (newest
+  date kept), two deleted, the rest kept. Commit `docs(lessons-prune): promote 1, merge 1,
+  delete 2`; the file stood at 21/20, and the run said so and listed the oldest kept lessons.
+- A fresh run (re-scan from disk) deleted one more on the user's answer: `delete 1`, 20/20.
+  `status` then printed no warning. The plan file was consumed; the tree was clean.
+- An earlier run with the decision path: `decisions/0001-…md` written from the template
+  with its README row and no draft marker, committed as `promote 2, delete 2`.
+Not exercised: `rewrite` of a malformed line through the skill; a refusal of a stale plan
+through the skill (script-level only); `git.authority: none`; wrapper mode with `docs_root`
+in the code repo; an under-cap run.
+Consequences: "done" for M7 is the user's call after Task 6. Watch whether proposals keep
+over-promoting single lessons; if they do, tighten `proposals.md` to require recurrence.
