@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+"""Tests for `scripts/lessons`: scan parsing, ages, duplicates, the cap, and apply.
+
+Usage: test-lessons [--help]   (run from anywhere; stdlib unittest)
+"""
+import datetime
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT = os.path.join(ROOT, "scripts", "lessons")
+
+HEADER = [
+    "# Lessons",
+    "",
+    "<!-- Written by /specd:init. One line per lesson:",
+    "     `YYYY-MM-DD — context — the rule to follow next time`. -->",
+]
+BODY = [
+    "2026-10-01 — implement — run the linter before committing a task",
+    "2026-09-01 — review — never mock the database in integration tests",
+    "2026-10-15 — implement — always run the linter before you commit a task",
+    "not a lesson at all",
+    "2026-13-40 — bad date — this date does not exist",
+    "2026-10-20 - deliver - keep PR titles under 70 characters",
+]
+
+
+def run(*args, stdin=None):
+    p = subprocess.run([SCRIPT] + list(args), input=stdin, capture_output=True, text=True)
+    return p.returncode, p.stdout, p.stderr
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.path = os.path.join(self.dir.name, "lessons.md")
+        self.write(HEADER + BODY)
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def write(self, lines):
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+
+    def read(self):
+        with open(self.path, encoding="utf-8") as f:
+            return f.read()
+
+    def scan(self, *extra):
+        code, out, err = run("scan", "--file", self.path, "--today", "2026-10-21", *extra)
+        self.assertEqual(code, 0, err)
+        return json.loads(out)
+
+
+class Scan(Base):
+    def test_parses_lessons_with_age(self):
+        r = self.scan()
+        self.assertEqual([l["line"] for l in r["lessons"]], [5, 6, 7, 10])
+        first = r["lessons"][0]
+        self.assertEqual(first["context"], "implement")
+        self.assertEqual(first["rule"], "run the linter before committing a task")
+        self.assertEqual(first["age_days"], 20)
+        self.assertEqual(r["lessons"][3]["context"], "deliver")
+
+    def test_header_comment_and_headings_are_not_malformed(self):
+        r = self.scan()
+        self.assertEqual([m["line"] for m in r["malformed"]], [8, 9])
+
+    def test_duplicate_pair(self):
+        r = self.scan()
+        self.assertEqual([d["lines"] for d in r["duplicates"]], [[5, 7]])
+        self.assertGreaterEqual(r["duplicates"][0]["score"], 0.5)
+
+    def test_cap_edge(self):
+        total = len(HEADER) + len(BODY)
+        self.assertFalse(self.scan("--max", str(total))["over"])
+        self.assertTrue(self.scan("--max", str(total - 1))["over"])
+        self.assertEqual(self.scan()["max"], 80)
+
+    def test_missing_file_is_empty(self):
+        os.remove(self.path)
+        r = self.scan()
+        self.assertEqual((r["lines"], r["over"], r["lessons"]), (0, False, []))
+
+
+class Apply(Base):
+    def apply(self, plan):
+        return run("apply", "--file", self.path, "--plan", "-", "--max", "8",
+                   stdin=json.dumps(plan))
+
+    def test_delete_and_replace(self):
+        merged = "2026-10-15 — implement — run the linter before committing a task"
+        code, out, err = self.apply([
+            {"line": 5, "expect": BODY[0], "action": "replace", "text": merged},
+            {"line": 7, "expect": BODY[2], "action": "delete"},
+            {"line": 8, "expect": BODY[3], "action": "delete"},
+        ])
+        self.assertEqual(code, 0, err)
+        r = json.loads(out)
+        self.assertEqual((r["before"], r["after"], r["deleted"], r["replaced"]), (10, 8, 2, 1))
+        self.assertFalse(r["over"])
+        lines = self.read().splitlines()
+        self.assertEqual(lines[4], merged)
+        self.assertNotIn(BODY[2], lines)
+        self.assertEqual(lines[:4], HEADER)
+
+    def test_stale_expect_refuses_and_leaves_file(self):
+        before = self.read()
+        code, _, err = self.apply([
+            {"line": 5, "expect": BODY[0], "action": "delete"},
+            {"line": 6, "expect": "something else", "action": "delete"},
+        ])
+        self.assertEqual(code, 1)
+        self.assertIn("changed since the scan", err)
+        self.assertEqual(self.read(), before)
+
+    def test_bad_replacement_refuses(self):
+        before = self.read()
+        code, _, err = self.apply([
+            {"line": 5, "expect": BODY[0], "action": "replace", "text": "just words"},
+        ])
+        self.assertEqual(code, 1)
+        self.assertEqual(self.read(), before)
+
+    def test_plan_file_is_consumed_on_success_only(self):
+        plan = os.path.join(self.dir.name, "plan.json")
+        with open(plan, "w") as f:
+            json.dump([{"line": 6, "expect": "wrong", "action": "delete"}], f)
+        self.assertEqual(run("apply", "--file", self.path, "--plan", plan)[0], 1)
+        self.assertTrue(os.path.exists(plan))
+        with open(plan, "w") as f:
+            json.dump([{"line": 6, "expect": BODY[1], "action": "delete"}], f)
+        code, _, err = run("apply", "--file", self.path, "--plan", plan)
+        self.assertEqual(code, 0, err)
+        self.assertFalse(os.path.exists(plan))
+
+    def test_out_of_range_and_duplicate_lines_refuse(self):
+        self.assertEqual(self.apply([{"line": 99, "expect": "", "action": "delete"}])[0], 1)
+        step = {"line": 5, "expect": BODY[0], "action": "delete"}
+        self.assertEqual(self.apply([step, step])[0], 1)
+
+
+if __name__ == "__main__":
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(__doc__.strip())
+        sys.exit(0)
+    unittest.main(verbosity=1)
