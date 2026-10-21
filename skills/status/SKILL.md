@@ -5,7 +5,7 @@ description: >
   are open, or runs `/specd:status [feature]`; also whenever a session starts on a repo with
   specd and the user wants to resume after `/clear`. It lists every feature under the spec
   root with tier, step, gates, task progress, review rounds and PR, warns about kept folders
-  older than the configured age, and prints the exact next command for the feature named or
+  older than the configured age and about a `lessons.md` over its cap, and prints the exact next command for the feature named or
   implied by the branch. It reads only; it changes nothing.
 ---
 
@@ -18,7 +18,8 @@ next. It is safe to run at any time and never asks a question.
 
 - `resolve-paths`, `detect-repo` (current branch), `"${CLAUDE_PLUGIN_ROOT}/scripts/state"
   list` and `state find`.
-- `<workspace_root>/specd.yml`: `flow.keep_days`.
+- `<workspace_root>/specd.yml`: `flow.keep_days`, `docs.lessons_max_lines`.
+- `"${CLAUDE_PLUGIN_ROOT}/scripts/lessons" scan --file <docs_root>/lessons.md` (counts only).
 - [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/state-yml.md`](../_shared/state-yml.md)
   (step meanings).
 
@@ -39,7 +40,9 @@ next. It is safe to run at any time and never asks a question.
    `error` gets a row saying `state.yml unreadable: <reason>`.
 3. **Warn.** Every feature with `step: closed` whose `updated` is older than `flow.keep_days`
    days: one line, `<feature> kept for <n> days; /specd:close <feature> cleans
-   it (spec-clean arrives with M7)`.
+   it (spec-clean arrives with M7)`. Then `lessons scan --file <docs_root>/lessons.md --max
+   <docs.lessons_max_lines>`; when `over`: `lessons.md has <lines>/<max> lines;
+   /specd:lessons-prune`.
 4. **Point.** Resolve the feature: the argument, else `state find --branch <current>
    --worktrees <wrapper_root>/.worktrees` (an
    ambiguous result is not an error here: skip this step and say `name a feature to see

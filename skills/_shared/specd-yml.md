@@ -91,7 +91,7 @@ layers:                      # layer -> files implement and review add to "Read 
 | `flow.keep_days` | integer | status, spec-clean |
 | `models.<role>` | model name | any skill that spawns an agent; roles only elsewhere |
 | `commands.*` | shell command | implement, verify, scaffold; empty = detect |
-| `docs.lessons_max_lines` | integer | lessons-prune |
+| `docs.lessons_max_lines` | integer | lessons-prune (enforces it), status (warns when `lessons.md` is over it) |
 | `sources.mcp` | `none`, `atlassian` | start, fix, onboard, refresh: a bare ticket key (and an `*.atlassian.net` URL) goes through this server ([`sources.md`](./sources.md)); `none` asks for a paste. A file from before M5 has `sources: []`: replace that line by hand with the two lines above |
 | `skills.allowlist` | list of GitHub `owner/repo` | toolsmith: the only repos it fetches from (`skill-fetch` refuses others); `config-set --add` / `--remove` |
 | `skills.discovery` | `skills.sh`, `off` | toolsmith: `skills.sh` sends each need's search words (never code) to the skills.sh index and offers the repos it finds for the allowlist; `off` searches the allowlist only. A file from before this key: missing means `skills.sh` |
