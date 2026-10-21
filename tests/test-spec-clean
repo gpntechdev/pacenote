@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+"""Tests for `scripts/spec-clean`: scan filtering by age, records, worktrees, and apply.
+
+Usage: test-spec-clean [--help]   (run from anywhere; stdlib unittest)
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT = os.path.join(ROOT, "scripts", "spec-clean")
+STATE = os.path.join(ROOT, "scripts", "state")
+TODAY = "2026-10-21"
+
+
+def run(*args):
+    p = subprocess.run([SCRIPT] + list(args), capture_output=True, text=True)
+    return p.returncode, p.stdout, p.stderr
+
+
+def seed(spec_root, name, step="closed", updated="2026-08-01T10:00:00Z", tier="full"):
+    path = os.path.join(spec_root, name, "state.yml")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    subprocess.run([STATE, "init", "--file", path, "--feature", name, "--tier", tier,
+                    "--step", step], check=True, capture_output=True)
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    text = re.sub(r'^updated: ".*?"', 'updated: "%s"' % updated, text, flags=re.M)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+    with open(os.path.join(spec_root, name, "spec.md"), "w") as f:
+        f.write("# Spec\n")
+    return path
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.spec = os.path.join(self.dir.name, "spec")
+        self.docs = os.path.join(self.dir.name, "docs")
+        os.makedirs(os.path.join(self.docs, "features"))
+        seed(self.spec, "old-recorded")
+        seed(self.spec, "old-bare", tier="quick", updated="2026-07-01T09:00:00Z")
+        seed(self.spec, "fresh-one", updated="2026-10-16T09:00:00Z")
+        seed(self.spec, "edge", updated="2026-09-21T23:59:00Z")  # exactly 30 days
+        seed(self.spec, "open-one", step="implement", updated="2026-01-01T00:00:00Z")
+        with open(os.path.join(self.docs, "features", "old-recorded.md"), "w") as f:
+            f.write("# Feature: old-recorded\n")
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def scan(self, *extra):
+        code, out, err = run("scan", "--spec-root", self.spec, "--docs-root", self.docs,
+                             "--today", TODAY, *extra)
+        self.assertEqual(code, 0, err)
+        return json.loads(out)
+
+    def plan(self, steps):
+        path = os.path.join(self.dir.name, "plan.json")
+        with open(path, "w") as f:
+            json.dump(steps, f)
+        return path
+
+    def apply(self, steps, *extra):
+        path = self.plan(steps)
+        return (path,) + run("apply", "--spec-root", self.spec, "--plan", path, *extra)
+
+
+class Scan(Base):
+    def test_old_fresh_and_open(self):
+        r = self.scan()
+        self.assertEqual([o["feature"] for o in r["old"]], ["old-bare", "old-recorded"])
+        self.assertEqual(sorted(f["feature"] for f in r["fresh"]), ["edge", "fresh-one"])
+        self.assertEqual((r["days"], r["blocked"], r["errors"]), (30, [], []))
+
+    def test_rows_carry_age_record_and_tier(self):
+        rows = {o["feature"]: o for o in self.scan()["old"]}
+        self.assertEqual(rows["old-recorded"]["age_days"], 81)
+        self.assertTrue(rows["old-recorded"]["record"])
+        self.assertFalse(rows["old-bare"]["record"])
+        self.assertEqual(rows["old-bare"]["tier"], "quick")
+        self.assertEqual(rows["old-bare"]["updated"], "2026-07-01T09:00:00Z")
+        self.assertTrue(rows["old-bare"]["path"].endswith(os.path.join("spec", "old-bare")))
+
+    def test_days_threshold(self):
+        r = self.scan("--days", "29")
+        self.assertIn("edge", [o["feature"] for o in r["old"]])
+
+    def test_unreadable_state_and_missing_date(self):
+        with open(os.path.join(self.spec, "old-bare", "state.yml"), "a") as f:
+            f.write("garbage line without a colon\n")
+        seed(self.spec, "no-date", updated="")
+        r = self.scan()
+        reasons = {e["feature"]: e["reason"] for e in r["errors"]}
+        self.assertIn("no-date", reasons)
+        self.assertIn("unreadable", reasons["old-bare"])
+        self.assertNotIn("no-date", [o["feature"] for o in r["old"]])
+
+    def test_closed_feature_in_a_worktree_is_blocked(self):
+        wts = os.path.join(self.dir.name, ".worktrees")
+        wt = os.path.join(wts, "parallel")
+        os.makedirs(wt)
+        with open(os.path.join(wt, "specd.yml"), "w") as f:
+            f.write("mode: wrapper\nproject: x\n")
+        seed(os.path.join(wt, "spec"), "parallel")
+        r = self.scan("--worktrees", wts)
+        self.assertEqual([b["feature"] for b in r["blocked"]], ["parallel"])
+        self.assertNotIn("parallel", [o["feature"] for o in r["old"]])
+
+
+class Apply(Base):
+    def test_removes_approved_folders_and_consumes_plan(self):
+        rows = {o["feature"]: o for o in self.scan()["old"]}
+        plan, code, out, err = self.apply([
+            {"feature": "old-recorded", "updated": rows["old-recorded"]["updated"]},
+            {"feature": "old-bare", "updated": rows["old-bare"]["updated"]},
+        ])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(json.loads(out)["removed"], ["old-recorded", "old-bare"])
+        self.assertFalse(os.path.exists(os.path.join(self.spec, "old-bare")))
+        self.assertTrue(os.path.isdir(os.path.join(self.spec, "fresh-one")))
+        self.assertFalse(os.path.exists(plan))
+
+    def assertRefused(self, steps, needle):
+        plan, code, _, err = self.apply(steps)
+        self.assertEqual(code, 1)
+        self.assertIn(needle, err)
+        self.assertTrue(os.path.exists(plan))
+        self.assertTrue(os.path.isdir(os.path.join(self.spec, "old-recorded")))
+
+    def test_changed_updated_refuses_everything(self):
+        self.assertRefused([
+            {"feature": "old-recorded", "updated": "2026-08-01T10:00:00Z"},
+            {"feature": "old-bare", "updated": "2026-01-01T00:00:00Z"},
+        ], "changed since the scan")
+
+    def test_open_feature_refuses(self):
+        self.assertRefused([
+            {"feature": "old-recorded", "updated": "2026-08-01T10:00:00Z"},
+            {"feature": "open-one", "updated": "2026-01-01T00:00:00Z"},
+        ], "no longer closed")
+
+    def test_missing_bad_and_repeated_names_refuse(self):
+        ok = {"feature": "old-recorded", "updated": "2026-08-01T10:00:00Z"}
+        self.assertRefused([ok, {"feature": "ghost", "updated": ""}], "not a spec folder")
+        self.assertRefused([ok, {"feature": "../docs", "updated": ""}], "not a folder name")
+        self.assertRefused([ok, ok], "twice")
+        self.assertRefused([], "non-empty")
+
+
+if __name__ == "__main__":
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(__doc__.strip())
+        sys.exit(0)
+    unittest.main(verbosity=1)

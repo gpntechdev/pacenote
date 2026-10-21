@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+"""List kept spec folders older than flow.keep_days, or remove an approved set, as JSON.
+
+Usage: spec-clean scan  --spec-root D --docs-root D [--worktrees D] [--days N] [--today YYYY-MM-DD]
+       spec-clean apply --spec-root D --plan PATH [--worktrees D]
+
+A kept folder is a feature whose state.yml has `step: closed` (close with `keep`). Features
+are read through `scripts/state list`, so the state parser lives in one place.
+
+scan prints `days` (default 30, the `flow.keep_days` default), `today`, `old` (closed and
+older than `days`, by the date of `updated`: feature, path, age_days, tier, retention, pr,
+updated, and `record`, true when `<docs-root>/features/<feature>.md` exists), `fresh` (closed,
+`days` old or younger: feature, age_days), `blocked` (closed but still inside a feature
+worktree, which `close` removes; feature, worktree, reason) and `errors` (unreadable
+state.yml, or a closed feature without an `updated` date). At exactly `days` a folder is fresh.
+
+apply reads a JSON list of `{feature, updated}` from PATH. Every feature must still be a
+closed folder under `--spec-root` (not in a worktree) whose `updated` equals the scanned
+value; any mismatch refuses the whole plan with one line on stderr and exit 1, and nothing is
+removed. Otherwise the folders are removed from the filesystem (no git command: staging and
+committing are the caller's, so `git.authority: none` holds), the plan file is deleted, and
+`removed` is printed. Stdlib only.
+"""
+import datetime
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+DEFAULT_DAYS = 30
+STATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state")
+
+
+def opt(argv, flag, default=None):
+    if flag in argv:
+        i = argv.index(flag)
+        if i + 1 >= len(argv):
+            print("specd: %s needs a value" % flag, file=sys.stderr)
+            sys.exit(2)
+        return argv[i + 1]
+    return default
+
+
+def refuse(msg):
+    print("specd: %s" % msg, file=sys.stderr)
+    return 1
+
+
+def features(spec_root, worktrees):
+    cmd = [sys.executable, STATE, "list", "--spec-root", spec_root]
+    if worktrees:
+        cmd += ["--worktrees", worktrees]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise ValueError(r.stderr.strip() or "state list failed")
+    return json.loads(r.stdout)
+
+
+def updated_date(value):
+    try:
+        return datetime.date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def scan(spec_root, docs_root, worktrees, days, today):
+    out = {"days": days, "today": today.isoformat(), "old": [], "fresh": [], "blocked": [],
+           "errors": []}
+    for f in features(spec_root, worktrees):
+        name = f.get("feature", "")
+        if "error" in f:
+            out["errors"].append({"feature": name, "reason": "state.yml unreadable: %s" % f["error"]})
+            continue
+        if f.get("step") != "closed":
+            continue
+        if f.get("worktree"):
+            out["blocked"].append({"feature": name, "worktree": f["worktree"],
+                                   "reason": "close stopped before removing the worktree; "
+                                             "run /specd:close %s from the wrapper root" % name})
+            continue
+        date = updated_date(f.get("updated", ""))
+        if date is None:
+            out["errors"].append({"feature": name, "reason": "closed without an updated date"})
+            continue
+        age = (today - date).days
+        if age <= days:
+            out["fresh"].append({"feature": name, "age_days": age})
+            continue
+        out["old"].append({
+            "feature": name, "path": os.path.join(os.path.abspath(spec_root), name),
+            "age_days": age, "tier": f.get("tier", ""), "retention": f.get("retention", ""),
+            "pr": f.get("pr", ""), "updated": f.get("updated", ""),
+            "record": os.path.isfile(os.path.join(docs_root, "features", name + ".md")),
+        })
+    out["old"].sort(key=lambda r: -r["age_days"])
+    return out
+
+
+def check_plan(spec_root, worktrees, plan):
+    """Return an error string, or None when every folder of the plan may go."""
+    if not isinstance(plan, list) or not plan:
+        return "plan must be a non-empty JSON list"
+    rows = {f.get("feature"): f for f in features(spec_root, worktrees)
+            if "error" not in f and not f.get("worktree")}
+    seen = set()
+    for step in plan:
+        if not isinstance(step, dict):
+            return "each plan step must be an object"
+        name = step.get("feature")
+        if not isinstance(name, str) or not name or "/" in name or name.startswith("."):
+            return "feature %r is not a folder name" % (name,)
+        if name in seen:
+            return "%s appears twice in the plan" % name
+        seen.add(name)
+        row = rows.get(name)
+        if row is None or not os.path.isdir(os.path.join(spec_root, name)):
+            return "%s is not a spec folder under %s" % (name, spec_root)
+        if row.get("step") != "closed":
+            return "%s is no longer closed (step %s); re-run scan" % (name, row.get("step"))
+        if str(row.get("updated", "")) != str(step.get("updated", "")):
+            return "%s changed since the scan; re-run scan" % name
+    return None
+
+
+def main(argv):
+    if len(argv) < 2 or "--help" in argv or "-h" in argv:
+        print(__doc__.strip())
+        return 0 if len(argv) >= 2 else 2
+    cmd = argv[1]
+    spec_root = opt(argv, "--spec-root")
+    if not spec_root:
+        return refuse("--spec-root is required")
+    worktrees = opt(argv, "--worktrees")
+
+    if cmd == "scan":
+        docs_root = opt(argv, "--docs-root")
+        if not docs_root:
+            return refuse("--docs-root is required")
+        try:
+            days = int(opt(argv, "--days", DEFAULT_DAYS))
+            today = datetime.date.fromisoformat(opt(argv, "--today", datetime.date.today().isoformat()))
+        except ValueError:
+            return refuse("--days must be an integer and --today YYYY-MM-DD")
+        try:
+            result = scan(spec_root, docs_root, worktrees, days, today)
+        except ValueError as e:
+            return refuse(str(e))
+        print(json.dumps(result, indent=2))
+        return 0
+
+    if cmd == "apply":
+        src = opt(argv, "--plan")
+        if not src:
+            return refuse("--plan is required")
+        try:
+            with open(src, encoding="utf-8") as f:
+                plan = json.load(f)
+        except (OSError, ValueError) as e:
+            return refuse("cannot read the plan: %s" % e)
+        try:
+            err = check_plan(spec_root, worktrees, plan)
+        except ValueError as e:
+            return refuse(str(e))
+        if err:
+            return refuse(err)
+        removed = []
+        for step in plan:
+            shutil.rmtree(os.path.join(spec_root, step["feature"]))
+            removed.append(step["feature"])
+        os.remove(src)
+        print(json.dumps({"removed": removed}, indent=2))
+        return 0
+
+    return refuse("unknown command %r; use scan or apply" % cmd)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
