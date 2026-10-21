@@ -596,6 +596,9 @@ Consequences: the wrapper's default branch holds the complete spec history as me
 commits; a second parallel feature needs worktrees (next entry), because one checkout can
 be on one branch. The 2026-09-24 M2 git entry now reads for two repos: "commit" means in
 the repo that contains the path (`paths.md`, "Rules"), never per mode.
+Amended 2026-10-21 M7: a wrapper may have a team remote and PRs of its own; whether the
+wrapper branch gets a draft PR or is merged by `close` is the user's choice
+(`git.wrapper_pr`, see that entry).
 
 ## 2026-10-09 M4: worktrees are opt-in; a feature worktree is a wrapper worktree with the code worktree inside
 
@@ -1231,12 +1234,9 @@ Decision:
   root (docs files included when the same repo holds them; each removed folder counts once),
   `docs(spec-clean): distill d` in a separate docs repo.
 Consequences: the util's commit never lands on a default branch, so a team that protects it
-gets a branch to push and review. Whether the other utils adopt the same default-branch rule
-(`utils.md` says "the branch that is checked out") is open; `lessons-prune` is unchanged.
-The user also corrected a premise: a wrapper has its own branches and may have a team remote,
-so it can have PRs. The `close` spine ("the wrapper has no PR, so this step merges it") and
-the 2026-10-09 M4 entry ("a PR there is pointless") rest on the opposite assumption; that is
-recorded here for a later fix, not changed in this task.
+gets a branch to push and review. The rule became every util's (entry below). The user also
+corrected a premise here: a wrapper has its own branches and may have a team remote; that
+is settled in the `git.wrapper_pr` entry below.
 
 ## 2026-10-21 M7: spec-clean built; smoke-tested headless
 
@@ -1268,3 +1268,43 @@ distill with a `review.md` or sequences to copy; a name collision on the chore b
 Consequences: "done" for M7 is the user's call after Task 6. Watch whether inline distills of
 old folders write records worth keeping, or mostly drift notes; if the latter, `delete` should
 become the default for every tier.
+
+## 2026-10-21 M7: a wrapper PR is the user's choice (`git.wrapper_pr`)
+
+Context: the 2026-10-09 M4 entry made `close` merge the wrapper branch locally because "the
+wrapper has no reviewers, so a PR there is pointless". The user corrected this: a wrapper has
+its own branches and may have a remote, used to share the work with a team, and then spec
+and docs changes deserve review too. Equally, a single user's wrapper may have no remote at
+all. It is the user's call.
+Decision: `git.wrapper_pr: false | true` in `specd.yml` (wrapper only; a missing key means
+`false`, a file from before M7 adds the line by hand, since `config-set` refuses unknown
+keys). `false` keeps the M4 behaviour. `true`:
+- `deliver`, when the user chose push + draft PR and the wrapper branch was pushed (it has an
+  `origin` and authority allows), opens a draft PR in the wrapper with the CLI of the
+  wrapper's own `remote_host`, base its default branch, titled like the code PR, body one line
+  linking the code PR. A re-deliver that finds one open says so; the URL is printed, not
+  stored, so `state.yml` keeps one `pr` (the code PR's). CLI missing: the command and the
+  compare URL are printed.
+- `close` still removes the worktree and pushes its removal commit, but leaves the merge to
+  the wrapper PR. Without an `origin` no wrapper PR can exist, so `close` says so and merges
+  locally as before.
+- `init`'s wrapper handoff names the key; `git.md` "Wrapper" holds the rules.
+Consequences: amends the 2026-10-09 M4 entry and PLAN 3.1. With `true` the user merges two
+PRs per feature, code and wrapper, in either order; the wrapper's default branch gets the
+spec history only when its PR merges. Not smoke-tested: a wrapper with a remote and the
+draft PR path.
+
+## 2026-10-21 M7: utils never commit on a default branch
+
+Context: the spec-clean question round set "commit wherever you are, except the default
+branch" for that util; the user then made it the rule for every util. `utils.md` said a util
+commits "on the branch that is checked out", which on `main` means a direct commit.
+Decision: `utils.md` gains a "Branch" section: before its first write, for each repo it will
+change, a util runs `detect-repo --from <root>` and, when `current_branch` equals
+`default_branch`, creates `chore/<util>-<YYYY-MM-DD>` (`-2`, `-3` when taken); on any other
+branch it stays; the wrapper is no exception; no branch on `git.authority: none`; pushing
+and any PR are the user's. The proposal question names the branch. `spec-clean`,
+`lessons-prune` (a new step 6) and `refresh` link it; `critique` writes nothing.
+Consequences: amends the 2026-10-21 utils entry ("on the checked-out branch"). A util run on a
+feature branch still rides that feature's PR. `lessons-prune` and `refresh` were not re-run
+headless after this change; the rule is the one `spec-clean`'s smoke run exercised.
