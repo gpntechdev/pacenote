@@ -19,17 +19,27 @@ its delta.
 
 1. The script scans; the main thread drafts a proposal: one row per item, with the action and
    a one-line reason, and the exact text it would write.
-2. One question: apply all, adjust (the user names rows to change or skip, in free text), or
+2. One question (it names the branch the run will commit to): apply all, adjust (the user names rows to change or skip, in free text), or
    cancel. Adjustments are applied to the proposal and shown once more before writing.
 3. Only approved rows are written. Cancel or no approved row: no write, no commit.
 4. The write goes through the util's script when it changes a file the script owns, so a file
    that moved since the scan refuses the plan instead of being overwritten.
 
+## Branch
+
+A util never commits on a default branch. Before its first write, for each repo it will
+change (the repo holding each root it writes, per `paths.md`), it runs `detect-repo --from
+<root>`: when `current_branch` equals `default_branch`, `git -C <root> checkout -b
+chore/<util>-<YYYY-MM-DD>` (name taken: add `-2`, `-3`). A dirty tree is fine; the branch
+carries it. On any other branch (a feature branch, an earlier chore branch) it stays there.
+This holds in the wrapper too. No branch on `git.authority: none`. Pushing and any PR are
+the user's; the handoff says so.
+
 ## Commit
 
 - One commit per run, in the repo that contains the changed files (`git -C <docs_root>`,
   `git -C <workspace_root>`; two roots in two repos are two commits, per `paths.md`), on the
-  branch that is checked out. The handoff names that branch.
+  branch from "Branch" above. The handoff names that branch.
 - Message: `<type>(<util>): <counts>`, where `<type>` is the area touched (`docs` for
   `<docs_root>`, `spec` for spec folders) and `<counts>` lists the non-zero actions in the
   util's own verbs, e.g. `docs(lessons-prune): promote 1, merge 2, delete 3`. No body unless

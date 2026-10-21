@@ -6,9 +6,8 @@ description: >
   kept folders older than `flow.keep_days`, or runs `/specd:spec-clean`. It lists every
   feature closed with `keep` and older than the cap with a script, proposes per folder
   delete (the feature record already exists), distill (write the missing record and durable
-  decisions, then delete) or skip, and applies only the rows you approve, on a
-  `chore/spec-clean-<date>` branch when you are on the default branch, then commits once per
-  repo. Not for a feature still in flight or one whose PR is open; that is `/specd:close`.
+  decisions, then delete) or skip, and applies only the rows you approve, then commits once
+  per repo, never on a default branch. Not for a feature still in flight or one whose PR is open; that is `/specd:close`.
 ---
 
 # Skill: spec-clean
@@ -60,12 +59,9 @@ no `state check`, nothing written without a yes.
 4. **Ask** one question per `utils.md`: apply all, adjust, cancel. Adjust: apply the user's
    changes (`auth skip`, `billing distill`, `billing D2 decision`), reprint the changed rows,
    ask again. Cancel or every row `skip`: handoff, nothing written.
-5. **Branch** (skip on `git.authority: none`). The repos that will change are the one holding
+5. **Branch** per `utils.md` "Branch". The repos that will change are the one holding
    `<spec_root>`, plus the one holding `<docs_root>` when a distill row exists and it is
-   another repo (`paths.md`, "Rules"). For each, `detect-repo --from <root>`: when
-   `current_branch` equals `default_branch`, `git -C <root> checkout -b
-   chore/spec-clean-<today>` (name taken: add `-2`, `-3`). A dirty tree is fine; the branch
-   carries it. Any other branch: stay on it.
+   another repo.
 6. **Distill** each approved distill row, one folder at a time, per
    [`./references/distill.md`](./references/distill.md): the record from the template, its
    README row, the approved decisions with README rows. Read the next folder only after the
@@ -91,7 +87,6 @@ no `state check`, nothing written without a yes.
 - Proposing or removing a fresh, open, blocked or skipped folder; the scan decides what is old,
   the user decides what goes.
 - Removing a folder with `rm`, `git rm` or a file tool; `spec-clean apply` is the only remover.
-- Committing on the default branch; step 5 branches first.
 - Running `/specd:docs` for a closed feature (it refuses) or editing architecture and
   data-model files from an old design; this run writes the record and decisions only.
 - Writing a record for a folder the user marked `delete`, or one question per folder.
