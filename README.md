@@ -78,8 +78,10 @@ ticket key fetches the Jira issue and up to five linked pages; fetched pages are
 before they are saved and summarised by an agent that cannot act on them. `git.authority` in `specd.yml` caps what the flow may do with
 git: `none`, `commit`, `push` or `draft_pr` (default).
 
-Third-party skills are hostile until audited. `toolsmith` fetches candidates only from the
-repos in `skills.allowlist`, at a pinned commit, into a gitignored `.quarantine/` that
+Third-party skills are hostile until audited. `toolsmith` finds candidates in the skills.sh
+index, the search behind find-skills, and offers repos you have not allowlisted yet for
+`skills.allowlist` (`skills.discovery: off` keeps it to the allowlist). It fetches only from
+allowlisted repos, at a pinned commit, into a gitignored `.quarantine/` that
 Claude Code never loads. A static script (`audit-static`) and an isolated `skill-auditor`
 agent both read it, nothing is executed, and a skill is installed only on your yes when
 neither stage blocks it. `skills.lock` records the commit and a hash of the installed
@@ -105,11 +107,13 @@ scripts/          deterministic helpers: validate, resolve-paths, detect-repo,
                   detect-commands, config-set, init-workspace, state, worktree, run-checks, squash-wip,
                   pr-comments, redact, fetch-source, refresh-source, audit-static, skill-fetch,
                   skill-lock
-tests/            test-audit and the audit fixtures (a seeded malicious skill, a clean one)
+tests/            test-audit, test-skill-find and their fixtures (a seeded malicious skill, a
+                  clean one, a skills.sh search response)
 docs/             PLAN.md, DECISIONS.md, AUTHORING.md
 ```
 
 ## Contributing
 
 Read `docs/AUTHORING.md` before adding or changing a skill. Run `scripts/validate`,
-`tests/test-audit` and `claude plugin validate .` before committing. Decisions go to `docs/DECISIONS.md`.
+`tests/test-audit`, `tests/test-skill-find` and `claude plugin validate .` before
+committing. Decisions go to `docs/DECISIONS.md`.

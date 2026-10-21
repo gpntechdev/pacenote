@@ -10,3 +10,6 @@ Skill folders for `tests/test-audit` and the M6 smoke runs. Nothing here is exec
   catches. Keep notes about the fixture out of its folder: the auditor reads everything
   inside it.
 - `clean-skill/` has no static finding.
+- `skills-search.json` is a trimmed skills.sh search response (2026-10-12, "flutter state
+  management") plus a non-GitHub source and a hostile-looking skill name, for
+  `tests/test-skill-find`.

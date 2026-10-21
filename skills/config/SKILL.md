@@ -3,7 +3,8 @@ name: config
 description: >
   Invoke whenever the user asks to change, set, show or check a specd setting (gate
   granularity, TDD, retention, PR host, ticket key, model roles, project commands, the
-  ticket-source MCP server, specialist review passes, the skills allowlist and layers) or
+  ticket-source MCP server, specialist review passes, skill discovery, the skills
+  allowlist and layers) or
   runs `/specd:config [key=value ...] [--add|--remove key=item]`. It reads `specd.yml`, shows the current value of the keys
   named (or the whole file when none), asks for the new values, patches them in place with
   `config-set` and shows `old -> new`. Not for creating the workspace; that is `/specd:init`.

@@ -58,9 +58,11 @@ sources:
   mcp: none                  # none | atlassian: the MCP server that fetches bare ticket keys
                              # (PROJ-123) and its own page URLs; URLs, files and pastes need no key
 
-skills:                      # GitHub repos toolsmith may search for third-party skills;
+skills:                      # GitHub repos toolsmith may fetch third-party skills from;
   allowlist:                 # change with /specd:config --add / --remove
     - anthropics/skills
+  discovery: skills.sh       # skills.sh | off: find candidates in the skills.sh index (the
+                             # search find-skills uses) and offer their repos for the allowlist
 
 layers:                      # layer -> files implement and review add to "Read first" for
                              #     tasks of that layer; paths relative to code_root. Filled by
@@ -91,7 +93,8 @@ layers:                      # layer -> files implement and review add to "Read 
 | `commands.*` | shell command | implement, verify, scaffold; empty = detect |
 | `docs.lessons_max_lines` | integer | lessons-prune |
 | `sources.mcp` | `none`, `atlassian` | start, fix, onboard, refresh: a bare ticket key (and an `*.atlassian.net` URL) goes through this server ([`sources.md`](./sources.md)); `none` asks for a paste. A file from before M5 has `sources: []`: replace that line by hand with the two lines above |
-| `skills.allowlist` | list of GitHub `owner/repo` | toolsmith: the only repos it searches and fetches from (`skill-fetch` refuses others); `config-set --add` / `--remove` |
+| `skills.allowlist` | list of GitHub `owner/repo` | toolsmith: the only repos it fetches from (`skill-fetch` refuses others); `config-set --add` / `--remove` |
+| `skills.discovery` | `skills.sh`, `off` | toolsmith: `skills.sh` sends each need's search words (never code) to the skills.sh index and offers the repos it finds for the allowlist; `off` searches the allowlist only. A file from before this key: missing means `skills.sh` |
 | `layers.<name>` | list of paths, relative to `code_root` (not `workspace_root`) | tasks (the `layer` vocabulary), implement and review (files the agent reads first); written by toolsmith or `config-set --add layers.<name>=<path>` |
 
 Retention per tier: trivial and quick close with `clean` unless the feature's `state.yml` says

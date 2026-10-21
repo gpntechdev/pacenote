@@ -1,6 +1,6 @@
 # Generating a project skill
 
-Read by `toolsmith` step 8, when no allowlisted skill was installed for a need. The result
+Read by `toolsmith` step 9, when no allowlisted skill was installed for a need. The result
 describes how *this* codebase does things, with pointers, plus the few library facts that
 are easy to get wrong. It is the project's own text, so it is not audited by an agent, but
 the static script still runs on it.
