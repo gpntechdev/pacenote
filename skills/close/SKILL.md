@@ -56,7 +56,7 @@ again to clean it). A merged PR is refused: the folder is already on the default
    `git -C <workspace_root> rm -r <spec_root>/<feature>`.
 3. **clean.** `git -C <workspace_root> rm -r <spec_root>/<feature>`.
 4. **keep.** `state set step=closed retention=keep worktree=`. The folder stays; `status`
-   warns after `flow.keep_days`.
+   warns after `flow.keep_days` and `/specd:spec-clean` clears it in a batch.
 5. **Commit** `docs(<feature>): close (<policy>)` with `git -C <workspace_root>`; push when
    authority ≥ `push` and `branch` is set: the same push as `deliver` in embedded mode, the
    `git.md` "Wrapper" rule when the wrapper is a second repo.
