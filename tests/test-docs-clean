@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+"""Tests for `scripts/docs-clean`: the six scan checks and apply's plan handling.
+
+Usage: test-docs-clean [--help]   (run from anywhere; stdlib unittest)
+"""
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT = os.path.join(ROOT, "scripts", "docs-clean")
+DRAFT = "<!-- specd:draft -->"
+
+CODE = {
+    "app/models/user.py": "import os\n\n\nclass User:\n    name = 'u'\n",
+    "app/models/order.py": "\n".join(["# order"] * 9 + ["class Order:", "    def total(self):",
+                                                        "        return Order"]) + "\n",
+    "app/api.py": "def handler():\n    return 1\n",
+}
+
+
+def write(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+
+def read(path):
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        d = self.dir.name
+        self.code = os.path.join(d, "repo")
+        self.ws = os.path.join(d, "repo", ".specd")
+        self.docs = os.path.join(self.ws, "docs")
+        self.spec = os.path.join(self.ws, "spec")
+        self.sources = os.path.join(self.ws, "sources")
+        for rel, text in CODE.items():
+            write(os.path.join(self.code, rel), text)
+        write(os.path.join(self.docs, "project.md"), "# P\n" + "x\n" * 99)       # 100: at cap
+        write(os.path.join(self.docs, "conventions.md"), "# C\n" + "r\n" * 80)  # 81: over
+        write(os.path.join(self.docs, "lessons.md"), "# L\n" + "l\n" * 200)     # not ours
+        write(os.path.join(self.docs, "data-models", "accounts.md"),
+              "# Data model: accounts\n\n## Entities\n\n"
+              "- User — an account — `app/models/user.py:4`\n"                 # ok
+              "- Order — a basket — `app/models/order.py:2`\n"                 # drifted, one def
+              "- Gone — removed — `app/models/gone.py:1`\n"                    # missing
+              "- `handler` serves it (`app/api.py:9`)\n"                       # out of range
+              "- `Order.total` sums (`app/models/order.py:3-4`)\n"             # drifted range
+              "- see `app/models/user.py` for the class, `app/models/user.py:4`\n"
+              "\n```\n`app/models/gone.py:3` inside a fence\n```\n")
+        write(os.path.join(self.docs, "architecture", "overview.md"),
+              DRAFT + "\n# Architecture\n\n- [orders](./orders.md)\n"            # draft; retarget
+              "- [nowhere](./nowhere.md) and [spec](https://example.com)\n"     # unresolved
+              "- [ok](../project.md#run) [snap](../../sources/kept.md)\n")
+        write(os.path.join(self.docs, "architecture", "areas", "orders.md"), "# Area\n")
+        write(os.path.join(self.docs, "features", "cart.md"), "# Feature: cart\n")
+        write(os.path.join(self.docs, "features", "search.md"), "# Feature: search\n" + "s\n" * 150)
+        write(os.path.join(self.docs, "features", "README.md"),
+              "# Features\n\n| Feature | What | Entry | Shipped |\n|---|---|---|---|\n"
+              "| [cart](./cart.md) | c | /cart | 2026-01-01 |\n"
+              "| wishlist | w | /w | 2026-02-01 |\n")
+        write(os.path.join(self.docs, "decisions", "0001-use-sqlite.md"),
+              "# 0001: Use SQLite\n\nDate: 2026-01-02\nStatus: accepted\n")
+        write(os.path.join(self.docs, "decisions", "0002-drop-redis.md"),
+              "# 0002: Drop Redis\n\nDate: 2026-03-04\nStatus: accepted\n")
+        write(os.path.join(self.docs, "decisions", "README.md"),
+              "# Decisions\n\n| # | Title | Date | Status |\n|---|---|---|---|\n"
+              "| 0001 | Use SQLite | 2026-01-02 | accepted |\n"
+              "| [0003](./0003-old.md) | Old | 2026-04-01 | accepted |\n")
+        write(os.path.join(self.sources, "kept.md"), '<!-- specd:source origin="x" via="file" -->\n')
+        write(os.path.join(self.sources, "brief-src.md"),
+              '<!-- specd:source origin="https://w/p" title="Page" via="http" -->\nbody\n')
+        write(os.path.join(self.sources, "orphan.md"),
+              '<!-- specd:source origin="https://w/o" title="Old page" via="http" -->\nbody\n')
+        write(os.path.join(self.sources, "orphan.new.md"), "pending\n")
+        write(os.path.join(self.spec, "feat", "brief.md"), "From sources/brief-src.md\n")
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def run_script(self, *args):
+        p = subprocess.run([SCRIPT] + list(args), capture_output=True, text=True)
+        return p.returncode, p.stdout, p.stderr
+
+    def scan(self):
+        code, out, err = self.run_script("scan", "--docs-root", self.docs, "--code-root", self.code,
+                                         "--workspace-root", self.ws, "--spec-root", self.spec)
+        self.assertEqual(code, 0, err)
+        return json.loads(out)
+
+    def apply(self, plan):
+        path = os.path.join(self.ws, ".docs-clean-plan.json")
+        write(path, json.dumps(plan))
+        code, out, err = self.run_script("apply", "--docs-root", self.docs, "--workspace-root",
+                                         self.ws, "--spec-root", self.spec, "--plan", path)
+        return code, out, err, path
+
+
+class Scan(Base):
+    def test_pointers(self):
+        r = self.scan()
+        by_ptr = {f["pointer"]: f for f in r["pointers"]}
+        self.assertEqual(set(by_ptr), {"app/models/order.py:2", "app/models/gone.py:1",
+                                       "app/api.py:9", "app/models/order.py:3-4"})
+        drift = by_ptr["app/models/order.py:2"]
+        self.assertEqual((drift["kind"], drift["identifier"], drift["new_pointer"]),
+                         ("drifted", "Order", "app/models/order.py:10"))
+        self.assertEqual(drift["suggest"], "- Order — a basket — `app/models/order.py:10`")
+        self.assertEqual(by_ptr["app/models/gone.py:1"]["kind"], "missing")
+        self.assertNotIn("suggest", by_ptr["app/models/gone.py:1"])
+        oor = by_ptr["app/api.py:9"]
+        self.assertEqual((oor["kind"], oor["new_pointer"]), ("out_of_range", "app/api.py:1"))
+        rng = by_ptr["app/models/order.py:3-4"]
+        self.assertEqual((rng["identifier"], rng["new_pointer"]), ("total", "app/models/order.py:11-12"))
+
+    def test_ambiguous_reanchor_has_no_suggest(self):
+        write(os.path.join(self.code, "app/x.py"), "a\nfoo()\nfoo()\n")
+        write(os.path.join(self.docs, "architecture", "x.md"), "- foo — calls — `app/x.py:1`\n")
+        f = [p for p in self.scan()["pointers"] if p["pointer"] == "app/x.py:1"][0]
+        self.assertEqual(f["kind"], "drifted")
+        self.assertNotIn("suggest", f)
+
+    def test_links(self):
+        links = {f["target"]: f for f in self.scan()["links"]}
+        self.assertEqual(set(links), {"./orders.md", "./nowhere.md"})
+        self.assertEqual(links["./orders.md"]["new_target"], "./areas/orders.md")
+        self.assertEqual(links["./orders.md"]["suggest"], "- [orders](./areas/orders.md)")
+        self.assertNotIn("suggest", links["./nowhere.md"])
+
+    def test_caps(self):
+        caps = {os.path.relpath(f["file"], self.docs): (f["lines"], f["max"]) for f in self.scan()["caps"]}
+        self.assertEqual(caps, {"conventions.md": (81, 80), "features/search.md": (151, 150)})
+
+    def test_drafts(self):
+        drafts = self.scan()["drafts"]
+        self.assertEqual([(os.path.relpath(f["file"], self.docs), f["section"]) for f in drafts],
+                         [("architecture/overview.md", "architecture")])
+
+    def test_readmes(self):
+        rows = self.scan()["readmes"]
+        kinds = sorted((f["kind"], f.get("key", ""), tuple(f.get("names", []))) for f in rows)
+        self.assertEqual(kinds, [("missing_row", "0002", ()), ("missing_row", "search", ()),
+                                 ("stale_row", "", ("0003",)), ("stale_row", "", ("wishlist",))])
+        dec = [f for f in rows if f.get("key") == "0002"][0]
+        self.assertEqual((dec["title"], dec["date"], dec["status"]),
+                         ("0002: Drop Redis", "2026-03-04", "accepted"))
+
+    def test_no_readme(self):
+        os.remove(os.path.join(self.docs, "decisions", "README.md"))
+        rows = [f for f in self.scan()["readmes"] if f["kind"] == "no_readme"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(len(rows[0]["files"]), 2)
+
+    def test_sources(self):
+        src = self.scan()["sources"]
+        self.assertEqual([os.path.basename(f["file"]) for f in src], ["orphan.md"])
+        self.assertEqual((src[0]["title"], src[0]["via"]), ("Old page", "http"))
+
+    def test_counts(self):
+        r = self.scan()
+        self.assertEqual(r["counts"]["total"], sum(len(r[k]) for k in
+                                                   ("pointers", "links", "caps", "drafts", "readmes", "sources")))
+
+    def test_clean_docs(self):
+        empty = os.path.join(self.dir.name, "empty")
+        os.makedirs(os.path.join(empty, "docs"))
+        code, out, err = self.run_script("scan", "--docs-root", os.path.join(empty, "docs"),
+                                         "--code-root", empty, "--workspace-root", empty,
+                                         "--spec-root", os.path.join(empty, "spec"))
+        self.assertEqual(json.loads(out)["counts"]["total"], 0)
+
+
+class Apply(Base):
+    def test_applies_and_consumes(self):
+        r = self.scan()
+        drift = [p for p in r["pointers"] if p["pointer"] == "app/models/order.py:2"][0]
+        readme = os.path.join(self.docs, "features", "README.md")
+        stale = [f for f in r["readmes"] if f.get("names") == ["wishlist"]][0]
+        overview = os.path.join(self.docs, "architecture", "overview.md")
+        orphan = os.path.join(self.sources, "orphan.md")
+        plan = [
+            {"file": drift["file"], "action": "replace", "line": drift["line"],
+             "expect": drift["text"], "text": drift["suggest"]},
+            {"file": readme, "action": "delete", "line": stale["line"], "expect": stale["text"]},
+            {"file": readme, "action": "insert", "line": 5, "expect": read(readme).splitlines()[4],
+             "text": "| [search](./search.md) | s | /s | 2026-01-05 |"},
+            {"file": readme, "action": "insert", "line": 5, "expect": read(readme).splitlines()[4],
+             "text": "| extra | e | /e | 2026-01-06 |"},
+            {"file": overview, "action": "delete", "line": 1, "expect": DRAFT},
+            {"file": orphan, "action": "remove"},
+        ]
+        code, out, err, path = self.apply(plan)
+        self.assertEqual(code, 0, err)
+        self.assertFalse(os.path.exists(path))
+        self.assertFalse(os.path.exists(orphan))
+        self.assertIn("`app/models/order.py:10`", read(drift["file"]))
+        rows = read(readme).splitlines()[4:]
+        self.assertEqual([r.split("|")[1].strip() for r in rows],
+                         ["[cart](./cart.md)", "[search](./search.md)", "extra"])
+        self.assertTrue(read(overview).startswith("# Architecture"))
+        self.assertEqual(json.loads(out)["removed"], [orphan])
+
+    def refused(self, plan, needle):
+        before = {p: read(p) for p in (os.path.join(self.docs, "features", "README.md"),)}
+        code, out, err, path = self.apply(plan)
+        self.assertEqual(code, 1, out)
+        self.assertIn(needle, err)
+        self.assertTrue(os.path.exists(path))
+        for p, text in before.items():
+            self.assertEqual(read(p), text)
+
+    def test_refusals(self):
+        readme = os.path.join(self.docs, "features", "README.md")
+        ok = {"file": readme, "action": "delete", "line": 6,
+              "expect": "| wishlist | w | /w | 2026-02-01 |"}
+        self.refused([], "non-empty")
+        self.refused([dict(ok, expect="| other |")], "changed since the scan")
+        self.refused([ok, ok], "appears twice")
+        self.refused([dict(ok, line=99)], "out of range")
+        self.refused([ok, dict(ok, file="README.md")], "absolute path")
+        self.refused([ok, dict(ok, file=os.path.join(self.code, "app", "api.py"), line=1,
+                               expect="def handler():")], "outside the docs root")
+        self.refused([ok, {"file": readme, "action": "remove"}], "only for sources")
+        self.refused([ok, {"file": os.path.join(self.sources, "brief-src.md"), "action": "remove"}],
+                     "linked again")
+        self.refused([ok, dict(ok, action="rename")], "unknown action")
+        self.refused([ok, {"file": readme, "action": "insert", "line": 1, "expect": "# Features",
+                           "text": "a\nb"}], "one line")
+
+
+if __name__ == "__main__":
+    if "--help" in sys.argv:
+        print(__doc__.strip())
+        sys.exit(0)
+    unittest.main()
