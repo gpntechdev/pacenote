@@ -39,7 +39,8 @@ check`, no write, no commit.
    given, must lie under `<code_root>`; else say so and stop.
 2. **Scan.** `"${CLAUDE_PLUGIN_ROOT}/scripts/analyze-codebase" scan --code-root
    <code_root> [--path <argument>]`, plus `--skip <root>` for each of `<workspace_root>`,
-   `<docs_root>` and `<spec_root>` that lies inside `<code_root>` (embedded mode). Print
+   `<docs_root>` and `<spec_root>` that lies inside `<code_root>` (embedded mode); every
+   path absolute, no shell variables. Print
    `analyze-codebase: <source> files, <tests> tests, <modules> modules, <cycles> cycles,
    <untested> untested`. No source files: say which extensions were found
    (`unsupported`) and end with the handoff.

@@ -78,6 +78,10 @@ class Hotspots(Base):
         files = [h["file"] for h in self.run_scan()["hotspots"]]
         self.assertFalse(any(f.startswith(("node_modules/", ".specd/")) for f in files))
 
+    def test_empty_files_are_not_hotspots(self):
+        files = [h["file"] for h in self.run_scan()["hotspots"]]
+        self.assertNotIn("app/orders/__init__.py", files)
+
     def test_top_limits(self):
         self.assertEqual(len(self.run_scan("--top", "1")["hotspots"]), 1)
 

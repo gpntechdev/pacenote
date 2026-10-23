@@ -10,7 +10,7 @@ __pycache__, .git) and every --skip folder (the specd workspace in embedded mode
 nothing; runs only read-only git commands.
 
 - hotspots: commits touching each source file since --since (`git log --since`) times its
-  line count; the top --top with commits > 0.
+  line count; the top --top with commits > 0 (empty files left out).
 - modules: a file's module is its folder cut to --depth components (root files: `.`). Per
   module: files, lines, fan_in and fan_out (distinct modules), depends_on.
 - cycles: groups of modules that depend on each other (strongly connected components),
@@ -290,7 +290,7 @@ def scan(root, path, since, top, depth, skips):
     score = {f: commits.get(f, 0) * size[f] for f in source}
     hotspots = [{"file": f, "commits": commits[f], "lines": size[f], "score": score[f]}
                 for f in sorted(source, key=lambda x: (-score[x], x))
-                if commits.get(f, 0) > 0][:top]
+                if commits.get(f, 0) > 0 and size[f] > 0][:top]
 
     index = Index(source)
     gomod = go_module(root)
