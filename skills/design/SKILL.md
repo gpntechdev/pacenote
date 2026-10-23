@@ -23,7 +23,8 @@ signal fires). `rerun: true` clears G2..G5 on write; ask first.
 ## Inputs
 
 - `resolve-paths`, `detect-repo`, `state find`, `state check`.
-- `<spec_root>/<feature>/spec.md`, `brief.md`, `state.yml` (tier).
+- `<spec_root>/<feature>/spec.md`, `brief.md`, `state.yml` (tier); `research.md` when
+  present (dated findings, per [`../_shared/research.md`](../_shared/research.md)).
 - `<docs_root>/project.md`, `architecture/overview.md` and the area files it names,
   `conventions.md`, `data-models/` when present.
 - `<workspace_root>/specd.yml`: `models.judgment`, `flow.critic`, `git.authority`.
@@ -35,6 +36,7 @@ signal fires). `rerun: true` clears G2..G5 on write; ask first.
 ## Outputs
 
 - `<spec_root>/<feature>/design.md`; `gates.G2`, `step: tasks` in `state.yml`.
+- `<spec_root>/<feature>/research.md`, appended only when the user chose to research.
 - One commit `spec(<feature>): design` (authority ≠ `none`).
 
 ## Protocol
@@ -53,13 +55,17 @@ signal fires). `rerun: true` clears G2..G5 on write; ask first.
    questions and each proposed decision with the user: keep / change / drop, at most four per
    round, three rounds. Edit `design.md` in place as answers arrive; a dropped decision is
    removed, a changed one keeps its alternatives list. Leftovers go to `## Risks` as open
-   items with an owner.
+   items with an owner. An open question that is an external fact (a version, a library's
+   recommended way, a limit) may be researched on the user's yes, per `research.md`: at
+   most three per run, appended to `research.md`, the finding with its URL and date
+   written into the decision or risk it settles.
 5. **Critic** per `critic.md` when `flow.critic` is not `off`: dispatch `critic` at
    `models.judgment` with `design.md`, `spec.md` and `project.md`, fold its findings into
    `## Risks` as `critic C<k>` lines, say how many. Otherwise one line: `critic: off`.
 6. **G2** per `gates.md`: path plus at most ten lines (approach in one line, decisions by
    title, sections included, open risks). Approve: remove the marker, `state set gates.G2=now
-   step=tasks`, clear G3..G5 when re-running, commit `spec(<feature>): design`.
+   step=tasks`, clear G3..G5 when re-running, commit `spec(<feature>): design`
+   (with `research.md` when it was appended).
 7. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: the decisions
    that could go another way. `Next: /specd:tasks <feature>`.
 

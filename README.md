@@ -4,7 +4,7 @@ Spec-driven development workflow for AI coding assistants, packaged as a Claude 
 Read "spec'd". Stack-agnostic; lives inside a code repo (`.specd/`) or wraps around it.
 
 Status: M6 (toolsmith, two-stage skill audit, specialist reviews, MCP proposals) is built;
-M5 is done. M7 (utils) is in progress: `lessons-prune`, `spec-clean` and `docs-clean` are built. See `docs/PLAN.md` for the plan of record and milestones.
+M5 is done. M7 (utils) is in progress: `lessons-prune`, `spec-clean`, `docs-clean` and `research` are built. See `docs/PLAN.md` for the plan of record and milestones.
 
 ## Install
 
@@ -69,6 +69,8 @@ cd <repo> && claude --plugin-dir /path/to/specd
                                           # feature record first, only on your yes
 /specd:docs-clean                         # stale pointers, broken links, over-cap files,
                                           # draft markers, index rows, orphan snapshots
+/specd:research "<question>"              # cited, dated findings from the researcher agent;
+                                          # saved to the feature, a docs note, or nowhere
 ```
 
 Three tiers, proposed by triage at `start` and confirmed by you: **trivial** (`start →

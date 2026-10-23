@@ -42,11 +42,14 @@ one plan step; count each finding in the commit.
   existing rows. Features: the stem (linked to `./<stem>.md`), what it does (the record's
   first sentence), the entry point (from the record) and the `Shipped` date, inserted by
   date. Decisions: `| <NNNN> | <title without the number> | <Date> | <Status> |` from the
-  scan's `title`, `date` and `status`, inserted by number.
+  scan's `title`, `date` and `status`, inserted by number. Research notes: per
+  [`research.md`](../../_shared/research.md), the question from the note's H1 and the date
+  and feature from its `Asked:` line, inserted by date.
   Insert after the row it follows (`insert`, `line` = that row; the separator row when it
   goes first). A cell the record does not state is `unknown`, never guessed.
-- **New README.** Copy [`decisions-README.md`](../../onboard/templates/decisions-README.md)
-  or [`features-README.md`](../../docs/templates/features-README.md) without its draft
+- **New README.** Copy [`decisions-README.md`](../../onboard/templates/decisions-README.md),
+  [`features-README.md`](../../docs/templates/features-README.md) or
+  [`research-README.md`](../../research/templates/research-README.md) without its draft
   marker and comment, then the rows as above.
 - **Sources.** The reason names `title`, `origin` and `via` from the scan. An `http` or
   `mcp:*` snapshot can be fetched again; a `paste` or `file` one cannot, so say so in its

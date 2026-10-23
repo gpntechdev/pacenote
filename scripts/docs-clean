@@ -23,12 +23,13 @@ re-anchorable pointer or link on that line, so one plan step per line covers the
   that basename exists under --docs-root or sources/.
 - caps: files over their line cap (whole file): project.md 100, conventions.md 80,
   architecture/<area>.md 60, data-models/<domain>.md 60, features/<feature>.md 150,
-  decisions/NNNN-*.md 40. At the cap is not over. lessons.md is lessons-prune's.
+  decisions/NNNN-*.md 40, research/<note>.md 60. At the cap is not over. lessons.md is
+  lessons-prune's.
 - drafts: files whose line 1 is the `<!-- specd:draft -->` marker, with the onboard section.
-- readmes: features/ and decisions/ against their README.md: `missing_row` (a file no row
-  names; with its H1, and for a decision its Date and Status), `stale_row` (a row naming a
+- readmes: features/, decisions/ and research/ against their README.md: `missing_row` (a
+  file no row names; with its H1, and for a decision its Date and Status), `stale_row` (a row naming a
   file that is gone), `no_readme`. A row names a file by a link to it, or by its first cell
-  (the stem for a feature, the number for a decision).
+  (the stem for a feature or a research note, the number for a decision).
 - sources: <workspace_root>/sources/*.md (not *.new.md) that no *.md under --docs-root or
   --spec-root mentions as `sources/<name>`. Only line 1 (the header) is read, for title,
   origin and via.
@@ -232,6 +233,8 @@ def cap_for(rel):
         return 150
     if len(parts) == 2 and parts[0] == "decisions" and DECISION_FILE.match(name):
         return 40
+    if len(parts) == 2 and parts[0] == "research" and name != "README.md":
+        return 60
     return None
 
 
@@ -381,7 +384,8 @@ def scan(docs_root, code_root, workspace_root, spec_root):
         if lines and lines[0].strip() == DRAFT:
             out["drafts"].append({"check": "drafts", "kind": "draft", "file": doc, "line": 1,
                                   "text": lines[0], "section": section_of(rel)})
-    out["readmes"] = check_readme(docs_root, "features") + check_readme(docs_root, "decisions")
+    out["readmes"] = [f for folder in ("features", "decisions", "research")
+                      for f in check_readme(docs_root, folder)]
     stale = {(f["file"], f["line"]) for f in out["readmes"] if f["kind"] == "stale_row"}
     out["links"] = [f for f in out["links"] if (f["file"], f["line"]) not in stale]
     out["sources"] = unlinked_sources(sources, docs_root, spec_root)

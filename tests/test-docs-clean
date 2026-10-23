@@ -153,6 +153,22 @@ class Scan(Base):
         self.assertEqual((dec["title"], dec["date"], dec["status"]),
                          ("0002: Drop Redis", "2026-03-04", "accepted"))
 
+    def test_research_notes(self):
+        notes = os.path.join(self.docs, "research")
+        write(os.path.join(notes, "2026-10-01-pg-pool.md"), "# Pool size?\n")
+        write(os.path.join(notes, "2026-10-02-long.md"), "# Long\n" + "f\n" * 60)
+        write(os.path.join(notes, "README.md"),
+              "# Research\n\n| Question | Asked | Feature |\n|---|---|---|\n"
+              "| [Pool size?](./2026-10-01-pg-pool.md) | 2026-10-01 | none |\n"
+              "| [Gone?](./2026-09-01-gone.md) | 2026-09-01 | none |\n")
+        r = self.scan()
+        rows = sorted((f["kind"], f.get("key", "")) for f in r["readmes"]
+                      if os.path.dirname(f["file"]) == notes)
+        self.assertEqual(rows, [("missing_row", "2026-10-02-long"), ("stale_row", "")])
+        caps = {os.path.relpath(f["file"], self.docs): f["max"] for f in r["caps"]}
+        self.assertEqual(caps.get("research/2026-10-02-long.md"), 60)
+        self.assertNotIn("research/README.md", caps)
+
     def test_no_readme(self):
         os.remove(os.path.join(self.docs, "decisions", "README.md"))
         rows = [f for f in self.scan()["readmes"] if f["kind"] == "no_readme"]

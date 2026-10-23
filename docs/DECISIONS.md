@@ -1380,3 +1380,68 @@ refusal through the skill (script-level only), `git.authority: none`, wrapper mo
 snapshots and the docs in two repos.
 Consequences: "done" for M7 is the user's call after Task 6. Watch whether trims of real
 files keep facts; if they cut too much, make `report` the default for caps.
+
+## 2026-10-23 M7: research is a dispatching spine; the result goes where you choose per run; specify and design may offer it
+
+Context: PLAN names `research` without a definition. The `researcher` agent already exists
+(onboard, toolsmith), each caller with its own prompt. The user chose in the question round
+where the result goes and whether steps may call it.
+Decision:
+- `/specd:research "<question>" [--feature <name>]` splits the input into at most three
+  questions, dispatches one `researcher` each at `models.judgment` (Context7 first, the stack
+  line from `project.md` as constraints), and prints the two sections as returned. The main
+  thread never calls WebSearch, WebFetch or Context7; the agent is the only reader of
+  fetched pages, as `intake` is for sources.
+- Where it goes (user's choice: ask per run): one question naming the branch, attach to the
+  feature `state find` resolves (open features only; a refusal means none, not a stop), a
+  docs note, or don't save. Attach appends `## <date> — <question>` sections to
+  `<spec_root>/<feature>/research.md`, which lives and dies with the spec folder. A note is
+  `<docs_root>/research/<date>-<slug>.md` from `skills/research/templates/note.md` plus a row
+  in `research/README.md`, newest last; a newer answer is a new note, never a refresh.
+- Commits per `utils.md`: `spec(research): attach <n>` or `docs(research): note <n>`; never
+  on a default branch.
+- No script (judgement call): nothing is counted, matched or applied from a plan; the work
+  is the agent's, and the slug, date and row are written inline, as spec-clean's distill
+  writes rows. `utils.md` says so.
+- `skills/_shared/research.md` holds the prompt, the rules and both write formats, for
+  three readers: `research`, `specify`, `design`. `onboard` and `toolsmith` keep their own
+  prompts (stack options, skill search, library facts), unchanged.
+- Steps (user's choice): `specify` (interview.md "Research") and `design` (interview step)
+  may offer "research it" for an open question that is an external fact, on the user's yes,
+  at most three per run; the answer is appended to `research.md`, folded into the open
+  question or decision with its URL and date, and rides the step's commit. Both read
+  `research.md` when present; design passes it to the architect.
+- `docs-clean` covers the new folder: the `readmes` check includes `research/` (rows keyed
+  by the note's stem) and research notes are capped at 60 lines.
+Consequences: a new `<docs_root>/research/` folder, created only on a user's choice. What
+must outlive a feature still becomes a decision through `design` or `docs`; a research note
+is evidence with a date, not a decision.
+
+## 2026-10-23 M7: research built; smoke-tested headless
+
+Context: this task's done-when was "one question answered with dated citations, written
+where the user chose, and nothing in the main thread fetched pages itself". As for M2 to M6,
+the plugin's own verification is headless (memory: headless smoke testing).
+Decision: built. Headless runs in a scratch embedded repo on `main` (`git.authority=commit`,
+FastAPI 0.115 / Pydantic 2.9 stack line in `project.md`, Context7 in `.mcp.json`), logged as
+`stream-json`, with WebSearch, WebFetch and Context7 allowed to every thread:
+- One Pydantic question with no feature: the researcher used Context7 then pinned 2.9.2 raw
+  docs, returned six dated findings with URLs and two Not found lines; the question offered
+  note or don't save (no feature to attach). "Save a docs note" created
+  `chore/research-2026-10-23`, the note and a new `research/README.md`, one commit
+  `docs(research): note 1`; `docs-clean scan` afterwards: zero findings.
+- On a started full-tier feature (`feat/rate-limit`): a two-part input was split into two
+  questions, two researchers ran in parallel; "attach both" appended two sections to
+  `research.md` on the feature branch, commit `spec(research): attach 2`.
+- `specify rate-limit` read `research.md`, cited its findings in two open questions, and
+  offered research for the multi-worker question; on yes it dispatched one researcher,
+  appended a third section, and folded the answer into Q4 with its date, uncommitted until G1.
+- Across the four runs, 26 WebFetch, WebSearch and Context7 calls, every one from the
+  researcher subagent (`parent_tool_use_id` set); none from the main thread.
+Not exercised: the `design` offer and the architect reading `research.md`; specify through
+G1 (the commit carrying `research.md`); "don't save"; a repeated question naming an earlier
+note; `git.authority: none`; wrapper mode with `docs_root` in the code repo; a `no_readme`
+creation for `research/` through docs-clean.
+Consequences: "done" for M7 is the user's call after Task 6. Watch whether steps offer
+research for choices rather than facts (specify offered it for a scope question that a
+fact informed); if that becomes noise, tighten `research.md` "When".

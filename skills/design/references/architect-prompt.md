@@ -9,7 +9,8 @@ Sequences, UX flows]>.
 Write exactly one file: <spec_root>/<feature>/design.md, using this template structure:
 <the body of templates/design.md, verbatim>
 Read: <spec_root>/<feature>/spec.md, <spec_root>/<feature>/brief.md, <docs_root>/project.md,
-<docs_root>/conventions.md, <docs_root>/architecture/overview.md, <the area files overview.md
+<docs_root>/conventions.md, <spec_root>/<feature>/research.md when it exists (dated
+findings with URLs; cite them, do not re-research), <docs_root>/architecture/overview.md, <the area files overview.md
 names that match the spec's nouns>, <docs_root>/data-models/*.md when Data model is selected.
 Code root: <code_root> (absolute). Read the areas the spec's nouns point at. Skip: .git,
 node_modules, vendor, dist, build, target, .venv, venv, __pycache__, coverage, .next, .specd,

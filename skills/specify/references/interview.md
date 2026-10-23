@@ -17,6 +17,16 @@ prose, one topic at a time.
 - The tier from `state.yml` sets the depth: trivial and quick stop after round one unless an
   AC is still unverifiable; full may use all three rounds.
 
+## Research
+
+When an open question is an external fact (a supported version, the recommended way to do
+X in a named library, a documented limit), offer "research it" as one option of its
+question. On yes, dispatch `researcher` per
+[`../../_shared/research.md`](../../_shared/research.md) (at most three per run), append
+the answer to `research.md` in the feature folder, and rewrite the open question with the
+finding, its URL and `seen` date, or turn it into an AC when the fact settles it. The user
+still picks; a finding is evidence, not the answer. Both files ride the step's commit.
+
 ## Question families
 
 | Section | Ask about |
