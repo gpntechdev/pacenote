@@ -5,9 +5,9 @@ description: >
   fill the evidence matrix, or runs `/specd:verify [feature]`; also as the next step after a
   clean `/specd:review`. It runs the project checks, confirms every acceptance criterion has
   evidence (a passing named test, a green check, or a manual note you give), writes that
-  evidence into the coverage matrix in `tasks.md` and hands off to docs (or straight to
-  deliver when the feature is already on a PR). Not for running the app end to end; that is
-  runtime-verify, a later milestone.
+  evidence into the coverage matrix in `tasks.md`, asks whether to exercise the running app
+  next, and hands off to runtime-verify, docs, or deliver when the feature is already on a
+  PR. Not for running the app end to end; that is `/specd:runtime-verify`.
 ---
 
 # Skill: verify
@@ -25,13 +25,13 @@ review's AC table stands as evidence, trivial has no acceptance criteria).
 
 - `resolve-paths`, `state find`, `state check`, `run-checks`.
 - `<spec_root>/<feature>/tasks.md` (matrix), `spec.md` (AC text), `state.yml`.
-- `<workspace_root>/specd.yml`: `git.authority`.
+- `<workspace_root>/specd.yml`: `git.authority`, `flow.runtime_verify`.
 - [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md).
 
 ## Outputs
 
-- The matrix in `tasks.md` with every Evidence cell filled; `step: docs` in `state.yml`
-  (`deliver` when `pr` is set).
+- The matrix in `tasks.md` with every Evidence cell filled; `runtime_verify` and `step`
+  (`runtime-verify`, `docs`, or `deliver` when `pr` is set) in `state.yml`.
 - One commit `spec(<feature>): verify` (authority ≠ `none`).
 
 ## Protocol
@@ -50,9 +50,15 @@ review's AC table stands as evidence, trivial has no acceptance criteria).
 5. **Gaps.** Show the matrix. A row still `missing`: offer to add a task (append to
    `tasks.md` under `Verify fixes`, `state set tasks.T<k>=todo step=implement`, handoff to
    `/specd:implement`) or to accept it with a reason written into the cell. All rows filled:
-   `state set step=next` (`docs`, or `deliver` when `pr` is set: the record was written
-   before the PR), then commit with `git -C <workspace_root>`.
-6. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: manual and
+   go on.
+6. **Runtime.** Full tier, `flow.runtime_verify` not `off` (a missing key means `ask`), and
+   an AC a running app can show (a request and its response, or what a page shows): one
+   question, "exercise it in the running app?", defaulting to the feature's current
+   `runtime_verify` when set, else yes. Otherwise no question and `off`. `state set
+   runtime_verify=<on|off> step=next` in one call (`runtime-verify`, else `docs`, or
+   `deliver` when `pr` is set: the record was written before the PR), then commit with
+   `git -C <workspace_root>`.
+7. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: manual and
    accepted rows. `Next: /specd:<step> <feature>` with the step reported; when it is
    `deliver` on a PR, one line: run `/specd:docs` first if the fixes changed what the
    feature record says.
