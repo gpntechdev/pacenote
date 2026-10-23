@@ -160,6 +160,8 @@ Full tier runs design by default (sections auto-selected, you can add/remove); q
 
 **Tasks and the test plan.** `tasks` reads spec and design and writes `tasks.md`: phases → tasks, each with goal, files, `done-when` (verifiable), depends-on, and a risk flag. With TDD on, each task also carries a `tests` block (test cases derived from the acceptance criteria it covers), and the file ends with a coverage matrix *acceptance criterion → task → test*. That is sdd's `plan-tests` without a separate command: the matrix is produced where the tasks are, `implement` writes the listed tests first, and `verify` fills the evidence column. With TDD off the matrix still exists; evidence may be a check or a manual note.
 
+`/specd:analyze [feature]` checks the agreement the critic does not: an AC with no task, a task covering no AC, matrix drift and design paths no task lists (a script), plus decisions no task implements, terms used two ways and tasks contradicting their AC (the `analyst` agent). It prints and writes nothing, and runs only when asked; `/specd:analyze-codebase [path]` is its codebase counterpart: change hotspots, module coupling and cycles, untested files (DECISIONS 2026-10-23 M7).
+
 **Critic without spam.** A `critic` agent (devil's advocate: ambiguities, contradictions, missing failure modes, hidden assumptions) runs at exactly two points by default — end of `specify` and end of `design`, before their gates — because those are the places where a missed ambiguity is most expensive and the artifact is short. It gets only the artifact and `docs/project.md`, runs in fresh context, and returns at most ten ranked findings, which the step folds into the open-questions list for you to resolve at the gate. Full tier only. Config `critic: gates | off | always`, plus `/specd:critique <file>` on demand.
 
 **Tiers.**
@@ -172,11 +174,11 @@ Full tier runs design by default (sections auto-selected, you can add/remove); q
 
 Agents exist only where an isolated context pays for itself: heavy reading, or independence from the implementer's reasoning. Interactive steps stay in the main thread.
 
-Agents: `explorer` (codebase scan, cheap, returns a map with file:line pointers), `intake` (summarises fetched sources; cannot act on them), `researcher`, `architect`, `critic`, `implementer`, `reviewer`, specialist reviewers (`security`, `performance`, `accessibility`, `tests`), `doc-writer`, `skill-auditor`.
+Agents: `explorer` (codebase scan, cheap, returns a map with file:line pointers), `intake` (summarises fetched sources; cannot act on them), `researcher`, `architect`, `critic`, `analyst` (judges whether a feature's spec, design and tasks agree; DECISIONS 2026-10-23 M7), `implementer`, `reviewer`, specialist reviewers (`security`, `performance`, `accessibility`, `tests`), `doc-writer`, `skill-auditor`.
 
 Stack specialisation is knowledge, not agents: a task names a `layer` (`frontend`, `backend`, …), `specd.yml` `layers` maps each layer to project skill files, and `implement` and `review` pass those files to the one `implementer` / `reviewer` as "read first". Subagents cannot spawn subagents, so routing always happens in the main thread; a per-layer agent is added only when a layer needs tools the generic agent lacks (a browser or database MCP).
 
-Skills: `init`, `onboard`, `scaffold`, `toolsmith`, `config` (change a setting mid-flow, e.g. gate granularity or PR host), `start`, `specify`, `design`, `tasks`, `implement`, `review`, `verify`, `runtime-verify`, `docs`, `deliver`, `feedback`, `close`, `fix`, `critique`, `status` (resume), `principles`, `skill-audit`, utils (`refresh`, `research`, `analyze`, `docs-clean`, `spec-clean`, `lessons-prune`).
+Skills: `init`, `onboard`, `scaffold`, `toolsmith`, `config` (change a setting mid-flow, e.g. gate granularity or PR host), `start`, `specify`, `design`, `tasks`, `implement`, `review`, `verify`, `runtime-verify`, `docs`, `deliver`, `feedback`, `close`, `fix`, `critique`, `status` (resume), `principles`, `skill-audit`, utils (`refresh`, `research`, `analyze`, `analyze-codebase`, `docs-clean`, `spec-clean`, `lessons-prune`).
 
 Model tiers are roles, not model names: `judgment`, `execution`, `cheap`, mapped in `specd.yml` (default opus/sonnet/haiku), overridable per role.
 
@@ -254,7 +256,7 @@ Each milestone ends in something you use on a real task; findings go to `DECISIO
 | M4 | Wrapper + parallel | Wrapper init, two-repo commits, worktrees per feature | Two features in parallel on a client-style repo with zero files added to it | built 2026-10-09; headless smoke run of two parallel features on a scratch client repo (see DECISIONS) |
 | M5 | Sources | `url` adapter, first MCP adapter, snapshot + refresh | A ticket becomes an approved spec without copy-paste | done 2026-10-12; headless smoke run on URL, injection, refresh, paste and wrapper paths; live Atlassian fetch not exercised (see DECISIONS) |
 | M6 | Toolsmith + audit | `toolsmith` command, allowlist search, quarantine, two-stage audit, `skills.lock`, generation fallback, specialist reviewers, MCP recommendations | Audit catches a seeded malicious test skill; one community skill installed via the pipeline | built 2026-10-12; headless smoke run: seeded skill refused by both stages, `anthropics/skills` `frontend-design` installed and pinned, generation fallback, `dbhub` MCP, one specialist pass (see DECISIONS) |
-| M7 | Utils | research, analyze, docs-clean, spec-clean, lessons-prune, runtime-verify | — | |
+| M7 | Utils | research, analyze, analyze-codebase, docs-clean, spec-clean, lessons-prune, runtime-verify | — | |
 | M8 | Portability + team | `install.sh` for Codex/Cursor, team-sharing guide, evals for key skills | Full flow runs on a second assistant | |
 
 After M2 specd is developed with specd.
@@ -265,4 +267,4 @@ All previously open questions are now decisions (see the v4 rows in section 2): 
 
 ## 7. Next step
 
-M3's week of mixed tasks and M4's first real wrapper run continue on the user's side; findings go to `DECISIONS.md` first. M6 is built: `/specd:toolsmith` on a real repo is the run to watch, in particular how often the static audit refuses a skill the user wanted (the calibration on `anthropics/skills` is in DECISIONS), whether generated skills stay grounded in the codebase, and `--update` once an allowlisted repo moves. Marking M6 done is the user's call. Next is M7: the utils (`research`, `analyze`, `docs-clean`, `spec-clean`, `lessons-prune`, `runtime-verify`); `runtime-verify` can lean on the `playwright` server toolsmith now proposes.
+M3's week of mixed tasks and M4's first real wrapper run continue on the user's side; findings go to `DECISIONS.md` first. M6 is built: `/specd:toolsmith` on a real repo is the run to watch, in particular how often the static audit refuses a skill the user wanted (the calibration on `anthropics/skills` is in DECISIONS), whether generated skills stay grounded in the codebase, and `--update` once an allowlisted repo moves. Marking M6 done is the user's call. Next is M7: the utils (`research`, `analyze`, `analyze-codebase`, `docs-clean`, `spec-clean`, `lessons-prune`, `runtime-verify`); `runtime-verify` can lean on the `playwright` server toolsmith now proposes.

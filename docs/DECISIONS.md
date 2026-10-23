@@ -1445,3 +1445,70 @@ creation for `research/` through docs-clean.
 Consequences: "done" for M7 is the user's call after Task 6. Watch whether steps offer
 research for choices rather than facts (specify offered it for a scope question that a
 fact informed); if that becomes noise, tighten `research.md` "When".
+
+## 2026-10-23 M7: analyze is two read-only utils; a script counts, an agent judges
+
+Context: PLAN names `analyze` without a definition, and two readings fit: cross-artifact
+consistency (spec-kit's `/analyze`) and codebase analysis. The user chose both in the
+question round, `analyze` manual only (the `tasks` step and G3 unchanged), and a new agent
+for the checks that need reading.
+Decision:
+- `/specd:analyze [feature]` checks that `spec.md`, `design.md` and `tasks.md` agree, at any
+  step once `tasks.md` exists. `scripts/analyze scan --feature-dir` parses the ACs, the
+  inline tasks and index lines (with their `tasks/T<n>.md`), the matrix, the decisions and
+  the `Changes by area` paths, and reports `ac_uncovered`, `ac_no_row`, `row_unknown_ac`,
+  `row_task_mismatch`, `task_no_ac`, `unknown_ac`, `bad_via` and `area_no_task`, each with
+  `file:line`. Finding ids from review and feedback (`F3`, `C2`, `SEC1`) count as covered;
+  `covers: all` only in the last phase. The D<n> no task names by id are candidates, not
+  findings.
+- `agents/analyst.md` (read-only, judgment role) reads only those artifacts, takes the
+  script's findings as settled and the candidates as leads, and returns at most ten
+  `A<n> · decision|term|conflict · <file:line> · … · resolve:` findings. The critic stays a
+  one-artifact judge (2026-10-06 M3); the two never share a run.
+- `/specd:analyze-codebase [path]` maps where the code is hard to change.
+  `scripts/analyze-codebase scan` ranks hotspots (commits since `--since` times lines), maps
+  imports parsed by regex (Python, JS/TS relative, Go under `go.mod`, Java/Kotlin, PHP, Ruby,
+  Rust) to modules cut at `--depth` 2 with fan-in, fan-out and cycles (strongly connected
+  components, with the import lines that close them), and lists source files no test names
+  by stem. An import resolves only to exactly one tracked file, so the graph is a lower
+  bound; unparsed languages are listed. One `explorer` at the cheap role explains the top
+  five hotspots and the cycles.
+- Both print and write nothing (judgement call): `utils.md` now says a read-only util
+  (`analyze`, `analyze-codebase`, `critique`) has no proposal round, branch or commit, and
+  its `Next` names the step that owns a fix (`tasks`, `design`, `specify` for analyze).
+Consequences: the critic and the analyst split one artifact's holes from the gaps between
+artifacts. `tasks` step 3 keeps its own prose check of the matrix before G3; the script
+could replace it later if G3 keeps missing gaps. `analyze-codebase` does not write
+`architecture/`; a contradiction with the overview points at `/specd:onboard architecture`.
+
+## 2026-10-23 M7: analyze and analyze-codebase built; smoke-tested headless
+
+Context: this task's done-when for `analyze` was "a scratch feature with one seeded gap of
+each kind gets a report that names each gap with `path:line`, and no file changes"; for
+`analyze-codebase` it was set here: a seeded hotspot, cycle and untested file all appear,
+and no file changes. As for M2 to M6, the plugin's own verification is headless (memory:
+headless smoke testing).
+Decision: built. `tests/test-analyze` covers every kind and its controls (`all` in Verify,
+`via`, finding ids, index lines with and without their file, folder and suffix path
+matches, quick without a design, the refusals). `tests/test-analyze-codebase` builds a git
+repo with churn, a Python module cycle, a relative TS import and test files by two naming
+conventions, and covers skipped folders, `--path`, `--depth`, `--top`, empty files and a
+non-repo. Headless runs in a scratch embedded repo (`app/orders` ↔ `app/billing` cycle,
+four extra commits on `invoice.py`), logged as `stream-json`:
+- `/specd:analyze export` on a full-tier feature seeded with AC4 without a task, T2 with
+  `covers: none`, D2 (stream rows) that T1 contradicts by building the list, and "export
+  file" in the spec against "report" in the tasks: S1–S3 for the first two, A1 `decision`
+  (no task builds D2, T1 builds the rejected alternative) and A2 `term`, every row with
+  `path:line`, owners `/specd:tasks`. The three artifacts were read only by the
+  `specd:analyst` subagent; file hashes and `git status` unchanged.
+- `/specd:analyze-codebase`: the cycle with both closing import lines, `invoice.py` as top
+  hotspot and first test gap, `model.py` covered by `test_model.py`; the explorer read only
+  the named files and added that `test_model.py` holds no test function. No file changed.
+  The run listed empty `__init__.py` files as hotspots and its first scan was blocked on a
+  `$PWD` argument; the script now drops empty files and the spine asks for absolute paths.
+Not exercised: a quick feature (no design) and a trivial one through the skill
+(script-level only); wrapper mode; a repo past a few hundred files (timing); import
+resolution for Go, Java/Kotlin, PHP, Ruby and Rust (no test or run covers it); a malformed analyst answer.
+Consequences: "done" for M7 is the user's call after Task 6. Watch whether the analyst
+flags terms that are harmless synonyms; if so, require that the two names lead to two
+readings of an AC or task.

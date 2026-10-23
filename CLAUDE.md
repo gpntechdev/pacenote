@@ -17,9 +17,9 @@ hooks/            secrets guardrail, source guard (snapshots, skill quarantine)
 scripts/          deterministic helpers: validate, resolve-paths, detect-*, config-set,
                   init-workspace, state, worktree, run-checks, squash-wip, pr-comments,
                   redact, fetch-source, refresh-source, audit-static, skill-fetch, skill-lock,
-                  lessons, spec-clean, docs-clean
-tests/            test-audit, test-skill-find, test-lessons,
-                  test-spec-clean, test-docs-clean + fixtures
+                  lessons, spec-clean, docs-clean, analyze, analyze-codebase
+tests/            test-audit, test-skill-find, test-lessons, test-spec-clean,
+                  test-docs-clean, test-analyze, test-analyze-codebase + fixtures
 docs/             PLAN.md, DECISIONS.md, AUTHORING.md
 ```
 

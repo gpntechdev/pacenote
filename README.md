@@ -4,7 +4,7 @@ Spec-driven development workflow for AI coding assistants, packaged as a Claude 
 Read "spec'd". Stack-agnostic; lives inside a code repo (`.specd/`) or wraps around it.
 
 Status: M6 (toolsmith, two-stage skill audit, specialist reviews, MCP proposals) is built;
-M5 is done. M7 (utils) is in progress: `lessons-prune`, `spec-clean`, `docs-clean` and `research` are built. See `docs/PLAN.md` for the plan of record and milestones.
+M5 is done. M7 (utils) is in progress: `lessons-prune`, `spec-clean`, `docs-clean`, `research`, `analyze` and `analyze-codebase` are built. See `docs/PLAN.md` for the plan of record and milestones.
 
 ## Install
 
@@ -71,6 +71,10 @@ cd <repo> && claude --plugin-dir /path/to/specd
                                           # draft markers, index rows, orphan snapshots
 /specd:research "<question>"              # cited, dated findings from the researcher agent;
                                           # saved to the feature, a docs note, or nowhere
+/specd:analyze <feature>                  # do spec, design and tasks agree: uncovered ACs, tasks
+                                          # covering nothing, unbuilt decisions, terms; prints only
+/specd:analyze-codebase [path]            # change hotspots, module coupling and cycles,
+                                          # untested files; prints only
 ```
 
 Three tiers, proposed by triage at `start` and confirmed by you: **trivial** (`start →
@@ -108,15 +112,16 @@ parallel, one session per worktree or all from the wrapper root with the feature
 .claude-plugin/   plugin.json, marketplace.json
 skills/<name>/    SKILL.md spine + references/ + templates/
 skills/_shared/   blocks referenced by many skills: gates, handoff, state, paths, sources, critic
-agents/           explorer, intake, researcher, architect, critic, implementer, reviewer,
+agents/           explorer, intake, researcher, architect, critic, analyst, implementer, reviewer,
                   specialist, skill-auditor
 hooks/            secrets guardrail, source guard (snapshots and the skill quarantine)
 scripts/          deterministic helpers: validate, resolve-paths, detect-repo,
                   detect-commands, config-set, init-workspace, state, worktree, run-checks, squash-wip,
                   pr-comments, redact, fetch-source, refresh-source, audit-static, skill-fetch,
-                  skill-lock
-tests/            test-audit, test-skill-find and their fixtures (a seeded malicious skill, a
-                  clean one, a skills.sh search response)
+                  skill-lock, lessons, spec-clean, docs-clean, analyze, analyze-codebase
+tests/            test-audit, test-skill-find, test-lessons, test-spec-clean, test-docs-clean,
+                  test-analyze, test-analyze-codebase and their fixtures (a seeded malicious
+                  skill, a clean one, a skills.sh search response)
 docs/             PLAN.md, DECISIONS.md, AUTHORING.md
 ```
 
