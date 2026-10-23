@@ -1,0 +1,521 @@
+#!/usr/bin/env python3
+"""Lint <docs_root> for drift, or apply an approved fix plan, printed as JSON.
+
+Usage: docs-clean scan  --docs-root D --code-root D --workspace-root D --spec-root D
+       docs-clean apply --docs-root D --workspace-root D --spec-root D --plan PATH
+
+scan reads every *.md under --docs-root (fenced code blocks skipped for pointers and links)
+and prints `counts` plus six lists. Every finding has `check`, `kind`, `file` (absolute) and,
+when it is about one line, `line` and `text` (the line as scanned, the `expect` of a plan
+step). `suggest` is the whole replacement line when the fix is deterministic; it fixes every
+re-anchorable pointer or link on that line, so one plan step per line covers them all.
+
+- pointers: backticked `path:N` or `path:N-M` (path holds a `/` or `.`) under --code-root.
+  Kinds `missing` (no such file), `out_of_range`, `drifted` (the line's identifier is not on
+  the pointed line or range). The identifier is the last backticked non-pointer token before
+  the pointer (last `.`/`::` part, `()` dropped), else a leading `Name —`, `Name:` or
+  `| Name |`. Re-anchor: the identifier's whole-word hits in the file; several hits narrow to
+  definition lines (`class`, `def`, `function`, `type`, `table`, ...); exactly one hit gives
+  `suggest` with the new number (a range keeps its length). No identifier: existence and
+  range only.
+- links: relative markdown links that do not resolve from the doc's folder, except on a
+  README row already reported as `stale_row`. `suggest` retargets when exactly one file of
+  that basename exists under --docs-root or sources/.
+- caps: files over their line cap (whole file): project.md 100, conventions.md 80,
+  architecture/<area>.md 60, data-models/<domain>.md 60, features/<feature>.md 150,
+  decisions/NNNN-*.md 40. At the cap is not over. lessons.md is lessons-prune's.
+- drafts: files whose line 1 is the `<!-- specd:draft -->` marker, with the onboard section.
+- readmes: features/ and decisions/ against their README.md: `missing_row` (a file no row
+  names; with its H1, and for a decision its Date and Status), `stale_row` (a row naming a
+  file that is gone), `no_readme`. A row names a file by a link to it, or by its first cell
+  (the stem for a feature, the number for a decision).
+- sources: <workspace_root>/sources/*.md (not *.new.md) that no *.md under --docs-root or
+  --spec-root mentions as `sources/<name>`. Only line 1 (the header) is read, for title,
+  origin and via.
+
+apply reads a JSON list of `{file, action, line, expect, text}` from PATH. `action`:
+`replace` (line `line` becomes `text`), `delete` (line `line` goes), `insert` (`text` goes
+after line `line`; 0 is the top and expects ""; several inserts at one line keep plan
+order), `remove` (the whole file; only a sources/*.md that is still unlinked). `file` is
+absolute and lies under --docs-root or sources/. Every `expect` must equal the current line,
+and no two replace or delete steps may name the same line of a file. Any mismatch refuses
+the whole plan with one line on stderr and exit 1, and nothing is written. Otherwise each
+file is rewritten once against the scanned line numbers, the plan file is deleted, and
+`changed` and `removed` are printed. No git command. Stdlib only.
+"""
+import glob
+import json
+import os
+import re
+import sys
+
+DRAFT = "<!-- specd:draft -->"
+POINTER = re.compile(r"`([^`\s:]+):(\d+)(?:-(\d+))?`")
+TICKED = re.compile(r"`([^`]+)`")
+LINK = re.compile(r"\]\(([^)\s#]+)(#[^)\s]*)?\)")
+FENCE = re.compile(r"^\s*(```|~~~)")
+LEAD_NAME = re.compile(r"^[\s>*+-]*\|?\s*\**([A-Za-z_][\w]*)\**\s*(?:—|–|-|:|\|)")
+IDENT = re.compile(r"^[A-Za-z_$][\w$]*$")
+DEF_WORDS = (r"class|def|function|interface|type|struct|const|let|var|func|fn|enum|table|"
+             r"module|trait|impl|record|object|model|message|schema")
+DECISION_FILE = re.compile(r"^(\d{4})-.+\.md$")
+SECTIONS = {"project.md": "project", "conventions.md": "conventions",
+            "architecture": "architecture", "data-models": "data-models",
+            "decisions": "decisions"}
+SOURCE_HEADER = re.compile(r'(\w+)="([^"]*)"')
+
+
+def opt(argv, flag, default=None):
+    if flag in argv:
+        i = argv.index(flag)
+        if i + 1 >= len(argv):
+            print("specd: %s needs a value" % flag, file=sys.stderr)
+            sys.exit(2)
+        return argv[i + 1]
+    return default
+
+
+def refuse(msg):
+    print("specd: %s" % msg, file=sys.stderr)
+    return 1
+
+
+def read_lines(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read().splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def write_lines(path, lines):
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + ("\n" if lines else ""))
+
+
+def md_files(root):
+    if not root or not os.path.isdir(root):
+        return []
+    return sorted(p for p in glob.glob(os.path.join(root, "**", "*.md"), recursive=True)
+                  if os.path.isfile(p))
+
+
+def prose_lines(lines):
+    """Yield (number, line) outside fenced code blocks."""
+    fenced = False
+    for i, line in enumerate(lines, 1):
+        if FENCE.match(line):
+            fenced = not fenced
+            continue
+        if not fenced:
+            yield i, line
+
+
+# ---- pointers -------------------------------------------------------------------------
+
+def identifier(line, start):
+    """The name a pointer at `start` points to, or None."""
+    before = [m for m in TICKED.finditer(line[:start])
+              if not POINTER.fullmatch(m.group(0)) and not re.search(r"[/\s]", m.group(1).strip())]
+    if before:
+        token = before[-1].group(1).strip()
+        token = re.sub(r"\(.*\)$", "", token)
+        token = re.split(r"\.|::|#|/", token)[-1].strip()
+        return token if IDENT.match(token) else None
+    m = LEAD_NAME.match(line)
+    return m.group(1) if m else None
+
+
+def word_re(name):
+    return re.compile(r"(?<![\w$])%s(?![\w$])" % re.escape(name))
+
+
+def reanchor(target, name):
+    """The single line number where `name` is defined in `target`, or None."""
+    word = word_re(name)
+    hits = [i for i, l in enumerate(target, 1) if word.search(l)]
+    if len(hits) > 1:
+        definition = re.compile(r"\b(%s)\s+[*&]?(?:\w+\.)?%s(?![\w$])" % (DEF_WORDS, re.escape(name)),
+                                re.I)
+        hits = [i for i in hits if definition.search(target[i - 1])]
+    return hits[0] if len(hits) == 1 else None
+
+
+def check_pointers(doc, n, line, code_root):
+    findings, new_line, shift = [], line, 0
+    for m in POINTER.finditer(line):
+        path, a = m.group(1), int(m.group(2))
+        b = int(m.group(3)) if m.group(3) else a
+        if "/" not in path and "." not in path:
+            continue
+        target_path = os.path.join(code_root, path)
+        base = {"check": "pointers", "file": doc, "line": n, "text": line, "pointer": m.group(0)[1:-1]}
+        if not os.path.isfile(target_path):
+            findings.append(dict(base, kind="missing"))
+            continue
+        target = read_lines(target_path) or []
+        name = identifier(line, m.start())
+        kind = None
+        if b > len(target) or a < 1 or b < a:
+            kind = "out_of_range"
+        elif name and not any(word_re(name).search(l) for l in target[a - 1:b]):
+            kind = "drifted"
+        if not kind:
+            continue
+        finding = dict(base, kind=kind, identifier=name or "")
+        found = reanchor(target, name) if name else None
+        if found:
+            span = b - a
+            fixed = "`%s:%d%s`" % (path, found, ("-%d" % (found + span)) if m.group(3) else "")
+            new_line = new_line[:m.start() + shift] + fixed + new_line[m.end() + shift:]
+            shift += len(fixed) - len(m.group(0))
+            finding["new_pointer"] = fixed[1:-1]
+        findings.append(finding)
+    if new_line != line:
+        for f in findings:
+            f["suggest"] = new_line
+    return findings
+
+
+# ---- links ----------------------------------------------------------------------------
+
+def basename_index(docs_root, sources):
+    index = {}
+    for root in (docs_root, sources):
+        if root and os.path.isdir(root):
+            for p in glob.glob(os.path.join(root, "**", "*"), recursive=True):
+                if os.path.isfile(p):
+                    index.setdefault(os.path.basename(p), []).append(p)
+    return index
+
+
+def check_links(doc, n, line, index):
+    findings, new_line, shift = [], line, 0
+    for m in LINK.finditer(line):
+        target = m.group(1)
+        if re.match(r"^[a-z][a-z0-9+.-]*:", target) or target.startswith("/"):
+            continue
+        if os.path.exists(os.path.normpath(os.path.join(os.path.dirname(doc), target))):
+            continue
+        finding = {"check": "links", "kind": "broken", "file": doc, "line": n, "text": line,
+                   "target": target}
+        hits = index.get(os.path.basename(target), [])
+        if len(hits) == 1:
+            new = os.path.relpath(hits[0], os.path.dirname(doc))
+            if not new.startswith("."):
+                new = "./" + new
+            start, end = m.start(1) + shift, m.end(1) + shift
+            new_line = new_line[:start] + new + new_line[end:]
+            shift += len(new) - len(target)
+            finding["new_target"] = new
+        findings.append(finding)
+    if new_line != line:
+        for f in findings:
+            f["suggest"] = new_line
+    return findings
+
+
+# ---- caps, drafts ---------------------------------------------------------------------
+
+def cap_for(rel):
+    parts = rel.split("/")
+    name = parts[-1]
+    if rel == "project.md":
+        return 100
+    if rel == "conventions.md":
+        return 80
+    if len(parts) == 2 and parts[0] == "architecture" and name != "overview.md":
+        return 60
+    if len(parts) == 2 and parts[0] == "data-models" and name != "README.md":
+        return 60
+    if len(parts) == 2 and parts[0] == "features" and name != "README.md":
+        return 150
+    if len(parts) == 2 and parts[0] == "decisions" and DECISION_FILE.match(name):
+        return 40
+    return None
+
+
+def section_of(rel):
+    return SECTIONS.get(rel.split("/")[0], "")
+
+
+# ---- READMEs --------------------------------------------------------------------------
+
+def table_rows(lines):
+    """(number, line, cells) of table body rows: rows after a separator row."""
+    rows, body = [], False
+    for i, line in enumerate(lines, 1):
+        s = line.strip()
+        if not s.startswith("|"):
+            body = False
+            continue
+        if re.match(r"^\|\s*:?-{3,}", s):
+            body = True
+            continue
+        if body:
+            cells = [c.strip() for c in s.strip("|").split("|")]
+            rows.append((i, line, cells))
+    return rows
+
+
+def first_cell(cells):
+    cell = cells[0] if cells else ""
+    m = re.match(r"^\[([^\]]*)\]\(.*\)$", cell)
+    return (m.group(1) if m else cell).strip("`* ")
+
+
+def row_names(line, cells, decisions):
+    """The file keys a README row names: stems for features, numbers for decisions."""
+    names = set()
+    for m in LINK.finditer(line):
+        base = os.path.basename(m.group(1))
+        if base.endswith(".md"):
+            dm = DECISION_FILE.match(base)
+            names.add(dm.group(1) if decisions and dm else base[:-3])
+    cell = first_cell(cells)
+    if decisions:
+        m = re.match(r"^(\d{1,4})\b", cell)
+        if m:
+            names.add(m.group(1).zfill(4))
+    elif cell:
+        names.add(cell)
+    return names
+
+
+def head_info(path, decisions):
+    lines = read_lines(path) or []
+    info = {"title": next((l[2:].strip() for l in lines if l.startswith("# ")), "")}
+    if decisions:
+        for l in lines:
+            m = re.match(r"^(Date|Status):\s*(.+)$", l)
+            if m and m.group(1).lower() not in info:
+                info[m.group(1).lower()] = m.group(2).strip()
+    return info
+
+
+def check_readme(docs_root, folder):
+    decisions = folder == "decisions"
+    path = os.path.join(docs_root, folder)
+    if not os.path.isdir(path):
+        return []
+    files = {}
+    for p in sorted(glob.glob(os.path.join(path, "*.md"))):
+        name = os.path.basename(p)
+        if name == "README.md":
+            continue
+        if decisions:
+            m = DECISION_FILE.match(name)
+            if m:
+                files[m.group(1)] = p
+        else:
+            files[name[:-3]] = p
+    readme = os.path.join(path, "README.md")
+    lines = read_lines(readme)
+    if lines is None:
+        return [{"check": "readmes", "kind": "no_readme", "file": readme,
+                 "files": [files[k] for k in sorted(files)]}] if files else []
+    out, named = [], set()
+    for n, line, cells in table_rows(lines):
+        names = row_names(line, cells, decisions)
+        named |= names
+        if names and not names & set(files):
+            out.append({"check": "readmes", "kind": "stale_row", "file": readme, "line": n,
+                        "text": line, "names": sorted(names)})
+    for key in sorted(set(files) - named):
+        out.append(dict({"check": "readmes", "kind": "missing_row", "file": readme,
+                         "target": files[key], "key": key}, **head_info(files[key], decisions)))
+    return out
+
+
+# ---- sources --------------------------------------------------------------------------
+
+def mention_text(docs_root, spec_root):
+    parts = []
+    for root in (docs_root, spec_root):
+        for p in md_files(root):
+            lines = read_lines(p)
+            if lines:
+                parts.append("\n".join(lines))
+    return "\n".join(parts)
+
+
+def unlinked_sources(sources, docs_root, spec_root):
+    if not os.path.isdir(sources):
+        return []
+    text = mention_text(docs_root, spec_root)
+    out = []
+    for p in sorted(glob.glob(os.path.join(sources, "*.md"))):
+        name = os.path.basename(p)
+        if name.endswith(".new.md") or ("sources/" + name) in text:
+            continue
+        header = {}
+        try:
+            with open(p, encoding="utf-8") as f:
+                first = f.readline()
+            header = {k: v for k, v in SOURCE_HEADER.findall(first)
+                      if k in ("title", "origin", "via")} if first.startswith("<!-- specd:source") else {}
+        except (OSError, UnicodeDecodeError):
+            pass
+        out.append(dict({"check": "sources", "kind": "unlinked", "file": p}, **header))
+    return out
+
+
+# ---- scan -----------------------------------------------------------------------------
+
+def scan(docs_root, code_root, workspace_root, spec_root):
+    sources = os.path.join(workspace_root, "sources")
+    index = basename_index(docs_root, sources)
+    out = {"pointers": [], "links": [], "caps": [], "drafts": [], "readmes": [], "sources": []}
+    for doc in md_files(docs_root):
+        lines = read_lines(doc)
+        if lines is None:
+            continue
+        rel = os.path.relpath(doc, docs_root).replace(os.sep, "/")
+        for n, line in prose_lines(lines):
+            out["pointers"] += check_pointers(doc, n, line, code_root)
+            out["links"] += check_links(doc, n, line, index)
+        cap = cap_for(rel)
+        if cap is not None and len(lines) > cap:
+            out["caps"].append({"check": "caps", "kind": "over", "file": doc,
+                                "lines": len(lines), "max": cap})
+        if lines and lines[0].strip() == DRAFT:
+            out["drafts"].append({"check": "drafts", "kind": "draft", "file": doc, "line": 1,
+                                  "text": lines[0], "section": section_of(rel)})
+    out["readmes"] = check_readme(docs_root, "features") + check_readme(docs_root, "decisions")
+    stale = {(f["file"], f["line"]) for f in out["readmes"] if f["kind"] == "stale_row"}
+    out["links"] = [f for f in out["links"] if (f["file"], f["line"]) not in stale]
+    out["sources"] = unlinked_sources(sources, docs_root, spec_root)
+    result = {"docs_root": docs_root, "counts": {k: len(v) for k, v in out.items()}}
+    result["counts"]["total"] = sum(result["counts"].values())
+    result.update(out)
+    return result
+
+
+# ---- apply ----------------------------------------------------------------------------
+
+def inside(path, root):
+    root = os.path.abspath(root)
+    return os.path.abspath(path).startswith(root + os.sep)
+
+
+def check_plan(plan, docs_root, sources, spec_root):
+    """Return (error, edits by file, files to remove)."""
+    if not isinstance(plan, list) or not plan:
+        return "plan must be a non-empty JSON list", None, None
+    edits, removes, seen, cache = {}, [], set(), {}
+    for step in plan:
+        if not isinstance(step, dict):
+            return "each plan step must be an object", None, None
+        path, action = step.get("file"), step.get("action")
+        if not isinstance(path, str) or not os.path.isabs(path):
+            return "file %r must be an absolute path" % (path,), None, None
+        path = os.path.normpath(path)
+        if not (inside(path, docs_root) or inside(path, sources)):
+            return "%s is outside the docs root and sources/" % path, None, None
+        if action == "remove":
+            if not (os.path.dirname(path) == os.path.abspath(sources) and path.endswith(".md")):
+                return "remove is only for sources/*.md: %s" % path, None, None
+            if not os.path.isfile(path):
+                return "%s does not exist" % path, None, None
+            if path in removes:
+                return "%s appears twice in the plan" % path, None, None
+            removes.append(path)
+            continue
+        if action not in ("replace", "delete", "insert"):
+            return "unknown action %r" % (action,), None, None
+        if path not in cache:
+            cache[path] = read_lines(path)
+        lines = cache[path]
+        if lines is None:
+            return "%s cannot be read" % path, None, None
+        line = step.get("line")
+        if not isinstance(line, int) or line < (0 if action == "insert" else 1) or line > len(lines):
+            return "%s: line %r is out of range" % (path, line), None, None
+        if action != "insert":
+            if (path, line) in seen:
+                return "%s: line %d appears twice in the plan" % (path, line), None, None
+            seen.add((path, line))
+        current = lines[line - 1] if line else ""
+        if step.get("expect") != current:
+            return "%s:%d changed since the scan; re-run scan" % (path, line), None, None
+        text = step.get("text", "")
+        if action != "delete" and (not isinstance(text, str) or "\n" in text):
+            return "%s:%d: text must be one line" % (path, line), None, None
+        edits.setdefault(path, []).append((line, action, text))
+    if removes:
+        linked = {os.path.basename(p) for p in removes
+                  if ("sources/" + os.path.basename(p)) in mention_text(docs_root, spec_root)}
+        if linked:
+            return "%s is linked again; re-run scan" % sorted(linked)[0], None, None
+    return None, edits, removes
+
+
+def apply(plan, docs_root, workspace_root, spec_root):
+    sources = os.path.join(workspace_root, "sources")
+    err, edits, removes = check_plan(plan, docs_root, sources, spec_root)
+    if err:
+        return err, None
+    changed = []
+    for path, steps in edits.items():
+        lines = read_lines(path)
+        edit = {line: (action, text) for line, action, text in steps if action != "insert"}
+        after = {}
+        for line, action, text in steps:
+            if action == "insert":
+                after.setdefault(line, []).append(text)
+        new = list(after.get(0, []))
+        for n, current in enumerate(lines, 1):
+            action, text = edit.get(n, (None, None))
+            if action == "replace":
+                new.append(text)
+            elif action != "delete":
+                new.append(current)
+            new += after.get(n, [])
+        write_lines(path, new)
+        changed.append(path)
+    for path in removes:
+        os.remove(path)
+    return None, {"changed": sorted(changed), "removed": sorted(removes)}
+
+
+def main(argv):
+    if len(argv) < 2 or "--help" in argv or "-h" in argv:
+        print(__doc__.strip())
+        return 0 if len(argv) >= 2 else 2
+    cmd = argv[1]
+    roots = {k: opt(argv, "--" + k) for k in ("docs-root", "workspace-root", "spec-root")}
+    if cmd == "scan":
+        roots["code-root"] = opt(argv, "--code-root")
+    missing = [k for k, v in roots.items() if not v]
+    if missing:
+        return refuse("--%s is required" % missing[0])
+    roots = {k: os.path.abspath(v) for k, v in roots.items()}
+
+    if cmd == "scan":
+        if not os.path.isdir(roots["docs-root"]):
+            return refuse("%s is not a folder" % roots["docs-root"])
+        print(json.dumps(scan(roots["docs-root"], roots["code-root"], roots["workspace-root"],
+                              roots["spec-root"]), indent=2, ensure_ascii=False))
+        return 0
+
+    if cmd == "apply":
+        src = opt(argv, "--plan")
+        if not src:
+            return refuse("--plan is required")
+        try:
+            with open(src, encoding="utf-8") as f:
+                plan = json.load(f)
+        except (OSError, ValueError) as e:
+            return refuse("cannot read the plan: %s" % e)
+        err, result = apply(plan, roots["docs-root"], roots["workspace-root"], roots["spec-root"])
+        if err:
+            return refuse(err)
+        os.remove(src)
+        print(json.dumps(result, indent=2))
+        return 0
+
+    return refuse("unknown command %r; use scan or apply" % cmd)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

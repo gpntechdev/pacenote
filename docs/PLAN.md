@@ -78,7 +78,7 @@ docs/
   features/           README index + one file per shipped feature: what it does, its flows, where it lives; written by `docs`
 ```
 
-`lessons.md` stays a single capped file on purpose: it is a holding area, and growth is the signal to promote items into `conventions.md` or a decision, or prune them. In brownfield, existing project docs are linked from `architecture/overview.md`, not duplicated.
+`lessons.md` stays a single capped file on purpose: it is a holding area, and growth is the signal to promote items into `conventions.md` or a decision, or prune them. In brownfield, existing project docs are linked from `architecture/overview.md`, not duplicated. `docs-clean` keeps the folder honest on demand: drifted `path:line` pointers (re-anchored when the name is found), broken links, files over their caps, leftover draft markers, index rows out of step with `features/` and `decisions/`, and snapshots nothing links (DECISIONS 2026-10-22 M7).
 
 **`spec/<feature>/` — the working set, ephemeral.**
 

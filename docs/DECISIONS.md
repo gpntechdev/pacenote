@@ -1308,3 +1308,75 @@ and any PR are the user's. The proposal question names the branch. `spec-clean`,
 Consequences: amends the 2026-10-21 utils entry ("on the checked-out branch"). A util run on a
 feature branch still rides that feature's PR. `lessons-prune` and `refresh` were not re-run
 headless after this change; the rule is the one `spec-clean`'s smoke run exercised.
+
+## 2026-10-22 M7: docs-clean is a six-check lint script plus a fixing spine
+
+Context: PLAN names `docs-clean` without a definition. `<docs_root>` drifts in ways no step
+notices: code moves under `path:line` pointers, files are renamed under links, always-loaded
+files grow, onboard drafts are abandoned, `docs` and `onboard` miss an index row, and
+snapshots outlive the spec folders that cited them. The user chose the scope, the pointer
+fix, the trim and the status behaviour in the question round.
+Decision:
+- `scripts/docs-clean scan` reads every `*.md` under `<docs_root>` (fenced blocks skipped for
+  pointers and links) and reports six checks: `pointers` (`missing`, `out_of_range`,
+  `drifted`), `links` (broken relative), `caps`, `drafts` (line 1 is the marker, with the
+  onboard section), `readmes` (`missing_row`, `stale_row`, `no_readme` for `features/` and
+  `decisions/`) and `sources` (`<workspace_root>/sources/*.md` that no `*.md` under
+  `<docs_root>` or `<spec_root>` mentions as `sources/<name>`; only the header line is read).
+  A link on a row already reported stale is not reported again.
+- Pointers (user's choice: the script re-anchors, the rest is reported, no agent): the
+  identifier is the last backticked non-path token before the pointer, else a leading
+  `Name —` / `| Name |`; it must appear as a whole word on the pointed line or range. When it
+  does not, its hits in the file narrow to definition lines (`class`, `def`, `function`,
+  `type`, `table`, …); one hit gives the replacement line, a range keeping its length. No
+  identifier means existence and range only, so prose pointers never false-alarm as drift.
+- Caps, whole file, at the cap is fine: `project.md` 100, `conventions.md` 80, area and
+  domain files 60, feature records 150, decision files 40. `lessons.md` is lessons-prune's.
+- `scripts/docs-clean apply` takes `[{file, action, line, expect, text}]` (`replace`,
+  `delete`, `insert` after a line, `remove` for an unlinked snapshot), refuses the whole plan
+  on any stale `expect`, a path outside `<docs_root>` and `sources/`, or a snapshot linked
+  again, rewrites each file once against the scanned numbering, and consumes the plan.
+- `/specd:docs-clean` proposes one action per finding per
+  `skills/docs-clean/references/proposals.md`: repoint, relink, unlink, report, trim (user's
+  choice: a drafted trim to approve, by the template's contract, folding that file's other
+  findings in), leave (a draft marker; sign-off only on the user's word, since the marker is
+  onboard's resume point), sync (README rows), delete (snapshots; a pasted one cannot be
+  fetched again, which the reason says).
+- Commit `docs(docs-clean): repoint a, relink b, unlink c, trim d, sign-off e, sync f,
+  delete g` in the repo holding `<docs_root>`; snapshots in another repo (wrapper with docs
+  in the code repo) get their own `docs(docs-clean): delete g` there.
+- Manual only (user's choice): `status` does not run it.
+Consequences: the docs get a linter without a new agent. Drift detection is a name match,
+so a pointer whose name line changed meaning but kept the name passes; the scan finds
+broken structure, not wrong prose.
+
+## 2026-10-22 M7: docs-clean built; smoke-tested headless
+
+Context: this task's done-when was "a seeded scratch `docs/` with one hit per check is
+reported, and the approved fixes land in one `docs:` commit". As for M2 to M6, the plugin's
+own verification is headless (memory: headless smoke testing).
+Decision: built. `tests/test-docs-clean` covers each check and its controls (fenced
+pointers, prose pointers without a name, external and anchored links, the cap edge,
+`lessons.md` excluded, both README row forms, a snapshot linked only from a spec folder, a
+`.new.md`), re-anchoring by definition, range shift and an ambiguous name, and every apply
+refusal plus several inserts at one line and the consumed plan. Headless runs in a scratch
+embedded repo on `main` (`git.authority=commit`), seeded with a drifted and a missing
+pointer, a moved link target, `project.md` at 110 lines, a draft marker on
+`data-models/README.md`, a feature without a row, a decision row without a file, and one
+unlinked plus one linked snapshot, logged as `stream-json`:
+- The scan reported all eight; the proposal gave repoint, report, relink, trim (the Notes
+  section, 110 → 5 lines, grounded: `project.md` is in context through CLAUDE.md), leave,
+  sync, sync, delete, and named `chore/docs-clean-2026-10-22`.
+- Adjust round (`F2 delete line`, `F5 sign-off`) was reprinted and asked again; "apply all"
+  created the branch, applied one plan through the script, wrote the trim, re-scanned to zero
+  and committed `docs(docs-clean): repoint 1, delete 2, relink 1, trim 1, sign-off 1, sync 2`.
+- No Read of a `sources/` file in any run.
+- The first apply read the script's source to learn the plan format, and the verb order
+  varied; the spine now names the action per row and the order. A second run from the same
+  seed applied without reading the script and committed `repoint 1, relink 1, trim 1, sync 2,
+  delete 2`, leaving the draft marker as `leave`.
+Not exercised: a `no_readme` creation, a trim of a feature record or decision, a stale-plan
+refusal through the skill (script-level only), `git.authority: none`, wrapper mode with the
+snapshots and the docs in two repos.
+Consequences: "done" for M7 is the user's call after Task 6. Watch whether trims of real
+files keep facts; if they cut too much, make `report` the default for caps.
