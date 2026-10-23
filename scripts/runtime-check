@@ -1,0 +1,284 @@
+#!/usr/bin/env python3
+"""Start the app, run HTTP checks against it, stop it. Prints JSON; never prints a whole body.
+
+Usage:
+  runtime-check start --serve CMD --url URL --cwd DIR --state-dir DIR [--timeout SECONDS]
+  runtime-check run   --plan FILE --url URL
+  runtime-check stop  --state-dir DIR
+
+start: when URL already answers (any HTTP status), reports `reused: true` and starts
+nothing; `stop` then leaves that process alone. Otherwise runs CMD with `sh -c` in DIR in a
+new process group, output to `<state-dir>/serve.log`, and polls URL every half second until
+it answers or `--timeout` (default 60) passes; on timeout or early exit the group is
+stopped and the last 40 log lines are reported. STATE-DIR gets a `.gitignore` of `*`.
+run: PLAN is a JSON list of checks
+  {id, ac, method, path, headers?, json? | body?, expect: {status?, contains?, json?, header?}}
+`path` must start with `/` and is joined to URL, so every request stays on that origin.
+`expect.json` is a subset match on the parsed body; `contains` lists substrings; `header`
+maps names to substrings. Each result carries status, ok, failures, elapsed_ms and a
+redacted body excerpt of at most 400 characters. The plan file is deleted after a run;
+a refused plan (malformed, a bad path) is kept and nothing is sent.
+stop: TERM to the group, KILL after five seconds, pid file removed.
+Exit 1 on a refusal, or from `run` when any check failed. Stdlib only.
+"""
+import importlib.util
+import json
+import os
+import signal
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from importlib.machinery import SourceFileLoader
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+EXCERPT = 400
+TAIL = 40
+METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS")
+
+
+def load_redact():
+    loader = SourceFileLoader("redact", os.path.join(HERE, "redact"))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module.redact
+
+
+def opt(argv, flag, default=None):
+    if flag in argv:
+        i = argv.index(flag)
+        if i + 1 >= len(argv):
+            raise ValueError("%s needs a value" % flag)
+        return argv[i + 1]
+    return default
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None  # a 3xx is a result to check, not a hop off the origin
+
+
+OPENER = urllib.request.build_opener(NoRedirect)
+
+
+def request(url, method="GET", headers=None, data=None, timeout=10):
+    """Return (status, headers, body text); status 0 when nothing answered."""
+    req = urllib.request.Request(url, data=data, method=method, headers=headers or {})
+    try:
+        with OPENER.open(req, timeout=timeout) as r:
+            return r.status, dict(r.headers), r.read(1 << 20).decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        return e.code, dict(e.headers or {}), e.read(1 << 20).decode("utf-8", "replace")
+    except (urllib.error.URLError, OSError, ValueError):
+        return 0, {}, ""
+
+
+def answers(url):
+    return request(url, timeout=2)[0] != 0
+
+
+def tail(path, n=TAIL):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return [l.rstrip("\n") for l in f.readlines()[-n:]]
+    except OSError:
+        return []
+
+
+def paths(state_dir):
+    return os.path.join(state_dir, "serve.pid"), os.path.join(state_dir, "serve.log")
+
+
+def kill_group(pid, child=None):
+    """TERM the group, KILL it after five seconds. CHILD (our own Popen) is reaped as it
+    dies: macOS answers EPERM, not ESRCH, for a group whose only member is a zombie."""
+    try:
+        os.killpg(pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError):
+        return "gone"
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        if child is not None:
+            child.poll()
+        try:
+            os.killpg(pid, 0)
+        except (ProcessLookupError, PermissionError):
+            return "stopped"
+        time.sleep(0.1)
+    try:
+        os.killpg(pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+    if child is not None:
+        child.wait()
+    return "killed"
+
+
+def cmd_start(argv):
+    serve, url = opt(argv, "--serve"), opt(argv, "--url")
+    cwd, state_dir = opt(argv, "--cwd"), opt(argv, "--state-dir")
+    if not (serve and url and cwd and state_dir):
+        raise ValueError("start needs --serve, --url, --cwd and --state-dir")
+    timeout = float(opt(argv, "--timeout", "60"))
+    if not os.path.isdir(cwd):
+        raise ValueError("no such folder: %s" % cwd)
+    os.makedirs(state_dir, exist_ok=True)
+    ignore = os.path.join(state_dir, ".gitignore")
+    if not os.path.exists(ignore):
+        with open(ignore, "w") as f:
+            f.write("*\n")
+    pidfile, log = paths(state_dir)
+    if os.path.exists(pidfile):
+        raise ValueError("%s exists: a server from an earlier run; run stop first" % pidfile)
+    if answers(url):
+        return {"status": "ready", "reused": True, "url": url}
+    began = time.time()
+    with open(log, "w") as out:
+        p = subprocess.Popen(["sh", "-c", serve], cwd=cwd, stdout=out, stderr=subprocess.STDOUT,
+                             stdin=subprocess.DEVNULL, start_new_session=True)
+    with open(pidfile, "w") as f:
+        f.write("%d\n" % p.pid)
+    while time.time() - began < timeout:
+        if p.poll() is not None:
+            os.remove(pidfile)
+            return {"status": "exited", "code": p.returncode, "url": url, "log_tail": tail(log)}
+        if answers(url):
+            return {"status": "ready", "reused": False, "url": url, "pid": p.pid,
+                    "ready_after_s": round(time.time() - began, 1)}
+        time.sleep(0.5)
+    kill_group(p.pid, p)
+    os.remove(pidfile)
+    return {"status": "timeout", "url": url, "timeout_s": timeout, "log_tail": tail(log)}
+
+
+def cmd_stop(argv):
+    state_dir = opt(argv, "--state-dir")
+    if not state_dir:
+        raise ValueError("stop needs --state-dir")
+    pidfile, log = paths(state_dir)
+    if not os.path.exists(pidfile):
+        return {"status": "not running"}
+    with open(pidfile) as f:
+        pid = int(f.read().strip())
+    result = kill_group(pid)
+    os.remove(pidfile)
+    return {"status": result, "pid": pid, "log_tail": tail(log, 10)}
+
+
+def subset(want, got):
+    if isinstance(want, dict):
+        return isinstance(got, dict) and all(k in got and subset(v, got[k]) for k, v in want.items())
+    if isinstance(want, list):
+        return isinstance(got, list) and len(want) == len(got) and \
+            all(subset(w, g) for w, g in zip(want, got))
+    return want == got
+
+
+def validate(plan):
+    if not isinstance(plan, list) or not plan:
+        raise ValueError("plan must be a non-empty JSON list")
+    seen = set()
+    for c in plan:
+        if not isinstance(c, dict) or not c.get("id") or not isinstance(c.get("expect"), dict):
+            raise ValueError("every check needs id and expect: %r" % (c,))
+        if c["id"] in seen:
+            raise ValueError("check id %s repeated" % c["id"])
+        seen.add(c["id"])
+        if str(c.get("method", "GET")).upper() not in METHODS:
+            raise ValueError("%s: unknown method %s" % (c["id"], c.get("method")))
+        path = str(c.get("path", ""))
+        if not path.startswith("/") or path.startswith("//"):
+            raise ValueError("%s: path must start with a single / (same origin only)" % c["id"])
+        if "json" in c and "body" in c:
+            raise ValueError("%s: give json or body, not both" % c["id"])
+
+
+def check(base, c, redact):
+    headers = dict(c.get("headers") or {})
+    data = None
+    if "json" in c:
+        data = json.dumps(c["json"]).encode()
+        headers.setdefault("Content-Type", "application/json")
+    elif "body" in c:
+        data = str(c["body"]).encode()
+    method = str(c.get("method", "GET")).upper()
+    began = time.time()
+    status, got_headers, body = request(base + c["path"], method, headers, data)
+    elapsed = int((time.time() - began) * 1000)
+    exp, failures = c["expect"], []
+    if status == 0:
+        failures.append("no answer")
+    if "status" in exp and status != exp["status"]:
+        failures.append("status %s, expected %s" % (status, exp["status"]))
+    for s in exp.get("contains", []):
+        if s not in body:
+            failures.append("body lacks %r" % s)
+    if "json" in exp:
+        try:
+            parsed = json.loads(body)
+        except ValueError:
+            failures.append("body is not JSON")
+        else:
+            if not subset(exp["json"], parsed):
+                failures.append("json does not match expect.json")
+    lower = {k.lower(): v for k, v in got_headers.items()}
+    for name, s in (exp.get("header") or {}).items():
+        if s not in lower.get(name.lower(), ""):
+            failures.append("header %s lacks %r" % (name, s))
+    excerpt, kinds = redact(body[:EXCERPT])
+    return {"id": c["id"], "ac": c.get("ac", ""), "request": "%s %s" % (method, c["path"]),
+            "status": status, "ok": not failures, "failures": failures, "elapsed_ms": elapsed,
+            "excerpt": excerpt, "truncated": len(body) > EXCERPT,
+            "redactions": sum(kinds.values())}
+
+
+def cmd_run(argv):
+    plan_path, url = opt(argv, "--plan"), opt(argv, "--url")
+    if not (plan_path and url):
+        raise ValueError("run needs --plan and --url")
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.netloc:
+        raise ValueError("url must be http(s)://host[:port]")
+    with open(plan_path, encoding="utf-8") as f:
+        try:
+            plan = json.load(f)
+        except ValueError as e:
+            raise ValueError("plan is not JSON: %s" % e)
+    validate(plan)
+    base = url.rstrip("/")
+    redact = load_redact()
+    results = [check(base, c, redact) for c in plan]
+    os.remove(plan_path)
+    return {"url": url, "passed": sum(r["ok"] for r in results),
+            "failed": sum(not r["ok"] for r in results), "checks": results}
+
+
+COMMANDS = {"start": cmd_start, "run": cmd_run, "stop": cmd_stop}
+
+
+def main(argv):
+    if not argv or "--help" in argv or "-h" in argv:
+        print(__doc__.strip())
+        return 0 if argv else 2
+    if argv[0] not in COMMANDS:
+        print("runtime-check: unknown command %s; one of %s" % (argv[0], ", ".join(COMMANDS)),
+              file=sys.stderr)
+        return 1
+    try:
+        result = COMMANDS[argv[0]](argv)
+    except (ValueError, OSError) as e:
+        print("runtime-check: %s" % e, file=sys.stderr)
+        return 1
+    print(json.dumps(result, indent=2))
+    if argv[0] == "run" and result["failed"]:
+        return 1
+    if argv[0] == "start" and result["status"] != "ready":
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

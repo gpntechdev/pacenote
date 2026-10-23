@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+"""Tests for `scripts/runtime-check`: start (ready, reused, exited, timeout), run (every
+expect kind, redaction, refusals, the consumed plan) and stop.
+
+Usage: test-runtime-check [--help]   (run from anywhere; stdlib unittest)
+"""
+import json
+import os
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT = os.path.join(ROOT, "scripts", "runtime-check")
+
+APP = r'''
+import json, sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+ITEMS = [{"id": 1, "name": "tea"}]
+
+class H(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        print("req", self.path, flush=True)
+    def send(self, code, obj, ctype="application/json"):
+        body = (json.dumps(obj) if ctype == "application/json" else obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.end_headers()
+        self.wfile.write(body)
+    def do_GET(self):
+        if self.path == "/items":
+            self.send(200, ITEMS)
+        elif self.path == "/secret":
+            self.send(200, "token: ghp_abcdefghijklmnopqrstuvwxyz0123", "text/plain")
+        elif self.path == "/big":
+            self.send(200, "x" * 1000, "text/plain")
+        elif self.path == "/moved":
+            self.send_response(302)
+            self.send_header("Location", "http://example.com/")
+            self.end_headers()
+        else:
+            self.send(404, {"error": "not found"})
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length", 0))
+        item = json.loads(self.rfile.read(n))
+        if not item.get("name"):
+            return self.send(422, {"error": "name required"})
+        item["id"] = len(ITEMS) + 1
+        ITEMS.append(item)
+        self.send(201, item)
+
+print("listening", flush=True)
+HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
+'''
+
+
+def free_port():
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+
+def run(*args):
+    p = subprocess.run([SCRIPT] + list(args), capture_output=True, text=True)
+    out = json.loads(p.stdout) if p.stdout.strip() else {}
+    return p.returncode, out, p.stderr
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.state = os.path.join(self.dir.name, ".runtime")
+        with open(os.path.join(self.dir.name, "app.py"), "w") as f:
+            f.write(APP)
+        self.port = free_port()
+        self.url = "http://127.0.0.1:%d" % self.port
+        self.serve = "%s app.py %d" % (sys.executable, self.port)
+
+    def tearDown(self):
+        run("stop", "--state-dir", self.state)
+        self.dir.cleanup()
+
+    def start(self, serve=None, timeout="15"):
+        return run("start", "--serve", serve or self.serve, "--url", self.url + "/items",
+                   "--cwd", self.dir.name, "--state-dir", self.state, "--timeout", timeout)
+
+    def plan(self, checks):
+        path = os.path.join(self.dir.name, "plan.json")
+        with open(path, "w") as f:
+            json.dump(checks, f)
+        return path
+
+
+class Start(Base):
+    def test_ready_then_stop(self):
+        code, out, err = self.start()
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out["status"], "ready")
+        self.assertFalse(out["reused"])
+        with open(os.path.join(self.state, ".gitignore")) as f:
+            self.assertEqual(f.read(), "*\n")
+        code, out, _ = run("stop", "--state-dir", self.state)
+        self.assertEqual(code, 0)
+        self.assertIn(out["status"], ("stopped", "killed"))
+        time.sleep(0.2)
+        self.assertEqual(run("stop", "--state-dir", self.state)[1]["status"], "not running")
+
+    def test_reused_when_already_answering(self):
+        p = subprocess.Popen([sys.executable, "app.py", str(self.port)], cwd=self.dir.name,
+                             stdout=subprocess.DEVNULL)
+        try:
+            for _ in range(50):
+                if self.start()[1].get("status") == "ready":
+                    break
+                time.sleep(0.1)
+            code, out, _ = self.start()
+            self.assertEqual(out["reused"], True)
+            self.assertEqual(run("stop", "--state-dir", self.state)[1]["status"], "not running")
+            self.assertIsNone(p.poll())
+        finally:
+            p.kill()
+            p.wait()
+
+    def test_exit_reports_log_tail(self):
+        code, out, _ = self.start(serve="echo boom; exit 3")
+        self.assertEqual(code, 1)
+        self.assertEqual(out["status"], "exited")
+        self.assertEqual(out["code"], 3)
+        self.assertIn("boom", out["log_tail"])
+
+    def test_timeout_stops_the_process(self):
+        code, out, _ = self.start(serve="echo waiting; sleep 30", timeout="1")
+        self.assertEqual(code, 1)
+        self.assertEqual(out["status"], "timeout")
+        self.assertIn("waiting", out["log_tail"])
+        self.assertFalse(os.path.exists(os.path.join(self.state, "serve.pid")))
+
+    def test_leftover_pid_refuses(self):
+        self.assertEqual(self.start()[0], 0)
+        self.assertEqual(self.start()[0], 1)
+
+
+class Run(Base):
+    def setUp(self):
+        super().setUp()
+        code, out, err = self.start()
+        self.assertEqual(code, 0, err)
+
+    def test_all_expect_kinds_pass(self):
+        plan = self.plan([
+            {"id": "R1", "ac": "AC1", "method": "GET", "path": "/items",
+             "expect": {"status": 200, "json": [{"name": "tea"}],
+                        "header": {"content-type": "json"}, "contains": ["tea"]}},
+            {"id": "R2", "ac": "AC2", "method": "POST", "path": "/items",
+             "json": {"name": "milk"}, "expect": {"status": 201, "json": {"name": "milk"}}},
+            {"id": "R3", "ac": "AC3", "method": "POST", "path": "/items", "json": {},
+             "expect": {"status": 422, "contains": ["name required"]}},
+            {"id": "R4", "ac": "AC4", "path": "/moved", "expect": {"status": 302}},
+        ])
+        code, out, err = run("run", "--plan", plan, "--url", self.url)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out["passed"], 4)
+        self.assertEqual(out["checks"][1]["request"], "POST /items")
+        self.assertFalse(os.path.exists(plan))
+
+    def test_failures_are_named(self):
+        plan = self.plan([
+            {"id": "R1", "path": "/items", "expect": {"status": 201, "contains": ["coffee"],
+                                                     "json": [{"name": "x"}]}},
+            {"id": "R2", "path": "/big", "expect": {"json": {"a": 1}}},
+        ])
+        code, out, _ = run("run", "--plan", plan, "--url", self.url)
+        self.assertEqual(code, 1)
+        f = out["checks"][0]["failures"]
+        self.assertEqual(len(f), 3)
+        self.assertIn("status 200, expected 201", f)
+        self.assertEqual(out["checks"][1]["failures"], ["body is not JSON"])
+        self.assertTrue(out["checks"][1]["truncated"])
+        self.assertEqual(len(out["checks"][1]["excerpt"]), 400)
+
+    def test_excerpt_is_redacted(self):
+        plan = self.plan([{"id": "R1", "path": "/secret", "expect": {"status": 200}}])
+        out = run("run", "--plan", plan, "--url", self.url)[1]
+        self.assertNotIn("ghp_abcdef", out["checks"][0]["excerpt"])
+        self.assertEqual(out["checks"][0]["redactions"], 1)
+
+    def test_refusals_keep_the_plan_and_send_nothing(self):
+        for bad in ([], [{"id": "R1", "path": "http://evil.test/x", "expect": {}}],
+                    [{"id": "R1", "path": "//evil.test/x", "expect": {}}],
+                    [{"id": "R1", "path": "/items"}],
+                    [{"id": "R1", "path": "/a", "expect": {}}, {"id": "R1", "path": "/b", "expect": {}}],
+                    [{"id": "R1", "method": "BREW", "path": "/a", "expect": {}}],
+                    [{"id": "R1", "path": "/a", "json": {}, "body": "x", "expect": {}}]):
+            plan = self.plan(bad)
+            code, _, err = run("run", "--plan", plan, "--url", self.url)
+            self.assertEqual(code, 1, bad)
+            self.assertTrue(os.path.exists(plan))
+        with open(os.path.join(self.state, "serve.log")) as f:
+            self.assertNotIn("req /a", f.read())
+
+    def test_bad_url_refused(self):
+        plan = self.plan([{"id": "R1", "path": "/items", "expect": {}}])
+        self.assertEqual(run("run", "--plan", plan, "--url", "file:///etc")[0], 1)
+
+
+if __name__ == "__main__":
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(__doc__.strip())
+        sys.exit(0)
+    unittest.main(verbosity=1)
