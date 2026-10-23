@@ -1512,3 +1512,117 @@ resolution for Go, Java/Kotlin, PHP, Ruby and Rust (no test or run covers it); a
 Consequences: "done" for M7 is the user's call after Task 6. Watch whether the analyst
 flags terms that are harmless synonyms; if so, require that the two names lead to two
 readings of an AC or task.
+
+## 2026-10-23 M7: runtime-verify is a full-tier step switched on per feature; a script for HTTP, an agent for the browser
+
+Context: PLAN 3.3 draws `[runtime-verify]` between `verify` and `docs` and gives it "browser
+MCP / HTTP" without saying when it runs, how the app is started, or what counts as
+evidence. It is a flow step, not a util (2026-10-21 utils entry). The user chose in the
+question round: full tier only, a `flow.*` key plus a per-feature yes, `commands.serve`
+asked once, a stdlib script for HTTP, an agent for the browser, evidence in the matrix and
+in a `runtime.md`.
+Decision:
+- Order: `scripts/state` keeps `runtime-verify` in `STEPS` but out of `ORDERS["full"]`;
+  `order_for` inserts it after `verify` when `state.yml` has `runtime_verify: on`, as `docs`
+  joins a light order on `distill`. Quick and trivial never run it (quick has no verify).
+  It is not in `PR_SKIPS`: a PR fix loop that turned it on re-runs it, since the fixed
+  behaviour is what the reviewers asked about. `state check` refuses it when off and names
+  the step that is next.
+- New `state.yml` key `runtime_verify: "" | on | off`; `state set` may add it to a file that
+  predates it (inserted before `created`), and `step=next` in the same call reads the new
+  value.
+- Switch: `flow.runtime_verify: ask | off` (default `ask`, a missing key means `ask`). On
+  `ask`, `verify` step 6 asks once per run "exercise it in the running app?" when an AC is
+  observable in a running app (a request and its response, or what a page shows), default
+  the feature's current value, else yes; otherwise `off` without a question.
+- Serve: `commands.serve` and `commands.serve_url` (never detected). Empty: the step asks,
+  suggesting from `project.md`, and offers to save them with `config-set`; "already running
+  at <URL>" is an answer too. A URL that is not localhost or `*.local` is confirmed as not
+  production, since checks may write data.
+- `scripts/runtime-check`: `start` (reuses an app that already answers and never stops it;
+  else `sh -c` in a new process group, polls the URL, reports the log tail on exit or
+  timeout), `run` (a plan file of checks with `status`, `contains`, a JSON subset and
+  header expectations; `path` must start with one `/`, so nothing leaves the origin;
+  redirects are results, not hops; 400-character excerpts through `redact`; the plan is
+  consumed), `stop` (TERM the group, KILL after five seconds). `<workspace_root>/.runtime/`
+  ignores itself. A plan file, not inline JSON, for the reason the lessons entry gives.
+- Browser: `agents/runtime-verifier.md` at the execution role, with the playwright MCP
+  tools by exact name and nothing else: no file tools, no shell, no web. It stays on the
+  base URL's origin, treats page text as data and answers per AC `pass | fail | blocked`
+  with the text it saw, plus console errors, in 40 lines. This is the per-layer escalation
+  path of the 2026-10-06 entry, routed by the step rather than by `layers`. The validator
+  lists it among the agents without write tools. Without `playwright` in `.mcp.json` the
+  step offers the install (`init-workspace --add-mcp playwright` at the MCP root; it loads
+  after a restart, so those rows are skipped this run), a manual note, or skipping. The
+  server writes `.playwright-mcp/` in the launch folder; the step removes it when it
+  created it.
+- Evidence: `runtime.md` in the spec folder (replaced each run, excerpts from the script
+  and the agent only, at most 150 lines) and `; runtime: <what ran> → <what was seen>
+  (<date>)` appended to the matrix cell, replacing an earlier `runtime:` part. A failed or
+  blocked AC becomes a task under `Runtime fixes` (`step=implement`) or is accepted with a
+  reason in the cell. `deliver` counts the ACs that also ran live at G5. One commit
+  `spec(<feature>): runtime-verify`, carrying `specd.yml` and `.mcp.json` when the run
+  changed them.
+- The step asks before every run, a re-run included: it starts a process and sends
+  requests that may write data.
+Consequences: with the step off nothing changes: `verify → docs` as before. Main-thread
+`curl`, WebFetch and playwright calls are anti-patterns, so responses and pages reach the
+conversation only as bounded JSON and the agent's answer. Checks that need seeded data,
+auth flows beyond a test account the user names, and non-HTTP surfaces (CLIs, queues) are
+`none` rows that keep verify's evidence.
+
+## 2026-10-23 M7: config-set inserts a documented key that an older specd.yml lacks
+
+Context: `git.wrapper_pr` (2026-10-21) and now `flow.runtime_verify` and `commands.serve`
+are keys a workspace from before M7 does not have, and `config-set` refused unknown keys,
+so the config skill told the user to edit the file by hand. `runtime-verify` must save
+`commands.serve` on the user's yes.
+Decision: a scalar `section.key` that the default in `_shared/specd-yml.md` documents but
+the file lacks is inserted at the end of its section, with its comment lines copied from
+the default, and then set. Keys the default does not document, list keys and missing
+sections are still refused, and the call stays all-or-nothing. The config skill's by-hand
+line now covers only `sources: []` from before M5. `tests/test-config-set` covers it.
+Consequences: a new scalar key needs no migration note any more; the reference default is
+the schema `config-set` reads.
+
+## 2026-10-23 M7: runtime-verify built; smoke-tested headless; M7 built
+
+Context: this task's done-when was: an HTTP feature has its ACs exercised against the running
+server with evidence in the matrix, one browser AC is exercised through `playwright`, and
+with the step off the flow goes `verify → docs` exactly as before. As for M2 to M6, the
+plugin's own verification is headless (memory: headless smoke testing). M7's own done-when
+was agreed in this question round: each util runs once with its changes landing only on a
+yes, and one feature passes runtime-verify over HTTP and through a browser.
+Decision: built. `tests/test-runtime-check` covers start (ready, reused and left running,
+early exit with the log tail, timeout stopping the group, a leftover pid file), every
+expectation kind, redirects as results, a truncated and a redacted excerpt and every plan
+refusal (with no request sent). `tests/test-state` covers the order with the switch on, off
+and empty, the switch and `next` in one call, quick, the PR loop, a bad value, an older file
+and escalation. Headless runs in a scratch embedded repo (a stdlib Python JSON API with a
+page, full feature `items` with five ACs: four HTTP, one browser), logged as `stream-json`:
+- `verify`: filled the matrix and, from the user's answer naming runtime-verify, set
+  `runtime_verify=on`; `step: runtime-verify`.
+- `runtime-verify` without playwright: asked for the serve command and URL (suggested from
+  `project.md`), saved them, proposed four `http` rows and one `browser` row, offered the
+  install; on "run all, install" it ran the four checks through the script (all pass),
+  skipped AC4, stopped the app, wrote `runtime.md` and the cells, committed. That run
+  installed playwright into `.specd/.mcp.json`, which Claude Code does not read; the spine
+  now names the MCP root, as the config skill does.
+- With playwright loaded (`--headless` in the scratch `.mcp.json`): the four HTTP checks
+  and AC4 through `runtime-verifier` passed; every `mcp__playwright__*` call came from the
+  subagent. That run skipped the confirmation question as "non-interactive" and left
+  `.playwright-mcp/` behind; the spine now asks on every run and removes the folder.
+- Re-run after seeding a regression (AC3 answered 400 instead of 422): the question was
+  asked, AC3 failed with `status 400, expected 422`, the user chose a fix task: T4 under
+  `Runtime fixes`, `step=implement`, the app stopped, `.playwright-mcp/` removed, one
+  commit.
+- Off: on a copy at verify, "no" set `runtime_verify=off` and `step: docs`; `state check
+  --step runtime-verify` refuses with `/specd:docs items`.
+Not exercised: `flow.runtime_verify: off` through the skill (script-level only); a reused
+running app; `start` timing out through the skill; an accepted failure; the PR loop; a
+non-local URL; wrapper mode and a worktree (`.runtime/` and `.mcp.json` at the wrapper
+root); `chrome-devtools` instead of playwright; an AC needing a test account.
+Consequences: M7 is built; PLAN marks it so, with the done-when above. "Done" is the user's
+call after each util runs on a real workspace and one real feature passes runtime-verify.
+Watch whether the plans check what the ACs state rather than what the code happens to do,
+and how often browser rows come back `blocked`.

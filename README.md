@@ -4,7 +4,8 @@ Spec-driven development workflow for AI coding assistants, packaged as a Claude 
 Read "spec'd". Stack-agnostic; lives inside a code repo (`.specd/`) or wraps around it.
 
 Status: M6 (toolsmith, two-stage skill audit, specialist reviews, MCP proposals) is built;
-M5 is done. M7 (utils) is in progress: `lessons-prune`, `spec-clean`, `docs-clean`, `research`, `analyze` and `analyze-codebase` are built. See `docs/PLAN.md` for the plan of record and milestones.
+M5 is done. M7 (utils and runtime-verify) is built: `lessons-prune`, `spec-clean`, `docs-clean`,
+`research`, `analyze`, `analyze-codebase` and the optional `runtime-verify` step. See `docs/PLAN.md` for the plan of record and milestones.
 
 ## Install
 
@@ -53,7 +54,10 @@ cd <repo> && claude --plugin-dir /path/to/specd
 /specd:review <feature>                   # reviewer agent in a fresh context, then optional
                                           # security / performance / accessibility / tests
                                           # passes; fixes become tasks and send you back to implement
-/specd:verify <feature>                   # evidence for every acceptance criterion
+/specd:verify <feature>                   # evidence for every acceptance criterion; asks
+                                          # whether to exercise the running app next
+/specd:runtime-verify <feature>           # optional (full tier): start the app, HTTP checks per
+                                          # AC, browser checks through playwright, evidence
 /specd:docs <feature>                     # feature record, decisions, doc deltas, before the PR
 /specd:deliver <feature>                  # checks, gate G5, optional squash; you choose push / PR
 /specd:feedback <feature>                 # PR comments -> fix tasks (back to implement) or replies
@@ -113,14 +117,16 @@ parallel, one session per worktree or all from the wrapper root with the feature
 skills/<name>/    SKILL.md spine + references/ + templates/
 skills/_shared/   blocks referenced by many skills: gates, handoff, state, paths, sources, critic
 agents/           explorer, intake, researcher, architect, critic, analyst, implementer, reviewer,
-                  specialist, skill-auditor
+                  specialist, skill-auditor, runtime-verifier
 hooks/            secrets guardrail, source guard (snapshots and the skill quarantine)
 scripts/          deterministic helpers: validate, resolve-paths, detect-repo,
                   detect-commands, config-set, init-workspace, state, worktree, run-checks, squash-wip,
                   pr-comments, redact, fetch-source, refresh-source, audit-static, skill-fetch,
-                  skill-lock, lessons, spec-clean, docs-clean, analyze, analyze-codebase
+                  skill-lock, lessons, spec-clean, docs-clean, analyze, analyze-codebase,
+                  runtime-check
 tests/            test-audit, test-skill-find, test-lessons, test-spec-clean, test-docs-clean,
-                  test-analyze, test-analyze-codebase and their fixtures (a seeded malicious
+                  test-analyze, test-analyze-codebase, test-runtime-check, test-state,
+                  test-config-set and their fixtures (a seeded malicious
                   skill, a clean one, a skills.sh search response)
 docs/             PLAN.md, DECISIONS.md, AUTHORING.md
 ```
@@ -128,5 +134,5 @@ docs/             PLAN.md, DECISIONS.md, AUTHORING.md
 ## Contributing
 
 Read `docs/AUTHORING.md` before adding or changing a skill. Run `scripts/validate`,
-`tests/test-audit`, `tests/test-skill-find` and `claude plugin validate .` before
+every `tests/test-*` and `claude plugin validate .` before
 committing. Decisions go to `docs/DECISIONS.md`.
