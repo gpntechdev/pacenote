@@ -12,7 +12,7 @@ its delta.
 - It opens with `resolve-paths` ([`paths.md`](./paths.md)); a util that acts on one feature
   adds `state find` from the same opening sequence and stops there.
 - Its deterministic part (counting, matching, listing, applying a plan) is a script in
-  `scripts/` that prints JSON. The spine reads the script's output, not the files it scanned,
+  `scripts/` that prints JSON. `research` has none: its work is the `researcher` agent's. The spine reads the script's output, not the files it scanned,
   wherever the script can answer.
 
 ## Nothing changes without a yes

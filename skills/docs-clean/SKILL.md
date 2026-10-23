@@ -6,8 +6,8 @@ description: >
   features or decisions index is out of date, onboard drafts were left behind, or old source
   snapshots pile up, or runs `/specd:docs-clean`. A script finds `path:line` pointers that no
   longer resolve or have drifted (and re-anchors them when it can), broken relative links,
-  files over their caps, leftover `specd:draft` markers, `features/` and `decisions/` READMEs
-  out of sync with their folders, and `sources/` snapshots nothing links; it proposes one fix
+  files over their caps, leftover `specd:draft` markers, `features/`, `decisions/` and
+  `research/` READMEs out of sync with their folders, and `sources/` snapshots nothing links; it proposes one fix
   per finding, applies only the rows you approve and commits once, never on a default branch.
   Not for `lessons.md` (that is `/specd:lessons-prune`) or for writing new docs (that is
   `/specd:onboard` or `/specd:docs`).
