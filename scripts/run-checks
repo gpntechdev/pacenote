@@ -22,7 +22,7 @@ def opt(argv, flag, default=None):
     if flag in argv:
         i = argv.index(flag)
         if i + 1 >= len(argv):
-            print("specd: %s needs a value" % flag, file=sys.stderr)
+            print("pacenote: %s needs a value" % flag, file=sys.stderr)
             sys.exit(2)
         return argv[i + 1]
     return default
@@ -38,14 +38,14 @@ def main(argv):
     try:
         tail = int(opt(argv, "--tail", "40"))
     except ValueError:
-        print("specd: --tail needs an integer", file=sys.stderr)
+        print("pacenote: --tail needs an integer", file=sys.stderr)
         return 2
     try:
         r = subprocess.run([sys.executable, os.path.join(HERE, "detect-commands"), "--from", start],
                            capture_output=True, text=True)
         detected = json.loads(r.stdout)
     except (OSError, ValueError) as e:
-        print("specd: detect-commands failed: %s" % e, file=sys.stderr)
+        print("pacenote: detect-commands failed: %s" % e, file=sys.stderr)
         return 1
     root = detected.get("root", start)
     commands = detected.get("commands", {})

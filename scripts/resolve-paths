@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Resolve specd workspace roots and print them as JSON.
+"""Resolve pacenote workspace roots and print them as JSON.
 
 Usage: resolve-paths [--from DIR] [--feature NAME]
 
-Walks upward from DIR (default: current directory) looking for specd.yml
-(wrapper mode) or .specd/specd.yml (embedded mode). A feature worktree
+Walks upward from DIR (default: current directory) looking for pacenote.yml
+(wrapper mode) or .pacenote/pacenote.yml (embedded mode). A feature worktree
 (`<wrapper>/.worktrees/<name>/`) is a wrapper layout of its own, so resolving
 from inside it returns the worktree's roots; --feature NAME resolves from
 `<wrapper>/.worktrees/NAME/` when that worktree exists, else from DIR as usual.
@@ -29,7 +29,7 @@ WORKTREES = ".worktrees"
 def find_config(start):
     d = os.path.abspath(start)
     while True:
-        for rel in ("specd.yml", os.path.join(".specd", "specd.yml")):
+        for rel in ("pacenote.yml", os.path.join(".pacenote", "pacenote.yml")):
             p = os.path.join(d, rel)
             if os.path.isfile(p):
                 return p
@@ -89,12 +89,12 @@ def main(argv):
     feature = opt(argv, "--feature")
     config = find_config(start)
     if not config:
-        print("specd: no specd.yml found from %s; run /specd:init" % os.path.abspath(start),
+        print("pacenote: no pacenote.yml found from %s; run /pacenote:init" % os.path.abspath(start),
               file=sys.stderr)
         return 1
     if feature:
         _, _, wrapper_root = worktree_of(os.path.dirname(config))
-        candidate = os.path.join(wrapper_root, WORKTREES, feature, "specd.yml")
+        candidate = os.path.join(wrapper_root, WORKTREES, feature, "pacenote.yml")
         if os.path.isfile(candidate):
             config = candidate
     top, paths = read_keys(config)

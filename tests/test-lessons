@@ -17,7 +17,7 @@ SCRIPT = os.path.join(ROOT, "scripts", "lessons")
 HEADER = [
     "# Lessons",
     "",
-    "<!-- Written by /specd:init. One line per lesson:",
+    "<!-- Written by /pacenote:init. One line per lesson:",
     "     `YYYY-MM-DD — context — the rule to follow next time`. -->",
 ]
 BODY = [

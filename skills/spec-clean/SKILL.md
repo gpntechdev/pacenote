@@ -3,11 +3,11 @@ name: spec-clean
 description: >
   Invoke whenever the user asks to clean up, remove or distill old kept spec folders, says
   closed features are piling up under the spec root, follows the `status` warning about
-  kept folders older than `flow.keep_days`, or runs `/specd:spec-clean`. It lists every
+  kept folders older than `flow.keep_days`, or runs `/pacenote:spec-clean`. It lists every
   feature closed with `keep` and older than the cap with a script, proposes per folder
   delete (the feature record already exists), distill (write the missing record and durable
   decisions, then delete) or skip, and applies only the rows you approve, then commits once
-  per repo, never on a default branch. Not for a feature still in flight or one whose PR is open; that is `/specd:close`.
+  per repo, never on a default branch. Not for a feature still in flight or one whose PR is open; that is `/pacenote:close`.
 ---
 
 # Skill: spec-clean
@@ -23,7 +23,7 @@ no `state check`, nothing written without a yes.
 
 - `resolve-paths` ([`../_shared/paths.md`](../_shared/paths.md)); `detect-repo --from <root>`
   for each repo that will change.
-- `<workspace_root>/specd.yml`: `flow.keep_days` (default 30), `git.authority`.
+- `<workspace_root>/pacenote.yml`: `flow.keep_days` (default 30), `git.authority`.
 - `"${CLAUDE_PLUGIN_ROOT}/scripts/spec-clean" scan` output (it reads every `state.yml`).
 - Distill rows only, one folder at a time: `spec.md`, `design.md`, `tasks.md`, `review.md`,
   `state.yml` of `<spec_root>/<feature>/`; `<docs_root>/features/README.md`,
@@ -43,7 +43,7 @@ no `state check`, nothing written without a yes.
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths` (no config: `run /specd:init first`). Read the two keys.
+1. **Resolve.** `resolve-paths` (no config: `run /pacenote:init first`). Read the two keys.
 2. **Scan.** `"${CLAUDE_PLUGIN_ROOT}/scripts/spec-clean" scan --spec-root <spec_root>
    --docs-root <docs_root> --worktrees <wrapper_root>/.worktrees --days <flow.keep_days>`.
    Print `kept folders: <old> older than <days> days, <fresh> younger` and one line per
@@ -87,7 +87,7 @@ no `state check`, nothing written without a yes.
 - Proposing or removing a fresh, open, blocked or skipped folder; the scan decides what is old,
   the user decides what goes.
 - Removing a folder with `rm`, `git rm` or a file tool; `spec-clean apply` is the only remover.
-- Running `/specd:docs` for a closed feature (it refuses) or editing architecture and
+- Running `/pacenote:docs` for a closed feature (it refuses) or editing architecture and
   data-model files from an old design; this run writes the record and decisions only.
 - Writing a record for a folder the user marked `delete`, or one question per folder.
-- Removing a worktree or merging anything; a blocked row goes back to `/specd:close`.
+- Removing a worktree or merging anything; a blocked row goes back to `/pacenote:close`.

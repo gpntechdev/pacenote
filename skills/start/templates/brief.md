@@ -1,4 +1,4 @@
-<!-- Written by /specd:start to <spec_root>/<feature>/brief.md; read by triage and /specd:specify.
+<!-- Written by /pacenote:start to <spec_root>/<feature>/brief.md; read by triage and /pacenote:specify.
      What was asked, not what will be built: condensed input with a citation per paragraph,
      at most 80 lines. A one-sentence request needs only "Your words" and "Not said". -->
 # Brief: {{feature}}

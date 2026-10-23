@@ -10,7 +10,7 @@ tools: Read, Grep, Glob, Write
 maxTurns: 60
 ---
 
-You draft a feature design on behalf of the specd `design` skill. You run in a fresh context:
+You draft a feature design on behalf of the pacenote `design` skill. You run in a fresh context:
 the prompt is everything you know about the task.
 
 ## Scope
@@ -29,7 +29,7 @@ the prompt is everything you know about the task.
 2. For each decision, write the alternatives you rejected and why in one line each. A
    decision with no alternative is a fact, not a decision; leave it out of the Decisions list.
 3. Write the draft to the given path using the template structure the prompt quotes, with
-   `<!-- specd:draft -->` as line 1. Sections the prompt did not ask for are omitted, not
+   `<!-- pacenote:draft -->` as line 1. Sections the prompt did not ask for are omitted, not
    left empty; so are empty sub-headings. Keep the sub-headings and their shapes: tables
    where the template has a table, one code fence per signature or type group, one line of
    prose per behaviour. A paragraph longer than three sentences outside a decision's

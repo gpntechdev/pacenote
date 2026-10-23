@@ -1,6 +1,6 @@
 # Principles
 
-**Reference-only.** Not a skill. Loaded by `/specd:principles` and referenced by every skill
+**Reference-only.** Not a skill. Loaded by `/pacenote:principles` and referenced by every skill
 that writes code. Owned by the plugin; changes are recorded in `docs/DECISIONS.md`.
 
 Stack-agnostic and permanent. They apply to code, tests, scripts, docs and configuration alike.

@@ -1,4 +1,4 @@
-# specd.yml
+# pacenote.yml
 
 **Reference-only.** Not a skill. The single source of truth for the workspace config file.
 Written by `init` (create) and `config` (change); read by every other skill. Skills that read it
@@ -6,7 +6,7 @@ never write it.
 
 ## Where it lives
 
-Embedded mode: `<repo>/.specd/specd.yml`. Wrapper mode: `<wrapper>/specd.yml`. The folder holding
+Embedded mode: `<repo>/.pacenote/pacenote.yml`. Wrapper mode: `<wrapper>/pacenote.yml`. The folder holding
 it is `workspace_root`; see [`paths.md`](./paths.md).
 
 ## Default file
@@ -15,7 +15,7 @@ it is `workspace_root`; see [`paths.md`](./paths.md).
 file and stay in place.
 
 ```yaml
-specd: 1                     # schema version; bump only on incompatible key changes
+pacenote: 1                     # schema version; bump only on incompatible key changes
 mode: embedded               # embedded | wrapper
 project: ""                  # display name; in wrapper mode also the code folder name
 
@@ -65,14 +65,14 @@ sources:
                              # (PROJ-123) and its own page URLs; URLs, files and pastes need no key
 
 skills:                      # GitHub repos toolsmith may fetch third-party skills from;
-  allowlist:                 # change with /specd:config --add / --remove
+  allowlist:                 # change with /pacenote:config --add / --remove
     - anthropics/skills
   discovery: skills.sh       # skills.sh | off: find candidates in the skills.sh index (the
                              # search find-skills uses) and offer their repos for the allowlist
 
 layers:                      # layer -> files implement and review add to "Read first" for
                              #     tasks of that layer; paths relative to code_root. Filled by
-                             #     toolsmith or /specd:config --add, e.g.
+                             #     toolsmith or /pacenote:config --add, e.g.
                              #     frontend:
                              #       - .claude/skills/react-conventions/SKILL.md
 ```
@@ -81,7 +81,7 @@ layers:                      # layer -> files implement and review add to "Read 
 
 | Key | Values | Used by |
 |---|---|---|
-| `specd` | integer | every reader, to refuse an unknown schema |
+| `pacenote` | integer | every reader, to refuse an unknown schema |
 | `mode` | `embedded`, `wrapper` | path resolution (skills name roots, never the mode) |
 | `project` | string | wrapper code folder name, generated docs |
 | `paths.*` | relative or absolute path | path resolution |
@@ -119,7 +119,7 @@ into for the audit.
 - A missing key means its default above.
 - Unknown keys are ignored, never removed.
 - A malformed file: warn once, use all defaults, do not rewrite.
-- Never write. Suggest `/specd:config` when a value should change.
+- Never write. Suggest `/pacenote:config` when a value should change.
 
 ## Rules for writers (`init`, `config`)
 

@@ -5,7 +5,7 @@ Usage: fetch-source --url URL --out PATH [--section NAME]
 
 Fetches an http(s) URL, converts HTML to plain text (headings as #, list items as -,
 links as `text (url)`), redacts it with `redact` and writes PATH with the
-`<!-- specd:source ... -->` provenance header (via="http"). Prints one JSON object:
+`<!-- pacenote:source ... -->` provenance header (via="http"). Prints one JSON object:
 status (ok | login | thin | error), path, origin, final_url, title, lines, bytes,
 redactions, reason. Only status ok writes a file: a 401/403, a redirect to a login or SSO
 page, or a body under 200 characters means the page needs a paste instead.
@@ -109,7 +109,7 @@ def fetch(url):
     """Return (status, final_url, text, title, reason)."""
     if not url.startswith(("http://", "https://")):
         return "error", url, "", "", "only http(s) URLs are fetched"
-    req = urllib.request.Request(url, headers={"User-Agent": "specd-fetch-source/1",
+    req = urllib.request.Request(url, headers={"User-Agent": "pacenote-fetch-source/1",
                                                "Accept": "text/html,text/plain,text/markdown"})
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
@@ -156,10 +156,10 @@ def main(argv):
     try:
         url, out, section = opt(argv, "--url"), opt(argv, "--out"), opt(argv, "--section", "")
     except ValueError as e:
-        print("specd: %s" % e, file=sys.stderr)
+        print("pacenote: %s" % e, file=sys.stderr)
         return 1
     if not url or not out or not out.endswith(".md"):
-        print("specd: --url URL and --out PATH.md are required", file=sys.stderr)
+        print("pacenote: --url URL and --out PATH.md are required", file=sys.stderr)
         return 1
     status, final, text, title, reason = fetch(url)
     report = {"status": status, "path": "", "origin": url, "final_url": final,

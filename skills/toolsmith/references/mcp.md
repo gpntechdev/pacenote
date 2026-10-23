@@ -9,10 +9,10 @@ here from the stack and the sources, and installed only on the user's yes, by
 
 | Server | Propose when | Reason to give | After install |
 |---|---|---|---|
-| `playwright` | a frontend layer, or end-to-end tests with Playwright | drive the app in a browser for `/specd:runtime-verify` and e2e debugging | approve it on first use; needs Node |
+| `playwright` | a frontend layer, or end-to-end tests with Playwright | drive the app in a browser for `/pacenote:runtime-verify` and e2e debugging | approve it on first use; needs Node |
 | `chrome-devtools` | a frontend layer, when performance or console debugging matters | console, network and performance traces from a real Chrome | needs Chrome and Node |
 | `dbhub` | a backend or data layer with PostgreSQL, MySQL, MariaDB, SQL Server, Oracle or SQLite | inspect the schema and run read queries while designing and debugging | set `DATABASE_URL` in the shell that launches Claude Code (a development database, never production); the file holds only `${DATABASE_URL}` |
-| `atlassian` | `sources.mcp` is `none` and the docs or the user name Jira or Confluence | fetch tickets with `/specd:start --from PROJ-123` | `/specd:config sources.mcp=atlassian`, then `/mcp` once to authorise |
+| `atlassian` | `sources.mcp` is `none` and the docs or the user name Jira or Confluence | fetch tickets with `/pacenote:start --from PROJ-123` | `/pacenote:config sources.mcp=atlassian`, then `/mcp` once to authorise |
 
 - Propose `playwright` or `chrome-devtools`, not both, unless the user asks; `playwright`
   by default.

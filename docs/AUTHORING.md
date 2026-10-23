@@ -18,7 +18,7 @@ context-engineering rules in `docs/PLAN.md` section 3.9. Each rule is tagged `[v
 ## 2. Descriptions are triggers
 
 - The frontmatter `description` says what the skill produces, when it should fire, and its
-  `/specd:<name>` form. It is written for the assistant deciding whether to invoke it, not for
+  `/pacenote:<name>` form. It is written for the assistant deciding whether to invoke it, not for
   a catalogue. `[review]`
 - Present and at most 1536 characters; Claude Code truncates beyond that. `[validated]`
 - Open with the instruction, not a definition: "Invoke first, before any tool call, whenever
@@ -69,7 +69,7 @@ context-engineering rules in `docs/PLAN.md` section 3.9. Each rule is tagged `[v
 ## 8. Model tiers are roles
 
 - Skills and agents name `judgment`, `execution` or `cheap`. The mapping to model names exists
-  in one place, the `models` block of `skills/_shared/specd-yml.md`. A model name anywhere else
+  in one place, the `models` block of `skills/_shared/pacenote-yml.md`. A model name anywhere else
   in `skills/` or `agents/` fails validation. `[validated]`
 
 ## 9. Generated files stay small
@@ -94,7 +94,7 @@ context-engineering rules in `docs/PLAN.md` section 3.9. Each rule is tagged `[v
 
 ## 11. Naming and prose
 
-- Command prefix `/specd:`, config `specd.yml`, embedded folder `.specd/`, gates `G1`..`G5`,
+- Command prefix `/pacenote:`, config `pacenote.yml`, embedded folder `.pacenote/`, gates `G1`..`G5`,
   tiers `trivial` / `quick` / `full`, model roles `judgment` / `execution` / `cheap`.
 - English. Short sentences, one instruction each. Imperative mood for protocol steps. No
   emoji. Files and commands in backticks.

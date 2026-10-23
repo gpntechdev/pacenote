@@ -1,7 +1,7 @@
 # Wrapper init
 
 Read by `init` when the mode is wrapper. The wrapper is the user's own git repo around the
-code repo (PLAN 3.1): specd files, docs and specs live here, the code repo sits inside,
+code repo (PLAN 3.1): pacenote files, docs and specs live here, the code repo sits inside,
 gitignored, and gets zero files from init unless the user sends `docs/` there.
 
 ## Deciding the mode
@@ -42,26 +42,26 @@ plus one:
 
 ```
 "${CLAUDE_PLUGIN_ROOT}/scripts/init-workspace" --root <wrapper> --mode wrapper --code <name> [--docs <name>/docs]
-"${CLAUDE_PLUGIN_ROOT}/scripts/config-set" --file <wrapper>/specd.yml mode=wrapper project=<name> \
+"${CLAUDE_PLUGIN_ROOT}/scripts/config-set" --file <wrapper>/pacenote.yml mode=wrapper project=<name> \
   paths.code_root=./<name> [paths.docs_root=<name>/docs] git.pr_host=<host> git.ticket_key=<key> commands.<k>=<v> ...
 ```
 
-`init-workspace` writes `specd.yml`, `docs/` (or the chosen folder), `spec/`, `sources/`,
+`init-workspace` writes `pacenote.yml`, `docs/` (or the chosen folder), `spec/`, `sources/`,
 `.claude/settings.json`, `.mcp.json`, `CLAUDE.md` and a `.gitignore` holding `<name>/` and
 `.worktrees/`. `git.worktrees` stays `false`: parallel features are opt-in with
-`/specd:config git.worktrees=true` (`paths.md`, "Feature worktrees").
+`/pacenote:config git.worktrees=true` (`paths.md`, "Feature worktrees").
 
 ## Commits
 
-`chore: initialise specd workspace` in the wrapper, staging what the script created or
-merged. When `docs/` went into the code repo, a second commit there, `docs: add specd
+`chore: initialise pacenote workspace` in the wrapper, staging what the script created or
+merged. When `docs/` went into the code repo, a second commit there, `docs: add pacenote
 knowledge folder`, on its current branch, so the client tree is clean; say so in the handoff.
 
 ## Handoff additions
 
 - "Launch the assistant in this folder; `<name>/` is the code." A session inside the code
-  folder finds no `specd.yml` and the wrapper's settings do not apply there.
-- "Parallel features: `/specd:config git.worktrees=true`, then each `/specd:start` opens a
+  folder finds no `pacenote.yml` and the wrapper's settings do not apply there.
+- "Parallel features: `/pacenote:config git.worktrees=true`, then each `/pacenote:start` opens a
   worktree under `.worktrees/`."
-- "A team sharing this wrapper through a remote: `/specd:config git.wrapper_pr=true` gives
+- "A team sharing this wrapper through a remote: `/pacenote:config git.wrapper_pr=true` gives
   each feature's wrapper branch its own draft PR; otherwise `close` merges it locally."

@@ -2,16 +2,16 @@
 name: implement
 description: >
   Invoke whenever the user asks to implement, build, code or continue coding a feature that
-  has an approved task list or is trivial, or runs `/specd:implement [feature] [tasks]`;
-  also as the next step after `/specd:tasks`, after a trivial `/specd:start`, after a review
-  that sent findings back and after `/specd:feedback` turned PR comments into fix tasks. It
+  has an approved task list or is trivial, or runs `/pacenote:implement [feature] [tasks]`;
+  also as the next step after `/pacenote:tasks`, after a trivial `/pacenote:start`, after a review
+  that sent findings back and after `/pacenote:feedback` turned PR comments into fix tasks. It
   runs the tasks in `tasks.md` one at a time through the implementer agent (a trivial
   feature has one implicit task from its brief), or only the selected ones (`T1-T3`,
   `T1, T4, T5`), verifies each with the project checks, stops for your approval (G4) at the
   configured granularity and on every high-risk task, proposes escalation when a light
   feature trips a signal, commits each task as a `WIP:` commit until the feature is on a PR
   (after the approval when the stop is per task), and resumes from the first open task
-  after `/clear`. Not for ad-hoc coding outside a feature; that is `/specd:principles`.
+  after `/clear`. Not for ad-hoc coding outside a feature; that is `/pacenote:principles`.
 ---
 
 # Skill: implement
@@ -39,7 +39,7 @@ reproduction). Re-entry after a G4 stop or a review round is the same command: t
   `brief.md` instead of the three.
 - `<docs_root>/conventions.md`, [`../_shared/principles.md`](../_shared/principles.md) (path
   passed to the agent, read by it).
-- `<workspace_root>/specd.yml`: `models.execution`, `flow.tdd`, `flow.gate_granularity`,
+- `<workspace_root>/pacenote.yml`: `models.execution`, `flow.tdd`, `flow.gate_granularity`,
   `git.authority`, `layers.*` (files per task `layer`, relative to `code_root`).
 - [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md).
 - [`./references/implementer-prompt.md`](./references/implementer-prompt.md),
@@ -60,7 +60,7 @@ reproduction). Re-entry after a G4 stop or a review round is the same command: t
    Resolve per `paths.md` ("Resolving for a feature"), `state check --step implement` per
    `gates.md`; `detect-commands --from <code_root>`. The current branch of `<code_root>`
    must be `branch` from `state.yml`; otherwise refuse in one line (`checkout <branch> in
-   <code_root> first`, or `/specd:start` again when its worktree is gone). Set
+   <code_root> first`, or `/pacenote:start` again when its worktree is gone). Set
    `step=implement`. Read `tasks.md` and `state.yml`
    once; on trivial, compose the implicit `T1` from `brief.md` per `loop.md` instead and
    show it. Validate the selection (`loop.md`): an unknown id, or a selected task whose
@@ -109,7 +109,7 @@ reproduction). Re-entry after a G4 stop or a review round is the same command: t
    the run ends, a dirty `state.yml` is committed alone as `spec(<feature>): implement`.
 7. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: deviations the
    agents reported, tests marked as looking wrong, uncommitted files left by a reject.
-   `Next: /specd:<step> <feature>` for the step reported in 6, else `/specd:implement <feature>`.
+   `Next: /pacenote:<step> <feature>` for the step reported in 6, else `/pacenote:implement <feature>`.
 
 ## Anti-patterns
 

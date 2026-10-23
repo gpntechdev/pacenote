@@ -1,5 +1,5 @@
-<!-- specd:draft -->
-<!-- Written by the architect agent for /specd:design to <spec_root>/<feature>/design.md; read
+<!-- pacenote:draft -->
+<!-- Written by the architect agent for /pacenote:design to <spec_root>/<feature>/design.md; read
      by tasks, implement, review and close. Only the sections listed on the Sections line
      exist; Approach and Decisions always. Sub-headings are fixed: tasks reads "Changes by
      area" and the contract kinds by name; empty kinds are omitted, not left blank.

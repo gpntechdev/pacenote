@@ -4,10 +4,10 @@ Running log of decisions that change or refine `docs/PLAN.md`. Newest last. Each
 context (why it came up), decision, consequences. The plan stays the source for the design;
 this file is the diff history of its judgement calls.
 
-## 2026-09-22 M0: specd.yml schema is an annotated YAML reference
+## 2026-09-22 M0: pacenote.yml schema is an annotated YAML reference
 
 Context: the schema needed a home that both skills and humans read, before any init code exists.
-Decision: `skills/_shared/specd-yml.md` holds the default file with a comment per key plus
+Decision: `skills/_shared/pacenote-yml.md` holds the default file with a comment per key plus
 reader and writer rules; no JSON Schema.
 Consequences: one source, copied verbatim by `init`; machine validation of user config, if ever
 needed, is a later script reading the same file.
@@ -23,8 +23,8 @@ Consequences: one extra file read when the skill fires; no duplicated text.
 
 Context: macOS ships Python 3.9 without PyYAML; the validator and path helper must run anywhere.
 Decision: `scripts/*` use the standard library only. Config is read by a flat-key parser that
-covers the subset specd.yml uses; full YAML parsing is not needed.
-Consequences: `specd.yml` stays flat (two levels, scalar values, simple lists) so the parser
+covers the subset pacenote.yml uses; full YAML parsing is not needed.
+Consequences: `pacenote.yml` stays flat (two levels, scalar values, simple lists) so the parser
 keeps working. A key needing deeper nesting is a decision to revisit here.
 
 ## 2026-09-22 M0: path resolution is a script, not prose
@@ -42,7 +42,7 @@ Decision: `skills/_shared/no-attribution.md` holds the `attribution` snippet `in
 each workspace's `.claude/settings.json`; this repo carries the same snippet for itself.
 Consequences: attribution is off only after `init`; deliver enforces the wording rules regardless.
 
-## 2026-09-22 M0: `git.docs_repo` dropped from specd.yml
+## 2026-09-22 M0: `git.docs_repo` dropped from pacenote.yml
 
 Context: PLAN 2 says wrapper mode chooses at init whether `docs/` lands in the wrapper or the
 code repo. A separate key would duplicate what `paths.docs_root` already says.
@@ -50,10 +50,10 @@ Decision: `init` writes `paths.docs_root` to the chosen folder; a skill committi
 picks the repo that contains the path.
 Consequences: one key fewer; the repo choice is derived, never stated twice.
 
-## 2026-09-22 M0: marketplace and plugin are both named `specd`
+## 2026-09-22 M0: marketplace and plugin are both named `pacenote`
 
 Context: the repo serves itself as a marketplace with one plugin.
-Decision: marketplace `specd`, plugin `specd`, install as `specd@specd`; `source: "./"`.
+Decision: marketplace `pacenote`, plugin `pacenote`, install as `pacenote@pacenote`; `source: "./"`.
 Consequences: a second plugin in this repo would need a `plugins/` subfolder and a rename of
 `source`; not planned.
 
@@ -83,7 +83,7 @@ that here.
 Context: the M1 request listed `toolsmith` with the init commands. PLAN 3.5 calls it from init's
 handoff, but its substance (allowlist search, quarantine, two-stage audit, `skills.lock`) is M6.
 Decision: no `toolsmith` skill in M1. `init`, `onboard` and `scaffold` end their handoff with one
-line naming `/specd:toolsmith` as a later step.
+line naming `/pacenote:toolsmith` as a later step.
 Consequences: a fresh workspace has Context7 and nothing else until M6; the handoff line is the
 only place to update when the command lands.
 
@@ -102,9 +102,9 @@ trigger to revisit; parsing shell is not worth it before one is observed.
 
 Context: `onboard` must resume after `/clear` from the first unfinished section; files are the
 state.
-Decision: every onboard template starts with `<!-- specd:draft -->`. A section is unfinished when
+Decision: every onboard template starts with `<!-- pacenote:draft -->`. A section is unfinished when
 its index file is missing or still carries the marker; sign-off removes the marker and commits.
-No `onboard.yml`, no key in `specd.yml`.
+No `onboard.yml`, no key in `pacenote.yml`.
 Consequences: resume is a file check. Project kind is not persisted either: `detect-repo` runs
 at the start of `onboard` and `scaffold`, and after scaffold the repo correctly reads as
 brownfield.
@@ -123,13 +123,13 @@ Consequences: the skeleton gets both gates but no fresh-context review until M2,
 ## 2026-09-22 M1: commit policy for init and onboard; private mode
 
 Context: PLAN fixes git authority for features (up to a draft PR) but not for setup commands.
-Decision: `init` commits once (`chore: initialise specd workspace`), `onboard` once per
+Decision: `init` commits once (`chore: initialise pacenote workspace`), `onboard` once per
 signed-off section (`docs: onboard <section>`), `scaffold` once at G5. Private mode
 (`init-workspace --private`) is the `.git/info/exclude` flag from PLAN 3.1 made concrete:
-`.specd/`, `CLAUDE.local.md` and `.claude/settings.local.json` are excluded, `.mcp.json` is
+`.pacenote/`, `CLAUDE.local.md` and `.claude/settings.local.json` are excluded, `.mcp.json` is
 skipped with a `claude mcp add` hint, and `init` does not commit.
 Consequences: a normal workspace has a clean tree after each command; a private one never shows
-specd files to the team and relies on the user's own MCP setup.
+pacenote files to the team and relies on the user's own MCP setup.
 
 ## 2026-09-22 M1: gates, handoff and state.yml are shared blocks from now
 
@@ -144,21 +144,21 @@ Consequences: every later step links these three files and states only its delta
 ## 2026-09-22 M1: init-workspace owns every init file operation; config-set is the only writer
 
 Context: init touches eight artifacts, all mechanical (copy, merge, marker insert), and
-`specd.yml` must be patched key by key by both `init` and `config`.
+`pacenote.yml` must be patched key by key by both `init` and `config`.
 Decision: `scripts/init-workspace` creates or merges all of them idempotently, including the
 CLAUDE.md pointer block, and reports created/merged/skipped. `scripts/config-set` patches
-`specd.yml` values in place, all-or-nothing, refusing list keys. `init` writes the detected
+`pacenote.yml` values in place, all-or-nothing, refusing list keys. `init` writes the detected
 `commands.*` (marked derived) rather than leaving them empty.
 Consequences: skills never edit config or settings files by hand; a bug in either script is
-fixed once. Detected commands are visible and correctable in `specd.yml`.
+fixed once. Detected commands are visible and correctable in `pacenote.yml`.
 
 ## 2026-09-22 M1: explorer has no Bash; the caller passes the model role
 
 Context: AUTHORING 10 keeps read-only agents without `Write`, `Edit` or `Bash`; AUTHORING 8
-forbids model names outside `specd-yml.md`, which rules out `model:` in agent frontmatter.
+forbids model names outside `pacenote-yml.md`, which rules out `model:` in agent frontmatter.
 Decision: `explorer` runs with `Read, Grep, Glob`; every git fact comes from `detect-repo` in
 the main thread. `researcher` (`WebSearch`, `WebFetch`, Context7) is included minimal for the
-greenfield architecture interview. The calling skill reads `models.<role>` from `specd.yml` and
+greenfield architecture interview. The calling skill reads `models.<role>` from `pacenote.yml` and
 passes it as the agent's model parameter.
 Consequences: agents are portable across projects with different model mappings. If the
 runtime ignores the per-call model parameter, the fallback is a validator allowlist for
@@ -177,17 +177,17 @@ refresh util has a folder to own.
 ## 2026-09-24 M1: config skill added; scaffolded repos are brownfield by state, not by count
 
 Context: a review of M1 found two gaps. `init`, the CLAUDE.md template and the handoffs sent
-users to `/specd:config`, which no milestone had built. And the entry above claiming that a
+users to `/pacenote:config`, which no milestone had built. And the entry above claiming that a
 scaffolded repo "correctly reads as brownfield" was false: a skeleton has two or three source
 files, under the `detect-repo` threshold of five, so onboard sections run after scaffold
 (conventions, data-models, decisions, which its gate does not require) would have run as
 interviews.
 Decision: `skills/config` exists as a thin wrapper over `config-set`: show, ask, patch, say
 when the value applies, no commit. `detect-repo` reports `scaffolded: true` when
-`.specd/spec/scaffold/state.yml` has `step: closed` and then reports `kind: brownfield`
-whatever the file count; the count stays the fallback for repos specd did not scaffold.
-Consequences: every `/specd:config` reference resolves. Lowering the threshold was rejected
-because a tiny real repo would then read as greenfield; the state file is the signal specd
+`.pacenote/spec/scaffold/state.yml` has `step: closed` and then reports `kind: brownfield`
+whatever the file count; the count stays the fallback for repos pacenote did not scaffold.
+Consequences: every `/pacenote:config` reference resolves. Lowering the threshold was rejected
+because a tiny real repo would then read as greenfield; the state file is the signal pacenote
 itself wrote. A scaffold still in progress leaves the kind untouched.
 
 ## 2026-09-24 M2: branch at start, commit per step; `git.authority` caps deliver
@@ -196,7 +196,7 @@ Context: PLAN 3.3 gave `deliver` "branch, atomic commits, push, draft PR", which
 spec file and all code uncommitted until the last step; M1 already commits per step.
 Decision: `start` creates the feature branch; `specify`, `design` and `tasks` commit their
 artifact after the gate; `implement` commits per task with the message fixed at G3; `deliver`
-re-runs checks, passes G5, pushes and opens the draft PR. `git.authority` means: `none`, specd
+re-runs checks, passes G5, pushes and opens the draft PR. `git.authority` means: `none`, pacenote
 runs no git write command at all (no branch, no commit); `commit`, branch and local commits,
 deliver stops after G5; `push`, plus push; `draft_pr`, plus the PR.
 Consequences: resume after `/clear` never loses work and two features never share a tree.
@@ -239,7 +239,7 @@ Consequences: one set of redaction rules; M5 adds the agent without touching the
 ## 2026-09-24 M2: critic hook points are marked comments in the spine
 
 Context: the critic agent is M3, but `specify` and `design` must already have its place.
-Decision: each spine carries one protocol step marked `<!-- specd:critic-hook: M3 -->` that
+Decision: each spine carries one protocol step marked `<!-- pacenote:critic-hook: M3 -->` that
 states the M3 behaviour and, until then, prints `critic: not available until M3`. M3 replaces
 the marker line, nothing else moves.
 Consequences: the user sees where the critic will run; the gate summary is unchanged.
@@ -302,7 +302,7 @@ Consequences: `onboard` and `close` cannot drift on the decision format.
 ## 2026-09-24 M2: the real-feature run is the user's; M2 closes on their feedback
 
 Context: PLAN 5 makes M2 done when one real feature ships as a draft PR and resumes after
-`/clear`. specd's own skills are not loaded in the session that builds them, and the gates
+`/clear`. pacenote's own skills are not loaded in the session that builds them, and the gates
 are the user's to answer.
 Decision: the milestone is marked built, not done. The user runs the flow on a real feature
 in a repo of their choice with `claude --plugin-dir`, and their findings land here before
@@ -390,7 +390,7 @@ Context: the user wanted a project-specific implementer (e.g. a `frontend-engine
 Claude Code subagents never have the `Agent` tool, so nested dispatch is impossible; and
 what differs between a frontend and a backend implementer is the conventions it reads, not
 the build-verify-report loop.
-Decision: a task carries an optional `layer` (a key of `specd.yml` `layers`); `layers.<name>`
+Decision: a task carries an optional `layer` (a key of `pacenote.yml` `layers`); `layers.<name>`
 lists project skill files, relative to `code_root`; `implement` and `review` resolve the
 task's (or the feature's) layer files to absolute paths and put them in the agent's "read
 first" list after `conventions.md`. One layer per task; a task needing two is two tasks.
@@ -412,7 +412,7 @@ repair commit too). At `task` granularity, and for a `risk: high` task, the G4 s
 first and the commit on approve; a reject leaves the task `todo` with its files uncommitted
 in the tree, and the next dispatch of that task is told about them. At `phase` and `end`
 tasks commit before the stop as before; a G4 edit is a revision dispatch, landing as a
-further `WIP:` commit when the task was already committed. `/specd:implement [feature]
+further `WIP:` commit when the task was already committed. `/pacenote:implement [feature]
 [tasks]` accepts ids and `T<n>-T<m>` ranges, comma or space separated; a selected task whose
 dependency is neither `done` nor selected is refused by name, never widened silently; the
 run ends after the last selected task with a G4 stop and without the finish step.
@@ -420,8 +420,8 @@ run ends after the last selected task with a G4 stop and without the finish step
 `scripts/squash-wip` (soft reset to the merge base, body = the squashed subjects), only when
 the branch has no upstream; otherwise the commits stay. Amends the 2026-09-24 "commit per
 step" entry (task commits are WIP commits) and the PLAN 3.3 deliver row ("atomic commits" →
-WIP commits, optionally squashed). No new `state.yml` or `specd.yml` keys.
-Consequences: a feature branch reads as drafts until deliver; the one history rewrite specd
+WIP commits, optionally squashed). No new `state.yml` or `pacenote.yml` keys.
+Consequences: a feature branch reads as drafts until deliver; the one history rewrite pacenote
 performs is before any push, on the user's choice, and recoverable from the `before` sha the
 script prints. In embedded mode the squash folds the `spec(<feature>): …` commits in as well.
 A selected run never sets `step=review`; the full command finishes the feature.
@@ -445,7 +445,7 @@ resolves each as fix / reply / skip, appends fix tasks under `PR feedback (round
 hand). `close` is retention only, runs on the branch once the PR is settled and before the
 merge, refuses a merged PR, and for `distill` requires the record `docs` wrote. `scripts/
 state` gains `docs` in the step order and a `feedback` check (ok when `pr` is set and the
-feature is not closed); no new `state.yml` or `specd.yml` keys. Amends the 2026-09-24
+feature is not closed); no new `state.yml` or `pacenote.yml` keys. Amends the 2026-09-24
 git-model entry and PLAN rows 140–142.
 Consequences: the PR carries the feature and its docs from the first push; the spec folder
 lives until the thread is settled, so fixes keep their spec, tasks and state. Fix commits
@@ -512,7 +512,7 @@ during implement lands on `design`, trivial→quick on `specify`, an escalation 
 task stays; `tasks` revises an existing `tasks.md` in place. Proposers: `specify` on quick
 (a design signal or more than five tasks), `implement` on trivial and quick (a report naming
 a migration, a new dependency, a changed public interface, three modules, or two readings of
-the task; the agent's files stay uncommitted). By hand: `/specd:start <feature> --tier
+the task; the agent's files stay uncommitted). By hand: `/pacenote:start <feature> --tier
 <tier>` on an existing feature; on a new one `--tier` skips the triage scan. Escalation only
 goes up; `close` and start over is the way down. `status` shows `quick→full`.
 Consequences: a feature under-sized by triage loses nothing; `triage.escalated` is the
@@ -536,7 +536,7 @@ quote (state.yml rule), so tests are narrowed by name.
 
 ## 2026-10-06 M3: the critic runs from one shared block; `critique` prints only
 
-Context: the `<!-- specd:critic-hook: M3 -->` markers in `specify` and `design` are where the
+Context: the `<!-- pacenote:critic-hook: M3 -->` markers in `specify` and `design` are where the
 critic goes; PLAN 3.3 wants it at exactly those two points, full tier, at most ten findings
 folded into the open questions, plus `critique` on demand.
 Decision: `agents/critic.md` (read-only, judgment role) returns one `## Findings` section,
@@ -544,7 +544,7 @@ Decision: `agents/critic.md` (read-only, judgment role) returns one `## Findings
 critic.md` holds the dispatch prompt (artifact, `project.md`, and `spec.md` for a design)
 and the folding rules: `specify` appends `Q<n> … critic C<k>` to Open questions, `design`
 appends to Risks, duplicates of existing items are skipped and counted. `flow.critic`:
-`gates` runs it on full before G1 and G2; `always` adds quick's G1; `off` never. `/specd:
+`gates` runs it on full before G1 and G2; `always` adds quick's G1; `off` never. `/pacenote:
 critique <path>` runs the same agent on any file and prints the findings; it writes nothing,
 so an approved artifact is only changed by re-running its step.
 Consequences: one agent, one prompt, three callers; the user resolves findings at the gate
@@ -552,7 +552,7 @@ and nothing is folded as resolved.
 
 ## 2026-10-09 M3 run: the PR body and the feature record are written for their readers
 
-Context: the coin-detail run on `specd-test-green` produced a PR body whose `Changes` were
+Context: the coin-detail run on `pacenote-test-green` produced a PR body whose `Changes` were
 22 WIP subjects (`fix: make test pass`, `docs: record`), a `Verification` of AC counts and
 a `Review` of round numbers and finding ids, and a feature record with a flat file list and
 an `AC<n> · evidence:` list. The design's approach summary, UX flow and sequence diagrams
@@ -590,7 +590,7 @@ there; the wrapper branch is pushed only when the wrapper has an `origin` remote
 `git.authority` ≥ `push`, else it stays local and the run says so. `close`, after its
 removal commit, merges the wrapper branch into the wrapper's default branch (`--no-ff`),
 deletes the local branch and pushes the default branch under the same rule; a conflict
-stops the run with the files named. specd never merges the code repo. Without worktrees
+stops the run with the files named. pacenote never merges the code repo. Without worktrees
 the wrapper is sequential like embedded: one feature checked out at a time.
 Consequences: the wrapper's default branch holds the complete spec history as merge
 commits; a second parallel feature needs worktrees (next entry), because one checkout can
@@ -605,13 +605,13 @@ wrapper branch gets a draft PR or is merged by `close` is the user's choice
 Context: parallel features need two checkouts of the code and, with a wrapper branch per
 feature, two checkouts of the wrapper too. A worktree of the code repo alone would leave
 the spec folder on a wrapper branch that is not checked out.
-Decision: `git.worktrees: false` by default in `specd.yml`, wrapper mode only, switched
-with `/specd:config git.worktrees=true`; embedded ignores it (the spec folder lives on the
+Decision: `git.worktrees: false` by default in `pacenote.yml`, wrapper mode only, switched
+with `/pacenote:config git.worktrees=true`; embedded ignores it (the spec folder lives on the
 feature branch inside the one checkout, a second checkout would hide it). When on, `start`
 runs `scripts/worktree add`, which creates `<wrapper>/.worktrees/<feature>/` as a worktree
 of the wrapper repo on the feature branch and, inside it at the code folder's relative
 path, a worktree of the code repo on the same branch. The worktree is therefore a complete
-wrapper layout; `resolve-paths` from inside it finds its own `specd.yml` first, so
+wrapper layout; `resolve-paths` from inside it finds its own `pacenote.yml` first, so
 `code_root`, `docs_root` and `spec_root` are the worktree's with no special casing, and
 `docs_root` inside the code repo lands in the worktree too. `resolve-paths --feature NAME`
 resolves from the worktree when run at the wrapper root; `state find` and `state list`
@@ -621,7 +621,7 @@ gains `worktree` (relative to the wrapper root; `start` sets it, `close` clears 
 init and by the script. The code worktree is a fresh checkout: `start` tells the user to
 install dependencies there before `implement`, naming `<runner> install` when
 `detect-commands` reports one; `run-checks` and `detect-commands --from <code_root>`
-already resolve the worktree's toplevel and find `specd.yml` upward.
+already resolve the worktree's toplevel and find `pacenote.yml` upward.
 Consequences: the assistant is launched in the wrapper root (name the feature, or let
 `state find` ask) or in a feature worktree (one session per feature; the feature resolves
 from the cwd by branch). Opt-in keeps the single-feature wrapper free of a dependency
@@ -642,7 +642,7 @@ flow; the branch → feature lookup the hook would need exists (`state find --br
 
 Context: PLAN 3.5 limits the wrapper interview to where `docs/` lands; the assistant's file
 tools reach only the folder it runs in.
-Decision: `/specd:init --wrapper [<folder|url>]`, or proposed when the current folder has
+Decision: `/pacenote:init --wrapper [<folder|url>]`, or proposed when the current folder has
 no source files and exactly one nested git repo (`detect-repo` `nested_repos`, which also
 stops counting a nested repo's files as the wrapper's). The code repo must be a folder
 directly inside the wrapper: a path outside is refused with the hint to move or clone it
@@ -653,7 +653,7 @@ the code, rides the feature branch, committed there once by init so the client t
 clean). `init-workspace --mode wrapper --code NAME [--docs REL]` writes the same files at
 the wrapper root plus a `.gitignore` with `NAME/` and `.worktrees/`; the generated
 CLAUDE.md gets one line naming the code folder and the launch rule, dropped in embedded
-mode. Launching inside the code folder is unsupported: no `specd.yml` is found and the
+mode. Launching inside the code folder is unsupported: no `pacenote.yml` is found and the
 wrapper's settings do not apply.
 Consequences: one `init-workspace` with a layout prefix per mode, embedded output
 unchanged byte for byte; the client repo's own CLAUDE.md is still read by Claude Code
@@ -677,7 +677,7 @@ the parts to watch are the per-worktree install and the merge at `close`.
 
 ## 2026-10-12 M5: adapters follow the input's shape; `sources.mcp` is one flat key; Atlassian first
 
-Context: the `sources: []` list in `specd.yml` described nested items the flat parser
+Context: the `sources: []` list in `pacenote.yml` described nested items the flat parser
 cannot read, and `config-set` refused it. PLAN 3.7 lists adapters per type; the user's
 tickets live in Jira and their pages in Confluence.
 Decision: the adapter is picked from the input: a bare ticket key, or an `*.atlassian.net`
@@ -686,7 +686,7 @@ through `scripts/fetch-source`; a path is a file; text is a paste (`_shared/sour
 `sources.mcp: none | atlassian` replaces the list and is patched by `config-set` like any
 scalar. The first server is Atlassian's remote MCP (`https://mcp.atlassian.com/v1/mcp`,
 OAuth through `/mcp`), installed into `.mcp.json` only on confirmation: one question at
-`init`, or `/specd:config sources.mcp=atlassian`, both through `init-workspace --add-mcp
+`init`, or `/pacenote:config sources.mcp=atlassian`, both through `init-workspace --add-mcp
 atlassian` (wrapper: the wrapper's file; private mode: skipped with a `claude mcp add`
 hint). A ticket's linked Confluence pages and Jira issues are fetched at depth 1, at most
 5, each its own snapshot. Links to other sites are listed in the brief and never fetched
@@ -705,11 +705,11 @@ whoever wrote the snapshot. An MCP fetch is done by an agent, and an agent witho
 cannot run a script.
 Decision: `scripts/redact` holds the patterns and the header handling; `fetch-source` and
 `refresh-source` call it. `hooks/source-guard`, a second PreToolUse hook on `Read|Write`,
-runs it on every Write whose content starts with the `specd:source` header, from the main
+runs it on every Write whose content starts with the `pacenote:source` header, from the main
 thread or any agent, and returns `updatedInput` with the redacted content and
 `redactions=` set. A spike on Claude Code 2.1.296 confirmed that `updatedInput` rewrites a
 Write without a `permissionDecision`, and that hook input carries `agent_type`
-(`specd:intake` for the plugin agent). If redaction raises, the hook denies the write. The
+(`pacenote:intake` for the plugin agent). If redaction raises, the hook denies the write. The
 URL adapter fetches with a script (urllib and a stdlib HTML-to-text converter), not
 WebFetch, so the snapshot is verbatim and no model sees the page before the intake agent.
 Consequences: a new hook, as AUTHORING 9 requires an entry for; `secrets-guard` is
@@ -749,7 +749,7 @@ values and the title is capped at 60 characters.
 
 Context: PLAN 3.7 gives snapshots a refresh util; the snapshot must be able to change
 without the spec drifting silently or being rewritten behind the user's back.
-Decision: `/specd:refresh [<feature> | <snapshot>]`.
+Decision: `/pacenote:refresh [<feature> | <snapshot>]`.
 - `scripts/refresh-source` does the deterministic part: it re-fetches `http` origins, takes
   `--new` for MCP re-fetches (written by `intake` to `<slug>.new.md`) and for file origins,
   redacts, diffs, overwrites the snapshot only when the body changed, and computes the
@@ -761,7 +761,7 @@ Decision: `/specd:refresh [<feature> | <snapshot>]`.
 - A patch to `brief.md` is offered and applied only on a yes; `spec.md` and `state.yml` are
   never touched.
 - Triage is not re-run. A change that trips an escalation signal names `start --tier`.
-- An onboard snapshot names `/specd:onboard <section>`.
+- An onboard snapshot names `/pacenote:onboard <section>`.
 Consequences: a skill rather than a mode of `start`, whose spine sits at 126 of 150 lines.
 Refresh is not a flow step and runs no `state check`.
 
@@ -780,7 +780,7 @@ Decision: the milestone is marked built. Headless runs in scratch repos, logged 
   run log.
 - A direct request to read that snapshot in full was denied by the hook and fell back to
   the header and the agent.
-- After the served page changed, `/specd:refresh` reported `+1 -1`, named G1, offered the
+- After the served page changed, `/pacenote:refresh` reported `+1 -1`, named G1, offered the
   brief patch and, on "skip", committed only the snapshot; `spec.md` and `brief.md` were
   unchanged.
 - A ticket key with `sources.mcp: none` gave a paste request with the config hint. With
@@ -798,7 +798,7 @@ Not exercised:
 - refresh of an MCP or file origin;
 - onboard with a URL.
 Consequences: "done" follows the user's first authorised ticket run: `start --from
-PROJ-123` on their Jira, then `/specd:refresh` after the ticket changes.
+PROJ-123` on their Jira, then `/pacenote:refresh` after the ticket changes.
 
 ## 2026-10-12 M5: marked done
 
@@ -809,7 +809,7 @@ Consequences: the Atlassian tool names in `agents/intake.md` and the five-page c
 checked on the first real ticket, and a mismatch goes here as a fix, not as a reopened
 milestone. PLAN section 7 now points to M6.
 
-## 2026-10-12 M6: skills live in the workspace's `.claude/skills/`; private mode keeps them in `.specd/skills/`
+## 2026-10-12 M6: skills live in the workspace's `.claude/skills/`; private mode keeps them in `.pacenote/skills/`
 
 Context: PLAN 3.1 puts generated project skills in the wrapper's `.claude/`, and `layers`
 paths are relative to `code_root`. The brief asked where installed and generated skills
@@ -817,7 +817,7 @@ land in each mode. The user chose in the M6 question round.
 Decision: the skill home is derived by `scripts/skill-lock`, never asked or tested by a
 skill. Embedded: `<repo>/.claude/skills/<name>/`, committed, and also loaded by Claude
 Code. Wrapper: `<wrapper>/.claude/skills/<name>/`, so the client repo gets no files; its
-`layers` path is `../.claude/skills/...`. Private (`.specd/` in `.git/info/exclude`):
+`layers` path is `../.claude/skills/...`. Private (`.pacenote/` in `.git/info/exclude`):
 `<workspace_root>/skills/<name>/`, excluded, reached only through `layers`.
 Consequences: a feature worktree carries the wrapper's skills, because they are committed
 in the wrapper. In private mode the skills do not auto-load in the main thread; the
@@ -857,7 +857,7 @@ Decision: `<workspace_root>/skills.lock` has one section per skill. The keys are
   - `record` handles generated skills.
   - `verify` reports `ok | modified | missing` per entry.
   - `where` and `discard` serve generation (entry below).
-- Updates (`/specd:toolsmith --update`) follow a table in
+- Updates (`/pacenote:toolsmith --update`) follow a table in
   `skills/toolsmith/references/audit.md`:
   - an upstream move is re-fetched at the new commit and re-audited;
   - a modified third-party skill is restored, or re-audited and re-pinned as `local`;
@@ -891,7 +891,7 @@ Decision: `scripts/audit-static` has two severities.
   capped at 80 characters, because they reach the main thread.
 - The install is refused on any `block`, any extracted link, or a stage-2 `refuse` (an
   unreadable answer counts as `refuse`).
-- No override inside specd. A user who still wants the skill installs it by hand, and
+- No override inside pacenote. A user who still wants the skill installs it by hand, and
   toolsmith does not record it.
 - After calibration, 3 of the 20 folders block: `claude-api` (a `curl | sh` line and
   references to `.ssh/id_rsa`, `.env`), `skill-creator` (environment iteration in a
@@ -951,7 +951,7 @@ missing key is created, so a new layer needs no hand edit. Scalars keep `key=val
 are refused with `--add`. The config skill's line "edited by hand until M6" becomes these
 two flags. The flat shape is unchanged: a layer is still a second-level key with a simple
 list.
-Consequences: toolsmith and `/specd:config` share one writer for lists. Amends the
+Consequences: toolsmith and `/pacenote:config` share one writer for lists. Amends the
 2026-09-22 M1 config-set entry and the 2026-10-06 layers entry.
 
 ## 2026-10-12 M6: one `specialist` agent with four lens files; `flow.specialists: ask | off`
@@ -997,7 +997,7 @@ new server is a script change.
 
 Context: the seeded malicious skill had to fail the full install path. It must not be
 published to GitHub, and a user may also be handed a skill folder by a colleague.
-Decision: `/specd:toolsmith --from <folder>` stages the folder with `skill-fetch stage`
+Decision: `/pacenote:toolsmith --from <folder>` stages the folder with `skill-fetch stage`
 and runs both audit stages, the report and the decision exactly as for a fetched
 candidate. On approval it installs with `source: local` and no commit pin.
 Consequences: the allowlist governs search and fetch, not a folder the user hands over
@@ -1019,7 +1019,7 @@ scratch embedded repo (React 19 `web/`, Express 5 + `pg` `api/`):
     reversed text;
   - the prose-only `references/style.md` was flagged by stage 2 alone;
   - nothing installed, lock and config untouched, no commit;
-  - every quarantine Read came from the `specd:skill-auditor` subagent.
+  - every quarantine Read came from the `pacenote:skill-auditor` subagent.
 - A direct main-thread Read of a quarantined file was denied by the hook. The injected
   text appears nowhere in that log.
 - `toolsmith` on the stack:
@@ -1156,7 +1156,7 @@ Decision:
   else nothing is written. The plan is a file the skill Writes to
   `<workspace_root>/.lessons-plan.json` and the script deletes on success: the first smoke run
   showed that JSON passed inline through a heredoc trips Claude Code's Bash obfuscation check.
-- `/specd:lessons-prune` proposes keep, promote (to a `conventions.md` section, or to a
+- `/pacenote:lessons-prune` proposes keep, promote (to a `conventions.md` section, or to a
   decision file from the shared template when the rule needs its reason), merge (newest
   date, stricter wording), rewrite (malformed) or delete, per
   `skills/lessons-prune/references/proposals.md`. Promotions are written in the main
@@ -1164,7 +1164,7 @@ Decision:
   never deletes just to fit: when the proposal leaves the file over the cap it says so and
   lists the five oldest kept lessons.
 - `status` runs `lessons scan` and prints `lessons.md has <n>/<max> lines;
-  /specd:lessons-prune` when over.
+  /pacenote:lessons-prune` when over.
 - Gap recorded, not fixed (user's choice): no skill appends lessons today, although the
   `lessons.md` template says "appended by any step the user corrects". The user appends by
   hand until a writer is decided.
@@ -1183,7 +1183,7 @@ lines) and the consumed plan file. Headless runs in a scratch embedded repo
 (`docs.lessons_max_lines=20`, `git.authority=commit`, 20 seeded lessons: 26 lines, two
 duplicate pairs, one lesson already in `conventions.md`, one about a removed module), logged
 as `stream-json`:
-- `status` warned `lessons.md has 26/20 lines; /specd:lessons-prune`.
+- `status` warned `lessons.md has 26/20 lines; /pacenote:lessons-prune`.
 - The first proposal covered every line, found both pairs and the lesson already stated in
   `conventions.md`, and drafted rule lines and one decision file. It promoted generously (9
   conventions lines from mostly single lessons), which the adjust round corrects.
@@ -1217,7 +1217,7 @@ Decision:
   plan when a folder is missing, reopened, in a worktree or has a changed `updated`, removes
   the folders from the filesystem only and consumes the plan. No git command, so
   `git.authority: none` holds; the skill stages with `git add -A --`.
-- `/specd:spec-clean` proposes per folder `delete` (default when the record exists), `distill`
+- `/pacenote:spec-clean` proposes per folder `delete` (default when the record exists), `distill`
   (default for a full-tier folder without a record) or `skip` (`delete` is the default for a
   record-less trivial or quick folder: their policy never wrote one), with the design's
   `### D<n>` blocks judged decision or notes in the same table, so one question covers it.
@@ -1250,7 +1250,7 @@ with the plan consumed, and every apply refusal (changed `updated`, reopened, mi
 repeated names, empty plan). Headless runs in a scratch embedded repo on `main`
 (`git.authority=commit`, `keep_days` 30), logged as `stream-json`:
 - `status` warned `old-bare kept for 93 days`, `old-recorded kept for 81 days`, then
-  `/specd:spec-clean`.
+  `/pacenote:spec-clean`.
 - The proposal: `old-bare` distill (full, no record), `old-recorded` delete (record exists),
   `fresh-one` reported as younger and left out; D1 judged decision, D2 notes; the branch named.
 - On "apply all": `chore/spec-clean-2026-10-21` was created before any write; the record (two
@@ -1276,7 +1276,7 @@ wrapper has no reviewers, so a PR there is pointless". The user corrected this: 
 its own branches and may have a remote, used to share the work with a team, and then spec
 and docs changes deserve review too. Equally, a single user's wrapper may have no remote at
 all. It is the user's call.
-Decision: `git.wrapper_pr: false | true` in `specd.yml` (wrapper only; a missing key means
+Decision: `git.wrapper_pr: false | true` in `pacenote.yml` (wrapper only; a missing key means
 `false`, a file from before M7 adds the line by hand, since `config-set` refuses unknown
 keys). `false` keeps the M4 behaviour. `true`:
 - `deliver`, when the user chose push + draft PR and the wrapper branch was pushed (it has an
@@ -1336,7 +1336,7 @@ Decision:
   `delete`, `insert` after a line, `remove` for an unlinked snapshot), refuses the whole plan
   on any stale `expect`, a path outside `<docs_root>` and `sources/`, or a snapshot linked
   again, rewrites each file once against the scanned numbering, and consumes the plan.
-- `/specd:docs-clean` proposes one action per finding per
+- `/pacenote:docs-clean` proposes one action per finding per
   `skills/docs-clean/references/proposals.md`: repoint, relink, unlink, report, trim (user's
   choice: a drafted trim to approve, by the template's contract, folding that file's other
   findings in), leave (a draft marker; sign-off only on the user's word, since the marker is
@@ -1387,7 +1387,7 @@ Context: PLAN names `research` without a definition. The `researcher` agent alre
 (onboard, toolsmith), each caller with its own prompt. The user chose in the question round
 where the result goes and whether steps may call it.
 Decision:
-- `/specd:research "<question>" [--feature <name>]` splits the input into at most three
+- `/pacenote:research "<question>" [--feature <name>]` splits the input into at most three
   questions, dispatches one `researcher` each at `models.judgment` (Context7 first, the stack
   line from `project.md` as constraints), and prints the two sections as returned. The main
   thread never calls WebSearch, WebFetch or Context7; the agent is the only reader of
@@ -1453,7 +1453,7 @@ consistency (spec-kit's `/analyze`) and codebase analysis. The user chose both i
 question round, `analyze` manual only (the `tasks` step and G3 unchanged), and a new agent
 for the checks that need reading.
 Decision:
-- `/specd:analyze [feature]` checks that `spec.md`, `design.md` and `tasks.md` agree, at any
+- `/pacenote:analyze [feature]` checks that `spec.md`, `design.md` and `tasks.md` agree, at any
   step once `tasks.md` exists. `scripts/analyze scan --feature-dir` parses the ACs, the
   inline tasks and index lines (with their `tasks/T<n>.md`), the matrix, the decisions and
   the `Changes by area` paths, and reports `ac_uncovered`, `ac_no_row`, `row_unknown_ac`,
@@ -1465,7 +1465,7 @@ Decision:
   script's findings as settled and the candidates as leads, and returns at most ten
   `A<n> · decision|term|conflict · <file:line> · … · resolve:` findings. The critic stays a
   one-artifact judge (2026-10-06 M3); the two never share a run.
-- `/specd:analyze-codebase [path]` maps where the code is hard to change.
+- `/pacenote:analyze-codebase [path]` maps where the code is hard to change.
   `scripts/analyze-codebase scan` ranks hotspots (commits since `--since` times lines), maps
   imports parsed by regex (Python, JS/TS relative, Go under `go.mod`, Java/Kotlin, PHP, Ruby,
   Rust) to modules cut at `--depth` 2 with fan-in, fan-out and cycles (strongly connected
@@ -1479,7 +1479,7 @@ Decision:
 Consequences: the critic and the analyst split one artifact's holes from the gaps between
 artifacts. `tasks` step 3 keeps its own prose check of the matrix before G3; the script
 could replace it later if G3 keeps missing gaps. `analyze-codebase` does not write
-`architecture/`; a contradiction with the overview points at `/specd:onboard architecture`.
+`architecture/`; a contradiction with the overview points at `/pacenote:onboard architecture`.
 
 ## 2026-10-23 M7: analyze and analyze-codebase built; smoke-tested headless
 
@@ -1495,13 +1495,13 @@ repo with churn, a Python module cycle, a relative TS import and test files by t
 conventions, and covers skipped folders, `--path`, `--depth`, `--top`, empty files and a
 non-repo. Headless runs in a scratch embedded repo (`app/orders` ↔ `app/billing` cycle,
 four extra commits on `invoice.py`), logged as `stream-json`:
-- `/specd:analyze export` on a full-tier feature seeded with AC4 without a task, T2 with
+- `/pacenote:analyze export` on a full-tier feature seeded with AC4 without a task, T2 with
   `covers: none`, D2 (stream rows) that T1 contradicts by building the list, and "export
   file" in the spec against "report" in the tasks: S1–S3 for the first two, A1 `decision`
   (no task builds D2, T1 builds the rejected alternative) and A2 `term`, every row with
-  `path:line`, owners `/specd:tasks`. The three artifacts were read only by the
-  `specd:analyst` subagent; file hashes and `git status` unchanged.
-- `/specd:analyze-codebase`: the cycle with both closing import lines, `invoice.py` as top
+  `path:line`, owners `/pacenote:tasks`. The three artifacts were read only by the
+  `pacenote:analyst` subagent; file hashes and `git status` unchanged.
+- `/pacenote:analyze-codebase`: the cycle with both closing import lines, `invoice.py` as top
   hotspot and first test gap, `model.py` covered by `test_model.py`; the explorer read only
   the named files and added that `test_model.py` holds no test function. No file changed.
   The run listed empty `__init__.py` files as hotspots and its first scan was blocked on a
@@ -1561,7 +1561,7 @@ Decision:
   (<date>)` appended to the matrix cell, replacing an earlier `runtime:` part. A failed or
   blocked AC becomes a task under `Runtime fixes` (`step=implement`) or is accepted with a
   reason in the cell. `deliver` counts the ACs that also ran live at G5. One commit
-  `spec(<feature>): runtime-verify`, carrying `specd.yml` and `.mcp.json` when the run
+  `spec(<feature>): runtime-verify`, carrying `pacenote.yml` and `.mcp.json` when the run
   changed them.
 - The step asks before every run, a re-run included: it starts a process and sends
   requests that may write data.
@@ -1571,13 +1571,13 @@ conversation only as bounded JSON and the agent's answer. Checks that need seede
 auth flows beyond a test account the user names, and non-HTTP surfaces (CLIs, queues) are
 `none` rows that keep verify's evidence.
 
-## 2026-10-23 M7: config-set inserts a documented key that an older specd.yml lacks
+## 2026-10-23 M7: config-set inserts a documented key that an older pacenote.yml lacks
 
 Context: `git.wrapper_pr` (2026-10-21) and now `flow.runtime_verify` and `commands.serve`
 are keys a workspace from before M7 does not have, and `config-set` refused unknown keys,
 so the config skill told the user to edit the file by hand. `runtime-verify` must save
 `commands.serve` on the user's yes.
-Decision: a scalar `section.key` that the default in `_shared/specd-yml.md` documents but
+Decision: a scalar `section.key` that the default in `_shared/pacenote-yml.md` documents but
 the file lacks is inserted at the end of its section, with its comment lines copied from
 the default, and then set. Keys the default does not document, list keys and missing
 sections are still refused, and the call stays all-or-nothing. The config skill's by-hand
@@ -1606,7 +1606,7 @@ page, full feature `items` with five ACs: four HTTP, one browser), logged as `st
   `project.md`), saved them, proposed four `http` rows and one `browser` row, offered the
   install; on "run all, install" it ran the four checks through the script (all pass),
   skipped AC4, stopped the app, wrote `runtime.md` and the cells, committed. That run
-  installed playwright into `.specd/.mcp.json`, which Claude Code does not read; the spine
+  installed playwright into `.pacenote/.mcp.json`, which Claude Code does not read; the spine
   now names the MCP root, as the config skill does.
 - With playwright loaded (`--headless` in the scratch `.mcp.json`): the four HTTP checks
   and AC4 through `runtime-verifier` passed; every `mcp__playwright__*` call came from the
@@ -1617,7 +1617,7 @@ page, full feature `items` with five ACs: four HTTP, one browser), logged as `st
   `Runtime fixes`, `step=implement`, the app stopped, `.playwright-mcp/` removed, one
   commit.
 - Off: on a copy at verify, "no" set `runtime_verify=off` and `step: docs`; `state check
-  --step runtime-verify` refuses with `/specd:docs items`.
+  --step runtime-verify` refuses with `/pacenote:docs items`.
 Not exercised: `flow.runtime_verify: off` through the skill (script-level only); a reused
 running app; `start` timing out through the skill; an accepted failure; the PR loop; a
 non-local URL; wrapper mode and a worktree (`.runtime/` and `.mcp.json` at the wrapper
@@ -1626,3 +1626,14 @@ Consequences: M7 is built; PLAN marks it so, with the done-when above. "Done" is
 call after each util runs on a real workspace and one real feature passes runtime-verify.
 Watch whether the plans check what the ACs state rather than what the code happens to do,
 and how often browser rows come back `blocked`.
+
+## 2026-10-23: the plugin is renamed from specd to pacenote
+
+Context: the name `specd` was already taken by another spec-driven development framework.
+Decision: the plugin, its marketplace, the command prefix (`/pacenote:`), the config
+(`pacenote.yml`), the embedded folder (`.pacenote/`), the markers written into user files
+(`pacenote:begin`, `pacenote:draft`, ...) and the GitHub repo (`gpntechdev/pacenote`) all
+take the new name. `skills/_shared/specd-yml.md` becomes `pacenote-yml.md`.
+Consequences: no migration; a workspace initialised under the old name keeps `specd.yml`,
+`.specd/` and `specd:` markers that the plugin no longer reads, and is re-run through
+`/pacenote:init`. Earlier entries in this file were rewritten to the new name.

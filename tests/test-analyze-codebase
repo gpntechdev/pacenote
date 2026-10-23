@@ -24,7 +24,7 @@ FILES = {
     "web/src/util/format.ts": "export function fmt() {\n  return 1\n}\n\n\n",
     "web/src/util/format.test.ts": "import { fmt } from './format'\n",
     "node_modules/x/index.js": "require('./y')\n",
-    ".specd/spec/a/spec.md": "# spec\n",
+    ".pacenote/spec/a/spec.md": "# spec\n",
     "native/lib.c": "int main() {}\n",
 }
 
@@ -60,7 +60,7 @@ class Base(unittest.TestCase):
         self.dir.cleanup()
 
     def run_scan(self, *extra, code=0):
-        r = subprocess.run([SCRIPT, "scan", "--code-root", self.root, "--skip", ".specd"]
+        r = subprocess.run([SCRIPT, "scan", "--code-root", self.root, "--skip", ".pacenote"]
                            + list(extra), capture_output=True, text=True)
         self.assertEqual(r.returncode, code, r.stderr)
         return json.loads(r.stdout) if code == 0 else r.stderr
@@ -76,7 +76,7 @@ class Hotspots(Base):
 
     def test_skipped_folders_are_not_counted(self):
         files = [h["file"] for h in self.run_scan()["hotspots"]]
-        self.assertFalse(any(f.startswith(("node_modules/", ".specd/")) for f in files))
+        self.assertFalse(any(f.startswith(("node_modules/", ".pacenote/")) for f in files))
 
     def test_empty_files_are_not_hotspots(self):
         files = [h["file"] for h in self.run_scan()["hotspots"]]

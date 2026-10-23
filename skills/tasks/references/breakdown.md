@@ -40,7 +40,7 @@ G4 (`gates.md`), whatever the granularity.
 
 ## layer
 
-- `specd.yml` `layers` maps a layer name (`frontend`, `backend`, `infra`, `data`, whatever
+- `pacenote.yml` `layers` maps a layer name (`frontend`, `backend`, `infra`, `data`, whatever
   the project uses) to the project skill files `implement` hands the implementer for tasks
   of that layer. When the map is non-empty, every task that touches one of its layers names
   it in `layer:`; a task that needs two layers is two tasks (the one-concern rule above).

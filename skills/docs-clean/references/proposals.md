@@ -34,7 +34,7 @@ one plan step; count each finding in the commit.
   inside the file are fixed in the same text. If the file cannot reach its cap without losing
   facts, say so and propose `report`, naming the split (an area or domain file per
   aggregate, per `onboard`).
-- **Draft.** `leave` names `/specd:onboard <section>` (the scan's `section`); an empty
+- **Draft.** `leave` names `/pacenote:onboard <section>` (the scan's `section`); an empty
   section means a file `onboard` does not own, which the proposal says. Propose `sign-off`
   as the default only when the user says the section is finished; never because the file
   looks complete.

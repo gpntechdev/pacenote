@@ -1,17 +1,17 @@
 {
-  "name": "specd",
+  "name": "pacenote",
   "owner": {
     "name": "Andrii Hapon",
     "email": "gpn.techdev@gmail.com",
     "url": "https://github.com/gpntechdev"
   },
-  "description": "Marketplace for specd, a spec-driven development workflow plugin for Claude Code.",
+  "description": "Marketplace for pacenote, a spec-driven development workflow plugin for Claude Code.",
   "plugins": [
     {
-      "name": "specd",
+      "name": "pacenote",
       "source": "./",
       "version": "0.1.0",
-      "description": "Spec-driven development workflow for AI coding assistants: intake, spec, design, tasks, implement, review, verify, docs, deliver, feedback, close, fix and critique as /specd: skills, with trivial, quick and full tiers. Stack-agnostic; runs embedded in a code repo or as a wrapper around it.",
+      "description": "Spec-driven development workflow for AI coding assistants: intake, spec, design, tasks, implement, review, verify, docs, deliver, feedback, close, fix and critique as /pacenote: skills, with trivial, quick and full tiers. Stack-agnostic; runs embedded in a code repo or as a wrapper around it.",
       "category": "workflow"
     }
   ]

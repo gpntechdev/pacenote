@@ -19,7 +19,7 @@ and why (`critic: off`, `critic: gates, tier quick`).
 
 ## Dispatch
 
-One `critic` run at `models.judgment` (read it from `specd.yml` and pass it as the agent's
+One `critic` run at `models.judgment` (read it from `pacenote.yml` and pass it as the agent's
 model). Every path absolute. The agent gets files, never the conversation.
 
 ```

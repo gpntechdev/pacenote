@@ -2,8 +2,8 @@
 name: deliver
 description: >
   Invoke whenever the user asks to deliver, ship, push or open the pull request for a
-  verified feature, or runs `/specd:deliver [feature]`; also as the next step after
-  `/specd:verify`. It re-runs the project checks, shows you the full change (commits, diff
+  verified feature, or runs `/pacenote:deliver [feature]`; also as the next step after
+  `/pacenote:verify`. It re-runs the project checks, shows you the full change (commits, diff
   stat, review verdict, evidence matrix) for the delivery gate (G5), then goes as far as
   `git.authority` allows: push the branch and open a draft PR or MR whose body says what was
   built, how to verify it and where the spec and record are, in your voice, with no AI
@@ -36,7 +36,7 @@ every re-run after a feedback cycle.
   header of each `<workspace_root>/sources/<feature>-*.md` it lists.
 - `<docs_root>/features/<feature>.md` and the `decisions/NNNN-*.md` files it names, when
   `docs` wrote them.
-- `<workspace_root>/specd.yml`: `git.authority`, `git.pr_host`, `git.ticket_key`,
+- `<workspace_root>/pacenote.yml`: `git.authority`, `git.pr_host`, `git.ticket_key`,
   `git.wrapper_pr`.
 - [`../_shared/no-attribution.md`](../_shared/no-attribution.md),
   [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md).
@@ -54,7 +54,7 @@ every re-run after a feedback cycle.
    `gates.md`. Every git command below runs in `<code_root>`, the repo the PR is for,
    unless it names the wrapper (`git.md`, "Wrapper").
 2. **Checks.** `"${CLAUDE_PLUGIN_ROOT}/scripts/run-checks" --from <code_root>`. Red: refuse
-   with the failing tail, handoff `Next: /specd:implement <feature>`.
+   with the failing tail, handoff `Next: /pacenote:implement <feature>`.
 3. **G5 view.** `git -C <code_root> log <default>..HEAD --oneline` (and, when the branch
    has an upstream, `git log @{u}..HEAD --oneline` as "since the last push"), `git diff
    --stat <default>...HEAD`, the last review or PR round's verdict and accepted findings
@@ -96,8 +96,8 @@ every re-run after a feedback cycle.
    wrapper rule of `git.md` "Wrapper" otherwise.
 8. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Produced`: the PR URL.
    `Review`: what the PR body claims; the `before` sha when a squash ran. `Next:
-   /specd:close <feature>` once the PR is settled, then merge; second line
-   `/specd:feedback <feature>` when comments arrive.
+   /pacenote:close <feature>` once the PR is settled, then merge; second line
+   `/pacenote:feedback <feature>` when comments arrive.
 
 ## Anti-patterns
 

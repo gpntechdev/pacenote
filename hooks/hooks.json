@@ -1,5 +1,5 @@
 {
-  "description": "specd secrets guardrail, source snapshot guard and skill quarantine fence",
+  "description": "pacenote secrets guardrail, source snapshot guard and skill quarantine fence",
   "hooks": {
     "PreToolUse": [
       {

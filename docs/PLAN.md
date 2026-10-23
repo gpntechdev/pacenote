@@ -1,12 +1,12 @@
 # Spec-Driven Workflow — Plan
 
-Name: **specd** (read "spec'd": spec-driven). Command prefix `/specd:`, config `specd.yml`, embedded folder `.specd/`.
+Name: **pacenote** (renamed from specd, DECISIONS 2026-10-23). Command prefix `/pacenote:`, config `pacenote.yml`, embedded folder `.pacenote/`.
 
-Status: v4, updated 2026-10-23. v2 reworked modes, folders, flow and init; v3 split init into commands and restructured `docs/`; v4 settles the remaining open questions (section 6). Progress: M0 and M1 done, M2 built and run on real features (DECISIONS 2026-10-05/06 record the amendments), M3 built and awaiting its week of mixed tasks, M4 built, M5 done, M6 built, M7 built (section 5). Git model amended by DECISIONS 2026-09-24: branch at `start`, commits per step. Light flows amended by DECISIONS 2026-10-06 M3: the step order per tier lives in `scripts/state`, specify-lite writes `spec.md` and `tasks.md`, trivial has G4 and G5. Wrapper mode amended by DECISIONS 2026-10-09 M4: the wrapper branch is merged by `close` unless it has its own PR (`git.wrapper_pr`, DECISIONS 2026-10-21 M7), worktrees are opt-in and hold the wrapper and the code, the gate hook stays out. Sources amended by DECISIONS 2026-10-12 M5: adapters follow the input's shape, `sources.mcp` is one flat key, fetched text reaches the main thread only through the `intake` agent, redaction is a script run by a hook. Toolsmith amended by DECISIONS 2026-10-12 M6: skills land in the workspace's `.claude/skills/` (private: `.specd/skills/`), candidates are GitHub tarballs at a full commit, `skills.lock` is flat YAML written by a script, a stage-1 `block` or a stage-2 `refuse` cannot be overridden, `source-guard` fences the quarantine, specialists are one agent with four lens files switched by `flow.specialists`; candidates are discovered in the skills.sh index (find-skills' search) and their repos offered for the allowlist. Runtime verification amended by DECISIONS 2026-10-23 M7: `runtime-verify` is a full-tier step that `verify` switches on per feature (`runtime_verify` in `state.yml`, `flow.runtime_verify: ask | off`), starts the app from `commands.serve` and keeps HTTP checks in a script and the browser in the `runtime-verifier` agent.
+Status: v4, updated 2026-10-23. v2 reworked modes, folders, flow and init; v3 split init into commands and restructured `docs/`; v4 settles the remaining open questions (section 6). Progress: M0 and M1 done, M2 built and run on real features (DECISIONS 2026-10-05/06 record the amendments), M3 built and awaiting its week of mixed tasks, M4 built, M5 done, M6 built, M7 built (section 5). Git model amended by DECISIONS 2026-09-24: branch at `start`, commits per step. Light flows amended by DECISIONS 2026-10-06 M3: the step order per tier lives in `scripts/state`, specify-lite writes `spec.md` and `tasks.md`, trivial has G4 and G5. Wrapper mode amended by DECISIONS 2026-10-09 M4: the wrapper branch is merged by `close` unless it has its own PR (`git.wrapper_pr`, DECISIONS 2026-10-21 M7), worktrees are opt-in and hold the wrapper and the code, the gate hook stays out. Sources amended by DECISIONS 2026-10-12 M5: adapters follow the input's shape, `sources.mcp` is one flat key, fetched text reaches the main thread only through the `intake` agent, redaction is a script run by a hook. Toolsmith amended by DECISIONS 2026-10-12 M6: skills land in the workspace's `.claude/skills/` (private: `.pacenote/skills/`), candidates are GitHub tarballs at a full commit, `skills.lock` is flat YAML written by a script, a stage-1 `block` or a stage-2 `refuse` cannot be overridden, `source-guard` fences the quarantine, specialists are one agent with four lens files switched by `flow.specialists`; candidates are discovered in the skills.sh index (find-skills' search) and their repos offered for the allowlist. Runtime verification amended by DECISIONS 2026-10-23 M7: `runtime-verify` is a full-tier step that `verify` switches on per feature (`runtime_verify` in `state.yml`, `flow.runtime_verify: ask | off`), starts the app from `commands.serve` and keeps HTTP checks in a script and the browser in the `runtime-verifier` agent.
 
 ## 1. Goal and non-goals
 
-specd automates development with AI coding assistants while keeping code quality, maintainability and simplicity under human control. It is stack-agnostic, works on greenfield and brownfield projects, and can live inside the code repo or wrap around it from the outside.
+pacenote automates development with AI coding assistants while keeping code quality, maintainability and simplicity under human control. It is stack-agnostic, works on greenfield and brownfield projects, and can live inside the code repo or wrap around it from the outside.
 
 It differs from the projects that inspired it (genkovich/sdd, AIDevTeamForge, spec-kit) in three deliberate ways. First, the source of truth may live outside the repo (Jira, Confluence, docs, chats), so specs start from an intake step rather than from a blank file. Second, feature artifacts are ephemeral: durable knowledge is distilled into `docs/` and the spec folder is cleaned, so the project never becomes a graveyard of spec files. Third, the location of workflow files is an abstraction (the *workspace*), so embedded and wrapper modes are the same code path.
 
@@ -32,23 +32,23 @@ Non-goals: a big fixed agent roster, a mandatory heavyweight document pipeline p
 | MVP | Init + full flow in embedded mode |
 | Artifact language (v4) | English |
 | Git conventions (v4) | Conventional Commits; ticket key in branch names when detected from git history or given at init |
-| PR host (v4) | Asked at init; changeable later (`specd.yml` or `/specd:config`) when the remote changes |
+| PR host (v4) | Asked at init; changeable later (`pacenote.yml` or `/pacenote:config`) when the remote changes |
 | G4 granularity (v4) | Asked at init; default `phase`; changeable mid-flow via config or command |
 | Secrets guardrail (v4) | Included: hook denies reads/edits of `.env`, key and credential files; redaction when snapshotting external docs |
-| Embedded folder (v4) | `.specd/` |
+| Embedded folder (v4) | `.pacenote/` |
 | Wrapper docs (v4) | At init you choose whether `docs/` lands in the wrapper or in the project repo; a branch per feature in both repos |
 
 ## 3. Architecture
 
 ### 3.1 Modes and folder structure (v2)
 
-Every skill resolves paths from `specd.yml`: `workspace_root` (specd files), `code_root` (the code), `docs_root` (defaults to `<workspace_root>/docs`). No skill hardcodes a path.
+Every skill resolves paths from `pacenote.yml`: `workspace_root` (pacenote files), `code_root` (the code), `docs_root` (defaults to `<workspace_root>/docs`). No skill hardcodes a path.
 
 **Wrapper mode.** The wrapper is its own git repo; the code repo sits inside it, gitignored. Launch the assistant in the wrapper.
 
 ```
 my-project-ai/               # wrapper git repo
-  specd.yml
+  pacenote.yml
   CLAUDE.md                  # short; points to docs/
   .claude/  .mcp.json        # generated project skills/agents, MCP config
   docs/                      # persistent knowledge (see below)
@@ -63,7 +63,7 @@ my-project-ai/               # wrapper git repo
 
 Agents commit to two repos: code changes to the code repo (`git -C <code_root>`), spec and docs changes to the wrapper repo, with the same branch name per feature in both, so a feature's code and its spec history line up. The PR is the code repo's; the wrapper branch gets a draft PR of its own when the user wants one (`git.wrapper_pr`, for a team sharing the wrapper through a remote), otherwise `close` merges it into the wrapper's default branch; `close` removes the worktree either way (DECISIONS 2026-10-09 M4, amended 2026-10-21 M7). A feature worktree is a complete wrapper layout, so resolving paths from inside it needs no special case, and the assistant runs either in the wrapper root or in a worktree, one session per parallel feature. At init you choose where `docs/` lands: in the wrapper (default, invisible to the client) or in the project repo (`docs_root` points there, the docs ship with the code). Both repos commit without AI attribution: the generated settings turn off Claude Code's co-author line, and the `deliver` skill forbids AI mentions in commit messages and PR bodies. Commit messages follow Conventional Commits; branch names carry the ticket key when the project uses one.
 
-**Embedded mode.** Same layout minus the code folder: `specd.yml`, `docs/` and `spec/` live under `<repo>/.specd/`. If the team wants agent-maintained docs to be the real project docs, `docs_root` can point at the repo's existing `docs/`. Keeping the folder out of git for a team that shouldn't see it is a `.git/info/exclude` flag at init, not a separate mode.
+**Embedded mode.** Same layout minus the code folder: `pacenote.yml`, `docs/` and `spec/` live under `<repo>/.pacenote/`. If the team wants agent-maintained docs to be the real project docs, `docs_root` can point at the repo's existing `docs/`. Keeping the folder out of git for a team that shouldn't see it is a `.git/info/exclude` flag at init, not a separate mode.
 
 **`docs/` — persistent knowledge, curated, size-conscious (v3).** Rule: anything loaded in full every session is a single small file; anything read selectively is a folder with an index, loaded by pointer.
 
@@ -76,7 +76,7 @@ docs/
   decisions/          0001-title.md … (context, decision, consequences) + README index
   data-models/        one file per domain, only if the project has them
   features/           README index + one file per shipped feature: what it does, its flows, where it lives; written by `docs`
-  research/           README index + dated notes from `/specd:research`, when the user chooses a note
+  research/           README index + dated notes from `/pacenote:research`, when the user chooses a note
 ```
 
 `lessons.md` stays a single capped file on purpose: it is a holding area, and growth is the signal to promote items into `conventions.md` or a decision, or prune them. In brownfield, existing project docs are linked from `architecture/overview.md`, not duplicated. `docs-clean` keeps the folder honest on demand: drifted `path:line` pointers (re-anchored when the name is found), broken links, files over their caps, leftover draft markers, index rows out of step with `features/`, `decisions/` and `research/`, and snapshots nothing links (DECISIONS 2026-10-22 M7). `research` answers an external question through the `researcher` agent and writes the cited findings where the user chooses per run: a section of the feature's `research.md`, a note in `research/`, or nowhere; `specify` and `design` may offer it for an open question that is an external fact (DECISIONS 2026-10-23 M7).
@@ -127,7 +127,7 @@ Square brackets = optional. Every step ends with a handoff block (what was produ
 - *Triage* reads the brief and glances at the codebase (`explorer`, cheap model) to estimate size and risk from signals: modules touched, new dependencies, schema/API changes, cross-cutting concerns, ambiguity. It proposes a tier and writes it to `state.yml`; you confirm or override. You can't size what you haven't read, so it comes after intake; and the tier decides how deep the spec goes, so it comes before specify.
 - *Specify* turns the brief into `spec.md` through an interview: problem, scope, out of scope, acceptance criteria, open questions.
 
-So the command surface is `/specd:start <feature> [--from TICKET-123 | url | file]` (creates `spec/<feature>/`, runs intake and triage, asks you to confirm the tier) followed by `/specd:specify`. Triage is re-checked after specify and during implementation; if a quick task trips a signal, the flow stops and proposes escalation, carrying over what exists.
+So the command surface is `/pacenote:start <feature> [--from TICKET-123 | url | file]` (creates `spec/<feature>/`, runs intake and triage, asks you to confirm the tier) followed by `/pacenote:specify`. Triage is re-checked after specify and during implementation; if a quick task trips a signal, the flow stops and proposes escalation, carrying over what exists.
 
 **Steps.**
 
@@ -160,9 +160,9 @@ Full tier runs design by default (sections auto-selected, you can add/remove); q
 
 **Tasks and the test plan.** `tasks` reads spec and design and writes `tasks.md`: phases → tasks, each with goal, files, `done-when` (verifiable), depends-on, and a risk flag. With TDD on, each task also carries a `tests` block (test cases derived from the acceptance criteria it covers), and the file ends with a coverage matrix *acceptance criterion → task → test*. That is sdd's `plan-tests` without a separate command: the matrix is produced where the tasks are, `implement` writes the listed tests first, and `verify` fills the evidence column. With TDD off the matrix still exists; evidence may be a check or a manual note.
 
-`/specd:analyze [feature]` checks the agreement the critic does not: an AC with no task, a task covering no AC, matrix drift and design paths no task lists (a script), plus decisions no task implements, terms used two ways and tasks contradicting their AC (the `analyst` agent). It prints and writes nothing, and runs only when asked; `/specd:analyze-codebase [path]` is its codebase counterpart: change hotspots, module coupling and cycles, untested files (DECISIONS 2026-10-23 M7).
+`/pacenote:analyze [feature]` checks the agreement the critic does not: an AC with no task, a task covering no AC, matrix drift and design paths no task lists (a script), plus decisions no task implements, terms used two ways and tasks contradicting their AC (the `analyst` agent). It prints and writes nothing, and runs only when asked; `/pacenote:analyze-codebase [path]` is its codebase counterpart: change hotspots, module coupling and cycles, untested files (DECISIONS 2026-10-23 M7).
 
-**Critic without spam.** A `critic` agent (devil's advocate: ambiguities, contradictions, missing failure modes, hidden assumptions) runs at exactly two points by default — end of `specify` and end of `design`, before their gates — because those are the places where a missed ambiguity is most expensive and the artifact is short. It gets only the artifact and `docs/project.md`, runs in fresh context, and returns at most ten ranked findings, which the step folds into the open-questions list for you to resolve at the gate. Full tier only. Config `critic: gates | off | always`, plus `/specd:critique <file>` on demand.
+**Critic without spam.** A `critic` agent (devil's advocate: ambiguities, contradictions, missing failure modes, hidden assumptions) runs at exactly two points by default — end of `specify` and end of `design`, before their gates — because those are the places where a missed ambiguity is most expensive and the artifact is short. It gets only the artifact and `docs/project.md`, runs in fresh context, and returns at most ten ranked findings, which the step folds into the open-questions list for you to resolve at the gate. Full tier only. Config `critic: gates | off | always`, plus `/pacenote:critique <file>` on demand.
 
 **Tiers.**
 
@@ -176,11 +176,11 @@ Agents exist only where an isolated context pays for itself: heavy reading, or i
 
 Agents: `explorer` (codebase scan, cheap, returns a map with file:line pointers), `intake` (summarises fetched sources; cannot act on them), `researcher`, `architect`, `critic`, `analyst` (judges whether a feature's spec, design and tasks agree; DECISIONS 2026-10-23 M7), `runtime-verifier` (drives the running app in a browser through the playwright MCP tools, the per-layer escalation path below; DECISIONS 2026-10-23 M7), `implementer`, `reviewer`, specialist reviewers (`security`, `performance`, `accessibility`, `tests`), `doc-writer`, `skill-auditor`.
 
-Stack specialisation is knowledge, not agents: a task names a `layer` (`frontend`, `backend`, …), `specd.yml` `layers` maps each layer to project skill files, and `implement` and `review` pass those files to the one `implementer` / `reviewer` as "read first". Subagents cannot spawn subagents, so routing always happens in the main thread; a per-layer agent is added only when a layer needs tools the generic agent lacks (a browser or database MCP).
+Stack specialisation is knowledge, not agents: a task names a `layer` (`frontend`, `backend`, …), `pacenote.yml` `layers` maps each layer to project skill files, and `implement` and `review` pass those files to the one `implementer` / `reviewer` as "read first". Subagents cannot spawn subagents, so routing always happens in the main thread; a per-layer agent is added only when a layer needs tools the generic agent lacks (a browser or database MCP).
 
 Skills: `init`, `onboard`, `scaffold`, `toolsmith`, `config` (change a setting mid-flow, e.g. gate granularity or PR host), `start`, `specify`, `design`, `tasks`, `implement`, `review`, `verify`, `runtime-verify`, `docs`, `deliver`, `feedback`, `close`, `fix`, `critique`, `status` (resume), `principles`, `skill-audit`, utils (`refresh`, `research`, `analyze`, `analyze-codebase`, `docs-clean`, `spec-clean`, `lessons-prune`).
 
-Model tiers are roles, not model names: `judgment`, `execution`, `cheap`, mapped in `specd.yml` (default opus/sonnet/haiku), overridable per role.
+Model tiers are roles, not model names: `judgment`, `execution`, `cheap`, mapped in `pacenote.yml` (default opus/sonnet/haiku), overridable per role.
 
 ### 3.5 Initialization (v3)
 
@@ -188,10 +188,10 @@ A single init command would drown in context on any real repo, so initialization
 
 | Command | What it does | Context cost |
 |---|---|---|
-| `/specd:init` | Mechanical setup: mode, folders, greenfield/brownfield detection, command detection (cascade: config override → Makefile → package.json scripts → language manifests), `specd.yml`, CLAUDE.md pointer block, `.mcp.json` with Context7, no-attribution settings, secrets guardrail hook. Interview limited to mode, retention, TDD, gate granularity (default `phase`), PR host, ticket-key convention if not detected from git history, and in wrapper mode where `docs/` lands | minutes, cheap |
-| `/specd:onboard [section]` | The knowledge work, one `docs/` section at a time: project → architecture → conventions → data models → decisions. Each section is one scan pass (brownfield) or one interview (greenfield) plus gap questions, written to disk before the next section starts. No argument = all sections for the whole project; resumable after `/clear` from the first unfinished section; `onboard architecture` refreshes one section later | one section per context |
-| `/specd:scaffold` | Greenfield only: builds the skeleton from `docs/architecture/` — structure, tooling (package manager, lint, format, typecheck, tests), one smoke test, `.gitignore` — and verifies build/test/lint pass. Runs as a normal quick-tier feature (`spec/scaffold/`) so it gets a gate and a review | one feature |
-| `/specd:toolsmith` | Project skills and MCP recommendations (3.6). Called last by init's handoff; re-runnable alone when the stack changes | delegated to agents |
+| `/pacenote:init` | Mechanical setup: mode, folders, greenfield/brownfield detection, command detection (cascade: config override → Makefile → package.json scripts → language manifests), `pacenote.yml`, CLAUDE.md pointer block, `.mcp.json` with Context7, no-attribution settings, secrets guardrail hook. Interview limited to mode, retention, TDD, gate granularity (default `phase`), PR host, ticket-key convention if not detected from git history, and in wrapper mode where `docs/` lands | minutes, cheap |
+| `/pacenote:onboard [section]` | The knowledge work, one `docs/` section at a time: project → architecture → conventions → data models → decisions. Each section is one scan pass (brownfield) or one interview (greenfield) plus gap questions, written to disk before the next section starts. No argument = all sections for the whole project; resumable after `/clear` from the first unfinished section; `onboard architecture` refreshes one section later | one section per context |
+| `/pacenote:scaffold` | Greenfield only: builds the skeleton from `docs/architecture/` — structure, tooling (package manager, lint, format, typecheck, tests), one smoke test, `.gitignore` — and verifies build/test/lint pass. Runs as a normal quick-tier feature (`spec/scaffold/`) so it gets a gate and a review | one feature |
+| `/pacenote:toolsmith` | Project skills and MCP recommendations (3.6). Called last by init's handoff; re-runnable alone when the stack changes | delegated to agents |
 
 Both project kinds share one mechanism: a **knowledge checklist** — the questions each `docs/` section must be able to answer (purpose and users, stack and versions, layout, commands, boundaries and key flows, data model, integrations, conventions, testing approach, git/PR rules, sources of truth). `onboard` fills the checklist from whatever exists and interviews only for the gaps.
 
@@ -203,7 +203,7 @@ Each section ends with a summary you sign off.
 
 ### 3.6 Project-specific skills: toolsmith and skill-audit
 
-`toolsmith` is a command on the outside and agents on the inside: it takes the detected stack and, per need (e.g. "React testing conventions", "NestJS module layout"): has `researcher` search the allowlisted sources in `specd.yml` (official Anthropic skills, vendor-official repos, anything you add); fetches candidates into a quarantine folder that Claude Code does not load; runs `skill-audit`; shows you the report; installs only on approval, pinned to a commit hash in `skills.lock`. If nothing suitable passes, it generates a project skill from codebase conventions plus Context7 docs. Each installed or generated skill is registered under the layer it serves in `specd.yml` `layers`, which is how it reaches the implementer (3.4).
+`toolsmith` is a command on the outside and agents on the inside: it takes the detected stack and, per need (e.g. "React testing conventions", "NestJS module layout"): has `researcher` search the allowlisted sources in `pacenote.yml` (official Anthropic skills, vendor-official repos, anything you add); fetches candidates into a quarantine folder that Claude Code does not load; runs `skill-audit`; shows you the report; installs only on approval, pinned to a commit hash in `skills.lock`. If nothing suitable passes, it generates a project skill from codebase conventions plus Context7 docs. Each installed or generated skill is registered under the layer it serves in `pacenote.yml` `layers`, which is how it reaches the implementer (3.4).
 
 `skill-audit` is two-stage because an LLM auditor reading hostile text is itself an injection target. Stage one is a deterministic script: hidden/bidi Unicode, encoded blobs, URLs and network calls, `curl | sh` patterns, bundled scripts and hooks, over-broad `allowed-tools`, references to secrets or env files. Stage two is the `skill-auditor` agent with read-only tools and no network, treating content strictly as data and flagging instructions that override behaviour, exfiltrate, or exceed the skill's stated purpose. Nothing is executed during audit; it re-runs on updates.
 
@@ -211,13 +211,13 @@ The same data-not-instructions rule applies to `intake`: fetched content is summ
 
 ### 3.7 Sources
 
-The adapter follows the input's shape (DECISIONS 2026-10-12 M5): a ticket key goes through the MCP server in `sources.mcp` (Atlassian first; Google Drive, Slack, GitHub… later), a URL through a fetch script, a path is a file, text is a paste. `start` accepts any of them per feature and falls back to asking for a paste. It always writes a distilled brief with links back, never raw dumps; fetched text is condensed by the `intake` agent and redacted before it is saved. `/specd:refresh` re-fetches snapshots and names the gate to re-open.
+The adapter follows the input's shape (DECISIONS 2026-10-12 M5): a ticket key goes through the MCP server in `sources.mcp` (Atlassian first; Google Drive, Slack, GitHub… later), a URL through a fetch script, a path is a file, text is a paste. `start` accepts any of them per feature and falls back to asking for a paste. It always writes a distilled brief with links back, never raw dumps; fetched text is condensed by the `intake` agent and redacted before it is saved. `/pacenote:refresh` re-fetches snapshots and names the gate to re-open.
 
 ### 3.8 MCP
 
 Context7 always. Everything else is proposed at init from the stack and sources — browser/DevTools MCP for frontend, database MCP for backend, tracker/wiki MCPs for sources — installed only on confirmation. In wrapper mode `.mcp.json` lives in the wrapper.
 
-### 3.9 Context-engineering rules for specd itself
+### 3.9 Context-engineering rules for pacenote itself
 
 Go into `docs/AUTHORING.md`; a validator script enforces the mechanical ones.
 
@@ -249,8 +249,8 @@ Each milestone ends in something you use on a real task; findings go to `DECISIO
 
 | # | Milestone | Scope | Done when | Status |
 |---|---|---|---|---|
-| M0 | Foundations | Repo scaffold, plugin manifest, `principles` skill, `specd.yml` schema, path resolution, no-attribution settings, `AUTHORING.md`, validator | Plugin installs locally; principles skill triggers on a coding request | done 2026-09-22 |
-| M1 | Init + onboard (embedded) | `init` (detection, `specd.yml`, CLAUDE.md, Context7), `onboard` with knowledge checklist, per-section state and resume, brownfield scans + gap interview, greenfield interviews + `scaffold` | Onboard on one real brownfield repo gives docs you'd sign off without context overflow; greenfield init + onboard + scaffold yields a project that builds and tests | done 2026-09-24; `config` skill added (see DECISIONS) |
+| M0 | Foundations | Repo scaffold, plugin manifest, `principles` skill, `pacenote.yml` schema, path resolution, no-attribution settings, `AUTHORING.md`, validator | Plugin installs locally; principles skill triggers on a coding request | done 2026-09-22 |
+| M1 | Init + onboard (embedded) | `init` (detection, `pacenote.yml`, CLAUDE.md, Context7), `onboard` with knowledge checklist, per-section state and resume, brownfield scans + gap interview, greenfield interviews + `scaffold` | Onboard on one real brownfield repo gives docs you'd sign off without context overflow; greenfield init + onboard + scaffold yields a project that builds and tests | done 2026-09-24; `config` skill added (see DECISIONS) |
 | M2 | Full flow | start (intake local/paste + triage), specify, design, tasks (+ test plan), implement, review (base), verify, deliver, close (`distill`/`clean`/`keep`), `status` | One real feature shipped as a draft PR; resume after `/clear` works. **MVP** | built 2026-09-24; awaiting the real-feature run (see DECISIONS) |
 | M3 | Light flows + critic | trivial, quick, `fix`, escalation, `critic` at gates, `critique` on demand | A week of mixed tasks without wanting to bypass the flow | built 2026-10-06; the week of mixed tasks is the user's (see DECISIONS) |
 | M4 | Wrapper + parallel | Wrapper init, two-repo commits, worktrees per feature | Two features in parallel on a client-style repo with zero files added to it | built 2026-10-09; headless smoke run of two parallel features on a scratch client repo (see DECISIONS) |
@@ -259,12 +259,12 @@ Each milestone ends in something you use on a real task; findings go to `DECISIO
 | M7 | Utils | research, analyze, analyze-codebase, docs-clean, spec-clean, lessons-prune, runtime-verify | Each util runs once with its changes landing only on a yes, and one feature passes runtime-verify over HTTP and through a browser | built 2026-10-23; headless smoke run per util and of runtime-verify over HTTP, playwright, a failure and the off path (see DECISIONS) |
 | M8 | Portability + team | `install.sh` for Codex/Cursor, team-sharing guide, evals for key skills | Full flow runs on a second assistant | |
 
-After M2 specd is developed with specd.
+After M2 pacenote is developed with pacenote.
 
 ## 6. Settled questions (v4)
 
-All previously open questions are now decisions (see the v4 rows in section 2): English artifacts; Conventional Commits with ticket keys in branch names when the project uses them; PR host and gate granularity asked at init and changeable mid-flow with `/specd:config`; secrets guardrail hook included; `.specd/` in embedded mode; in wrapper mode `docs/` location chosen at init and one branch per feature in both repos.
+All previously open questions are now decisions (see the v4 rows in section 2): English artifacts; Conventional Commits with ticket keys in branch names when the project uses them; PR host and gate granularity asked at init and changeable mid-flow with `/pacenote:config`; secrets guardrail hook included; `.pacenote/` in embedded mode; in wrapper mode `docs/` location chosen at init and one branch per feature in both repos.
 
 ## 7. Next step
 
-M3's week of mixed tasks and M4's first real wrapper run continue on the user's side; findings go to `DECISIONS.md` first. M6 is built: `/specd:toolsmith` on a real repo is the run to watch, in particular how often the static audit refuses a skill the user wanted (the calibration on `anthropics/skills` is in DECISIONS), whether generated skills stay grounded in the codebase, and `--update` once an allowlisted repo moves. Marking M6 done is the user's call. M7 is built: the utils (`research`, `analyze`, `analyze-codebase`, `docs-clean`, `spec-clean`, `lessons-prune`) and the optional `runtime-verify` step, each smoke-tested headless; marking it done is the user's call, after each util has run once on a real workspace and one real feature has passed runtime-verify. The runs to watch: whether runtime-verify plans checks the ACs actually state, and how often its browser rows are blocked. Next is M8: portability and team.
+M3's week of mixed tasks and M4's first real wrapper run continue on the user's side; findings go to `DECISIONS.md` first. M6 is built: `/pacenote:toolsmith` on a real repo is the run to watch, in particular how often the static audit refuses a skill the user wanted (the calibration on `anthropics/skills` is in DECISIONS), whether generated skills stay grounded in the codebase, and `--update` once an allowlisted repo moves. Marking M6 done is the user's call. M7 is built: the utils (`research`, `analyze`, `analyze-codebase`, `docs-clean`, `spec-clean`, `lessons-prune`) and the optional `runtime-verify` step, each smoke-tested headless; marking it done is the user's call, after each util has run once on a real workspace and one real feature has passed runtime-verify. The runs to watch: whether runtime-verify plans checks the ACs actually state, and how often its browser rows are blocked. Next is M8: portability and team.

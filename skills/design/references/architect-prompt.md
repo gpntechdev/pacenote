@@ -1,7 +1,7 @@
 # Architect prompt
 
 One dispatch per design run, at the `judgment` model role (read `models.judgment` from
-`specd.yml` and pass it as the agent's model). Fill every placeholder with absolute paths.
+`pacenote.yml` and pass it as the agent's model). Fill every placeholder with absolute paths.
 
 ```
 Feature: <feature>. Sections to write: <Approach, Decisions[, Data model, API and contracts,
@@ -13,7 +13,7 @@ Read: <spec_root>/<feature>/spec.md, <spec_root>/<feature>/brief.md, <docs_root>
 findings with URLs; cite them, do not re-research), <docs_root>/architecture/overview.md, <the area files overview.md
 names that match the spec's nouns>, <docs_root>/data-models/*.md when Data model is selected.
 Code root: <code_root> (absolute). Read the areas the spec's nouns point at. Skip: .git,
-node_modules, vendor, dist, build, target, .venv, venv, __pycache__, coverage, .next, .specd,
+node_modules, vendor, dist, build, target, .venv, venv, __pycache__, coverage, .next, .pacenote,
 .env*, *.pem, *.key, credentials*.
 Constraints: follow the patterns conventions.md and the code already use; no new library,
 framework or service unless project.md or the manifests name it (else an open question);

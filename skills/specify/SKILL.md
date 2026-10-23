@@ -2,12 +2,12 @@
 name: specify
 description: >
   Invoke whenever the user asks to write, draft or refine the spec, requirements or
-  acceptance criteria for a started feature, or runs `/specd:specify [feature]`; also as the
-  next step after `/specd:start` or `/specd:fix`. It turns `brief.md` into `spec.md` through
+  acceptance criteria for a started feature, or runs `/pacenote:specify [feature]`; also as the
+  next step after `/pacenote:start` or `/pacenote:fix`. It turns `brief.md` into `spec.md` through
   a short interview (problem, scope, out of scope, verifiable acceptance criteria, open
   questions), runs the critic pass on the full tier, asks you to approve it (G1) and
   commits. On the quick tier it also drafts `tasks.md` and the one gate approves both. Not
-  for opening a feature (`/specd:start`) or for designing how it is built (`/specd:design`).
+  for opening a feature (`/pacenote:start`) or for designing how it is built (`/pacenote:design`).
 ---
 
 # Skill: specify
@@ -33,7 +33,7 @@ before continuing.
   the brief cites as `via file` or `paste`. A fetched one (`http`, `mcp:*`) is never opened:
   its content is the brief ([`../_shared/sources.md`](../_shared/sources.md); a hook denies
   the read).
-- `<workspace_root>/specd.yml`: `flow.critic`, `flow.tdd`, `models.judgment`, `git.authority`,
+- `<workspace_root>/pacenote.yml`: `flow.critic`, `flow.tdd`, `models.judgment`, `git.authority`,
   `layers.*` (quick: the `layer` vocabulary for tasks).
 - [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/gates.md`](../_shared/gates.md),
   [`../_shared/state-yml.md`](../_shared/state-yml.md), [`../_shared/critic.md`](../_shared/critic.md).
@@ -77,7 +77,7 @@ before continuing.
    commit `spec(<feature>): specify` with every file written.
 8. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: the open questions
    (critic ones first) and any AC the user accepted as manual; on quick, a declined
-   escalation. `Next: /specd:<step> <feature>` with the step `state set` reported.
+   escalation. `Next: /pacenote:<step> <feature>` with the step `state set` reported.
 
 ## Anti-patterns
 

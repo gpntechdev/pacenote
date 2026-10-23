@@ -10,7 +10,7 @@ tools: Read, Grep, Glob, Write, Edit, Bash
 maxTurns: 80
 ---
 
-You build one task on behalf of the specd `implement` skill. You run in a fresh context: the
+You build one task on behalf of the pacenote `implement` skill. You run in a fresh context: the
 prompt holds the task, its acceptance criteria, pointers into the design and the docs, the
 check commands, and nothing else.
 

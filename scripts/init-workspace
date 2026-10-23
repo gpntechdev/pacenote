@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""Create the specd workspace in a repo. Idempotent; prints a JSON report.
+"""Create the pacenote workspace in a repo. Idempotent; prints a JSON report.
 
 Usage: init-workspace --root DIR [--mode embedded|wrapper] [--code NAME] [--docs REL] [--private]
        init-workspace --root DIR --add-mcp NAME
 
-Embedded (default): creates .specd/ with its folders, .specd/specd.yml (copied from the
-plugin's reference), .specd/docs/lessons.md, merges the no-attribution setting into
+Embedded (default): creates .pacenote/ with its folders, .pacenote/pacenote.yml (copied from the
+plugin's reference), .pacenote/docs/lessons.md, merges the no-attribution setting into
 .claude/settings.json, adds Context7 to .mcp.json and inserts the pointer block into
-CLAUDE.md between the specd markers. --private keeps everything out of the team's view:
+CLAUDE.md between the pacenote markers. --private keeps everything out of the team's view:
 files go to CLAUDE.local.md and .claude/settings.local.json, .mcp.json is skipped and
-.specd/ is git-excluded.
-Wrapper: the same files at the root of DIR (specd.yml, docs/, spec/, sources/), --code NAME
+.pacenote/ is git-excluded.
+Wrapper: the same files at the root of DIR (pacenote.yml, docs/, spec/, sources/), --code NAME
 names the code repo folder inside DIR, which is gitignored together with .worktrees/;
 --docs REL (default docs) puts the docs folder elsewhere, e.g. NAME/docs to ship them with
 the code. --private is refused: the wrapper is the user's own repo.
 --add-mcp NAME (atlassian, playwright, chrome-devtools, dbhub) only merges that MCP server
 into DIR/.mcp.json, the file init wrote (embedded: the repo root; wrapper: the wrapper root);
-in a private workspace (.specd/ git-excluded) it is skipped with a `claude mcp add` hint.
+in a private workspace (.pacenote/ git-excluded) it is skipped with a `claude mcp add` hint.
 dbhub reads its connection string from the DATABASE_URL environment variable, never from
 the file.
 Each artifact is reported as created, merged or skipped. Exit 1 on refusal. Stdlib only.
@@ -27,10 +27,10 @@ import re
 import sys
 
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LAYOUT = {"embedded": ".specd/", "wrapper": ""}  # folder prefix of the workspace files
+LAYOUT = {"embedded": ".pacenote/", "wrapper": ""}  # folder prefix of the workspace files
 SUBFOLDERS = ["", "docs", "docs/architecture", "docs/decisions", "docs/data-models",
               "docs/features", "spec", "sources"]
-BEGIN, END = "<!-- specd:begin -->", "<!-- specd:end -->"
+BEGIN, END = "<!-- pacenote:begin -->", "<!-- pacenote:end -->"
 MCP_SERVERS = {
     "context7": {"type": "http", "url": "https://mcp.context7.com/mcp"},
     "atlassian": {"type": "http", "url": "https://mcp.atlassian.com/v1/mcp"},
@@ -39,7 +39,7 @@ MCP_SERVERS = {
     "dbhub": {"command": "npx", "args": ["-y", "@bytebase/dbhub@latest", "--transport", "stdio"],
               "env": {"DSN": "${DATABASE_URL}"}},
 }
-EXCLUDES = [".specd/", "CLAUDE.local.md", ".claude/settings.local.json"]
+EXCLUDES = [".pacenote/", "CLAUDE.local.md", ".claude/settings.local.json"]
 WORKTREES = ".worktrees/"
 
 report = {"mode": "embedded", "private": False, "created": [], "merged": [], "skipped": [],
@@ -47,7 +47,7 @@ report = {"mode": "embedded", "private": False, "created": [], "merged": [], "sk
 
 
 def fail(msg):
-    print("specd: %s" % msg, file=sys.stderr)
+    print("pacenote: %s" % msg, file=sys.stderr)
     return 1
 
 
@@ -169,7 +169,7 @@ def insert_block(path, block):
         report["merged"].append(path)
         return
     if b >= 0 or e >= 0:
-        report["warnings"].append("%s has an unmatched specd marker; block not inserted" % path)
+        report["warnings"].append("%s has an unmatched pacenote marker; block not inserted" % path)
         return
     sep = "" if text.endswith("\n\n") else ("\n" if text.endswith("\n") else "\n\n")
     write(path, text + sep + block)
@@ -230,7 +230,7 @@ def add_mcp(root, name):
         return fail("--add-mcp takes one of: %s" % ", ".join(n for n in MCP_SERVERS if n != "context7"))
     gd = git_dir(root)
     exclude = os.path.join(gd, "info", "exclude") if gd else ""
-    if exclude and os.path.isfile(exclude) and ".specd/" in read(exclude).splitlines():
+    if exclude and os.path.isfile(exclude) and ".pacenote/" in read(exclude).splitlines():
         report["private"] = True
         skip(os.path.join(root, ".mcp.json"), "private mode")
         report["warnings"].append(mcp_hint(name))
@@ -280,7 +280,7 @@ def main(argv):
     if not os.path.exists(os.path.join(root, ".git")):
         return fail("%s is not a git repository; run git init first" % root)
     try:
-        config = fence("skills/_shared/specd-yml.md", "yaml")
+        config = fence("skills/_shared/pacenote-yml.md", "yaml")
         attribution = json.loads(fence("skills/_shared/no-attribution.md", "json"))["attribution"]
         claude_md = read(os.path.join(PLUGIN_ROOT, "skills/init/templates/CLAUDE.md"))
         lessons = read(os.path.join(PLUGIN_ROOT, "skills/init/templates/lessons.md"))
@@ -288,7 +288,7 @@ def main(argv):
         return fail("plugin files unreadable: %s" % e)
 
     ensure_folders(root, prefix, docs_rel)
-    ensure_file(os.path.join(root, prefix + "specd.yml"), config)
+    ensure_file(os.path.join(root, prefix + "pacenote.yml"), config)
     ensure_file(os.path.join(root, docs_rel, "lessons.md"), lessons)
     settings = ".claude/settings.local.json" if private else ".claude/settings.json"
     merge_settings(os.path.join(root, settings), attribution)
@@ -305,7 +305,7 @@ def main(argv):
         ensure_lines(os.path.join(root, ".gitignore"), [code + "/", WORKTREES], "ignores")
     path = os.path.join(root, target)
     if os.path.exists(path) and read(path).count("\n") > 60:
-        report["warnings"].append("%s exceeds 60 lines; trim what is outside the specd markers" % path)
+        report["warnings"].append("%s exceeds 60 lines; trim what is outside the pacenote markers" % path)
     print(json.dumps(report, indent=2))
     return 0
 

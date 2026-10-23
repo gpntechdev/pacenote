@@ -20,7 +20,7 @@ concrete options when one exists; otherwise ask in prose, one topic at a time.
 Round 1: what it is (two sentences), who uses it, the one outcome that makes it worth building.
 Round 2: constraints (deadline, budget, platforms, compliance), preferences already fixed
 (language, hosting, existing accounts), and the must / should / won't split for the first
-version. Write `project.md` with `## Run, test, lint` left as "filled by /specd:scaffold".
+version. Write `project.md` with `## Run, test, lint` left as "filled by /pacenote:scaffold".
 
 ## Greenfield: architecture section
 
@@ -38,7 +38,7 @@ becomes a file in `decisions/` (use `../../_shared/templates/decision.md`); refe
 ## Greenfield: conventions, data-models, decisions
 
 Conventions: offer the stack's mainstream defaults (formatter, linter, test layout, commit
-convention from `specd.yml`) as prefilled answers; the user edits. Data models: ask D1; if yes,
+convention from `pacenote.yml`) as prefilled answers; the user edits. Data models: ask D1; if yes,
 one round on domains and entities, one file per domain with key fields and defaults, since
 no code exists to point at; once it does, `onboard data-models` refreshes the files to
 pointers. Decisions: usually already written during architecture; the section confirms the

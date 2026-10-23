@@ -4,13 +4,13 @@ description: >
   Invoke whenever the user asks to clean up, lint, check or tidy the project docs, says
   pointers or links in `<docs_root>` are stale or broken, a docs file is too long, the
   features or decisions index is out of date, onboard drafts were left behind, or old source
-  snapshots pile up, or runs `/specd:docs-clean`. A script finds `path:line` pointers that no
+  snapshots pile up, or runs `/pacenote:docs-clean`. A script finds `path:line` pointers that no
   longer resolve or have drifted (and re-anchors them when it can), broken relative links,
-  files over their caps, leftover `specd:draft` markers, `features/`, `decisions/` and
+  files over their caps, leftover `pacenote:draft` markers, `features/`, `decisions/` and
   `research/` READMEs out of sync with their folders, and `sources/` snapshots nothing links; it proposes one fix
   per finding, applies only the rows you approve and commits once, never on a default branch.
-  Not for `lessons.md` (that is `/specd:lessons-prune`) or for writing new docs (that is
-  `/specd:onboard` or `/specd:docs`).
+  Not for `lessons.md` (that is `/pacenote:lessons-prune`) or for writing new docs (that is
+  `/pacenote:onboard` or `/pacenote:docs`).
 ---
 
 # Skill: docs-clean
@@ -25,7 +25,7 @@ no `state check`, nothing written without a yes.
 
 - `resolve-paths` ([`../_shared/paths.md`](../_shared/paths.md)); `detect-repo --from <root>`
   for each repo that will change.
-- `<workspace_root>/specd.yml`: `git.authority`.
+- `<workspace_root>/pacenote.yml`: `git.authority`.
 - `"${CLAUDE_PLUGIN_ROOT}/scripts/docs-clean" scan` output: every finding with its file,
   line, scanned text and, when deterministic, the replacement line.
 - Only the docs files a `caps` finding names (to draft the trim), the README of a
@@ -45,7 +45,7 @@ no `state check`, nothing written without a yes.
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths` (no config: `run /specd:init first`). Read `git.authority`.
+1. **Resolve.** `resolve-paths` (no config: `run /pacenote:init first`). Read `git.authority`.
 2. **Scan.** `"${CLAUDE_PLUGIN_ROOT}/scripts/docs-clean" scan --docs-root <docs_root>
    --code-root <code_root> --workspace-root <workspace_root> --spec-root <spec_root>`. Print
    `docs-clean: <total> findings — pointers p, links l, caps c, drafts d, readmes r,

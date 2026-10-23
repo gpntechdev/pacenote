@@ -4,12 +4,12 @@ description: >
   Invoke whenever the user asks whether a feature's spec, design and tasks agree, wants a
   consistency or coverage check across them, asks which acceptance criterion has no task,
   which task covers nothing, which design decision nothing builds, or whether the files use
-  the same terms, or runs `/specd:analyze [feature]`. A script checks the coverage (AC →
+  the same terms, or runs `/pacenote:analyze [feature]`. A script checks the coverage (AC →
   task → matrix, design's changed files → tasks) and the `analyst` agent, in a fresh context,
   judges what needs reading (decisions no task implements, inconsistent terms, a task that
   contradicts its AC). It prints one report with `path:line` per finding, writes nothing and
   names the step that owns each fix. Not for one artifact's own holes (that is
-  `/specd:critique`) or for code against the spec (that is `/specd:review`).
+  `/pacenote:critique`) or for code against the spec (that is `/pacenote:review`).
 ---
 
 # Skill: analyze
@@ -27,7 +27,7 @@ runs at any step once `tasks.md` exists, before or after G3.
 - `"${CLAUDE_PLUGIN_ROOT}/scripts/analyze" scan` output: the ACs, the tasks with their
   covers and files, the decisions, every coverage finding with `file:line`, and the decision
   candidates.
-- `<workspace_root>/specd.yml`: `models.judgment`.
+- `<workspace_root>/pacenote.yml`: `models.judgment`.
 - [`./references/analyst-prompt.md`](./references/analyst-prompt.md) (dispatch prompt and
   report format).
 - The artifacts themselves are read by the agent, not by the main thread.
@@ -38,12 +38,12 @@ runs at any step once `tasks.md` exists, before or after G3.
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths` (no config: `run /specd:init first`), then `state find`
+1. **Resolve.** `resolve-paths` (no config: `run /pacenote:init first`), then `state find`
    per `paths.md`. No feature, or several: ask which. Tier `trivial`: say there is no spec
    or tasks to compare and end with the handoff (`Next: none`).
 2. **Scan.** `"${CLAUDE_PLUGIN_ROOT}/scripts/analyze" scan --feature-dir
-   <spec_root>/<feature>`. A refusal names the step to run first (`/specd:specify`,
-   `/specd:tasks`): print it and end with the handoff. Print `analyze: <n> coverage
+   <spec_root>/<feature>`. A refusal names the step to run first (`/pacenote:specify`,
+   `/pacenote:tasks`): print it and end with the handoff. Print `analyze: <n> coverage
    findings, <d> decisions no task names, design <present|absent>`.
 3. **Dispatch** `analyst` at `models.judgment` with the prompt in `analyst-prompt.md`:
    absolute paths of `spec.md`, `design.md` (when the scan says present), `tasks.md` and
@@ -56,7 +56,7 @@ runs at any step once `tasks.md` exists, before or after G3.
 5. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Produced: none`.
    `Review`: the rows that block G3 or the next gate (an uncovered AC, a decision nothing
    builds). `State: analyze`. `Next`: the earliest owning step with rows
-   (`/specd:specify <feature>`, `/specd:design <feature>`, `/specd:tasks <feature>`), with
+   (`/pacenote:specify <feature>`, `/pacenote:design <feature>`, `/pacenote:tasks <feature>`), with
    one line saying a re-run clears the later gates; none: the command the user was running.
 
 ## Anti-patterns

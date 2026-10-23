@@ -1,6 +1,6 @@
-<!-- specd:draft -->
-<!-- Written by /specd:onboard architecture to <docs_root>/architecture/overview.md. Read on
-     demand by pointer. Headings are fixed: /specd:scaffold reads Stack, Structure, Tooling and
+<!-- pacenote:draft -->
+<!-- Written by /pacenote:onboard architecture to <docs_root>/architecture/overview.md. Read on
+     demand by pointer. Headings are fixed: /pacenote:scaffold reads Stack, Structure, Tooling and
      Testing strategy verbatim, so in greenfield they hold names and commands, not intentions.
      Brownfield links existing docs under "Existing docs" and never copies them. One file per
      area under architecture/<area>.md, indexed under "Areas". Answers A1..A7. Remove the first

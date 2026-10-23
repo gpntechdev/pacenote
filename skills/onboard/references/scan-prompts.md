@@ -2,14 +2,14 @@
 
 One `explorer` run per section. Fill the placeholders from `resolve-paths` and `detect-repo`
 output, pass the section's checklist questions verbatim, and dispatch at the `cheap` model role
-(read `models.cheap` from `specd.yml` and pass it as the agent's model). Never run the scan in
+(read `models.cheap` from `pacenote.yml` and pass it as the agent's model). Never run the scan in
 the main thread.
 
 ## Common header
 
 ```
 Root: <code_root> (absolute). Read: <read globs>. Skip: .git, node_modules, vendor, dist, build,
-target, .venv, venv, __pycache__, coverage, .next, .specd, .env*, *.pem, *.key, credentials*.
+target, .venv, venv, __pycache__, coverage, .next, .pacenote, .env*, *.pem, *.key, credentials*.
 Existing docs to read first, never to rewrite: <paths from detect-repo: CLAUDE.md, AGENTS.md,
 README.md, docs dirs>.
 Answer in the fixed four-section shape from your instructions, at most 80 lines.

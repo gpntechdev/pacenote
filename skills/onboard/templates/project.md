@@ -1,7 +1,7 @@
-<!-- specd:draft -->
-<!-- Written by /specd:onboard project; always loaded, so at most 100 lines. Answers checklist
-     P1..P8. Facts only, no history. Commands here are the ones specd.yml carries; greenfield
-     leaves "Run, test, lint" as "filled by /specd:scaffold". Remove the first line on sign-off. -->
+<!-- pacenote:draft -->
+<!-- Written by /pacenote:onboard project; always loaded, so at most 100 lines. Answers checklist
+     P1..P8. Facts only, no history. Commands here are the ones pacenote.yml carries; greenfield
+     leaves "Run, test, lint" as "filled by /pacenote:scaffold". Remove the first line on sign-off. -->
 # {{project}}
 
 ## What it is

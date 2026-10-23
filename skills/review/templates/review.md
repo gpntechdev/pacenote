@@ -1,5 +1,5 @@
-<!-- Written by /specd:review to <spec_root>/<feature>/review.md, one "## Round n" per run;
-     /specd:feedback appends "## PR round n" sections (PR comments as C<k>, resolution fix /
+<!-- Written by /pacenote:review to <spec_root>/<feature>/review.md, one "## Round n" per run;
+     /pacenote:feedback appends "## PR round n" sections (PR comments as C<k>, resolution fix /
      reply / skip). Read by deliver and docs. Findings keep their ids across rounds (F1..
      continue; specialist findings use their lens prefix SEC, PERF, A11Y, TEST and the lens as
      Ref). Each resolution is fix (-> task id), accept (reason) or dispute (reason). -->

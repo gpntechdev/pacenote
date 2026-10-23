@@ -1,5 +1,5 @@
-<!-- specd:draft -->
-<!-- Written by /specd:specify to <spec_root>/<feature>/spec.md; read by design, tasks, review,
+<!-- pacenote:draft -->
+<!-- Written by /pacenote:specify to <spec_root>/<feature>/spec.md; read by design, tasks, review,
      verify and close. Acceptance criteria are numbered AC1.., one behaviour each, verifiable
      by a test, a command or a manual check named in verify. At most 120 lines. Remove the
      first line on G1. -->

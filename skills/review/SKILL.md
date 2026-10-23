@@ -2,8 +2,8 @@
 name: review
 description: >
   Invoke whenever the user asks to review the implemented feature, check the diff against
-  the spec, or runs `/specd:review [feature]`; also as the next step after
-  `/specd:implement` finishes. It writes the feature's diff to disk, dispatches the reviewer
+  the spec, or runs `/pacenote:review [feature]`; also as the next step after
+  `/pacenote:implement` finishes. It writes the feature's diff to disk, dispatches the reviewer
   agent in a fresh context with only the spec, design, tasks, conventions and the diff,
   proposes specialist passes (security, performance, accessibility, tests) from the diff and
   runs the ones you pick, each in its own fresh context, records the findings in
@@ -33,7 +33,7 @@ stop by hand.
   `review.md` (earlier rounds).
 - `<docs_root>/conventions.md`, [`../_shared/principles.md`](../_shared/principles.md) (path
   for the agent).
-- `<workspace_root>/specd.yml`: `models.judgment`, `git.authority`, `layers.*`,
+- `<workspace_root>/pacenote.yml`: `models.judgment`, `git.authority`, `layers.*`,
   `flow.specialists`.
 - [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/gates.md`](../_shared/gates.md),
   [`../_shared/state-yml.md`](../_shared/state-yml.md).
@@ -55,7 +55,7 @@ stop by hand.
    per `gates.md`. Round = `review.round + 1`; refuse a fourth. Set `step=review`.
 2. **Diff.** `git -C <code_root> diff <default branch>...HEAD` into
    `<spec_root>/<feature>/review.diff`, excluding `<spec_root>` and `<docs_root>` paths;
-   show `--stat` to the user. An empty diff: say so and stop (`Next: /specd:implement`).
+   show `--stat` to the user. An empty diff: say so and stop (`Next: /pacenote:implement`).
 3. **Dispatch** `reviewer` at `models.judgment` with `reviewer-prompt.md` filled: absolute
    paths, the layer files for every `layer` the feature's tasks name (`layers.*`, resolved
    against `code_root`, missing ones dropped), the round, the changed-file list, earlier
@@ -74,11 +74,11 @@ stop by hand.
    the finding, inline unless its body would pass the heavy-task threshold in
    `breakdown.md`; `state set tasks.T<k>=todo`), **accept** (one-line reason recorded), or
    **dispute** (recorded as accepted with the user's reason). A `missing` AC cannot be
-   accepted; it is a fix or the spec changes (`/specd:specify`, which re-runs the flow).
+   accepted; it is a fix or the spec changes (`/pacenote:specify`, which re-runs the flow).
 7. **Route.** `state set review.round=<n> review.open=<fix count>`. Fixes: `step=implement`,
-   `Next: /specd:implement <feature>` then this command again. None: `state set step=next`
+   `Next: /pacenote:implement <feature>` then this command again. None: `state set step=next`
    (`verify` on full, `deliver` on quick, where this round's AC table is the evidence),
-   `Next: /specd:<step> <feature>` with the step it reported. Commit `review.md`,
+   `Next: /pacenote:<step> <feature>` with the step it reported. Commit `review.md`,
    `tasks.md`, `state.yml` with `git -C <workspace_root>`.
 8. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: accepted findings
    the user may want to revisit, the verdict.

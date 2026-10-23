@@ -3,13 +3,13 @@ name: refresh
 description: >
   Invoke whenever the user says a ticket, wiki page or other source behind a feature or a
   docs section has changed, asks to re-fetch, refresh or re-check sources, or runs
-  `/specd:refresh [<feature> | <snapshot path>]`. It re-fetches every snapshot of the
+  `/pacenote:refresh [<feature> | <snapshot path>]`. It re-fetches every snapshot of the
   feature by its `origin` (web pages directly, tickets through the intake agent and the MCP
   server), overwrites the changed ones, has the intake agent summarise the diff, and says
-  which gate to re-open (re-run `/specd:specify` when the spec was approved against the old
+  which gate to re-open (re-run `/pacenote:specify` when the spec was approved against the old
   text). It offers a patch to `brief.md` and applies it only on your yes; it never edits
   `spec.md` and never re-runs triage. Not for taking in a new source; that is
-  `/specd:start --from`.
+  `/pacenote:start --from`.
 ---
 
 # Skill: refresh
@@ -26,7 +26,7 @@ behalf: what the spec does about the change is for the re-opened gate.
 - The argument: a feature, a snapshot path, or nothing (the feature `state find` resolves).
 - `<workspace_root>/sources/<feature>-*.md`, header line only; `<spec_root>/<feature>/
   state.yml`; `brief.md` when a patch is offered.
-- `<workspace_root>/specd.yml`: `models.cheap`, `git.authority`, `sources.mcp`.
+- `<workspace_root>/pacenote.yml`: `models.cheap`, `git.authority`, `sources.mcp`.
 - [`../_shared/sources.md`](../_shared/sources.md) (adapters, dispatching intake),
   [`../start/references/triage.md`](../start/references/triage.md) (escalation signals).
 
@@ -61,12 +61,12 @@ behalf: what the spec does about the change is for the re-opened gate.
 4. **Report.** Per snapshot: `changed +a -r`, `unchanged`, or `skipped: <reason>`. Then the
    agent's `Asked` (what changed) and `Flagged`, at most 15 lines. Then the gate:
    - `reopen: G1`: "the spec was approved against the old source: re-open G1 with
-     `/specd:specify <feature>`" (re-running it clears the later gates);
-   - `reopen: G4`: the same with `/specd:implement <feature>`;
+     `/pacenote:specify <feature>`" (re-running it clears the later gates);
+   - `reopen: G4`: the same with `/pacenote:implement <feature>`;
    - empty: the script's `reason`;
-   - onboard snapshot: "re-run `/specd:onboard <section>`".
+   - onboard snapshot: "re-run `/pacenote:onboard <section>`".
 
-   If the change trips an escalation signal in `triage.md`, name `/specd:start <feature>
+   If the change trips an escalation signal in `triage.md`, name `/pacenote:start <feature>
    --tier <next tier>`. Triage is not re-run.
 5. **Offer the brief patch** (feature only): show the exact lines to change in `brief.md`:
    - the source's paragraph in What was asked, from the agent's answer;

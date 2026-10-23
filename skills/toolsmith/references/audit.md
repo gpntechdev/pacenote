@@ -66,7 +66,7 @@ Answer in your fixed shape, at most 40 lines.
 | `warn` | empty | `pass` | ask; list every `warn` finding and the verdict line |
 
 - Refused is final for this run. The report says why in one line per reason. A user who
-  still wants the skill installs it by hand, outside specd; toolsmith does not record it.
+  still wants the skill installs it by hand, outside pacenote; toolsmith does not record it.
 - A stage-2 answer that is malformed or `unreadable` counts as `refuse`.
 - Show stage-1 findings as the script printed them (category, file:line, escaped match);
   never re-read the line to "see it properly".

@@ -11,8 +11,8 @@ Usage: skill-lock install --workspace W --code-root C --from QDIR --name NAME --
        skill-lock discard --workspace W --name NAME
 
 The skill home is derived, never asked: <repo>/.claude/skills/<name>/ for an embedded
-workspace (W is <repo>/.specd), <W>/.claude/skills/<name>/ for a wrapper, and
-<W>/skills/<name>/ when the workspace is private (.specd/ in .git/info/exclude).
+workspace (W is <repo>/.pacenote), <W>/.claude/skills/<name>/ for a wrapper, and
+<W>/skills/<name>/ when the workspace is private (.pacenote/ in .git/info/exclude).
 install: copies a quarantine folder (W/.quarantine/...) to the skill home and writes its
          lock section, source `repo` with --repo/--path/--commit, else `local`. Refuses a
          block verdict, a source outside the quarantine, and a home that exists but is not
@@ -26,7 +26,7 @@ where:   prints the skill home, its path relative to C, and an empty draft folde
          .gitignore). Drafts never sit where Claude Code loads skills.
 discard: removes the draft folder of NAME.
 Every write command prints {name, dir, layer_path, sha256, lock}: `layer_path` is the
-SKILL.md path relative to the code root, the value for specd.yml `layers.<layer>`.
+SKILL.md path relative to the code root, the value for pacenote.yml `layers.<layer>`.
 skills.lock is flat YAML: one section per skill, scalar keys. Stdlib only.
 """
 import datetime
@@ -83,11 +83,11 @@ def private(repo):
     if not exclude or not os.path.isfile(exclude):
         return False
     with open(exclude, encoding="utf-8") as f:
-        return ".specd/" in f.read().splitlines()
+        return ".pacenote/" in f.read().splitlines()
 
 
 def home(workspace, name):
-    if os.path.basename(workspace) == ".specd":
+    if os.path.basename(workspace) == ".pacenote":
         repo = os.path.dirname(workspace)
         if private(repo):
             return os.path.join(workspace, "skills", name)
@@ -144,8 +144,8 @@ def write_lock(workspace, entries):
 
 def common(argv):
     workspace = os.path.abspath(need(argv, "--workspace"))
-    if not os.path.isfile(os.path.join(workspace, "specd.yml")):
-        raise Refused("no specd.yml in %s" % workspace)
+    if not os.path.isfile(os.path.join(workspace, "pacenote.yml")):
+        raise Refused("no pacenote.yml in %s" % workspace)
     return workspace
 
 
@@ -284,7 +284,7 @@ def main(argv):
     try:
         result = COMMANDS[argv[0]](argv[1:])
     except Refused as e:
-        print("specd: %s" % e, file=sys.stderr)
+        print("pacenote: %s" % e, file=sys.stderr)
         return 1
     print(json.dumps(result, indent=2))
     return 0

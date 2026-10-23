@@ -2,11 +2,11 @@
 
 ## Arguments
 
-`/specd:implement [feature] [tasks]`. Every token after the command that matches `T<n>` or
+`/pacenote:implement [feature] [tasks]`. Every token after the command that matches `T<n>` or
 `T<n>-T<m>`, separated by commas and/or spaces, belongs to the selection: `T1-T3`,
 `T1, T4, T5`, `T1-T3,T5`. A range expands by id number, both ends included. The one remaining
 token, if any, is the feature; with none, `state find` resolves it as usual, so
-`/specd:implement T1-T3` works on the current branch. No selection: every `todo` task.
+`/pacenote:implement T1-T3` works on the current branch. No selection: every `todo` task.
 
 Validating a selection, before anything is dispatched:
 
@@ -76,7 +76,7 @@ every dispatch of a light feature, not only the first.
 | last selected task | at the end of a selected run, whatever the setting | per the rows above |
 
 The Verify task never stops on its own; it is covered by step 6 of the protocol. The setting
-is read once at the start of the run; a change via `/specd:config` applies at the next run.
+is read once at the start of the run; a change via `/pacenote:config` applies at the next run.
 
 At a stop whose task is still uncommitted ("after approve" rows): **approve** flips it to
 `done` and commits it; **edit** re-dispatches it with the user's request (revision block in

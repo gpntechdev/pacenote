@@ -11,7 +11,7 @@ tools: Read, Grep, Glob
 maxTurns: 30
 ---
 
-You judge the agreement between one feature's artifacts on behalf of specd's `analyze`. You
+You judge the agreement between one feature's artifacts on behalf of pacenote's `analyze`. You
 run in a fresh context: the prompt names the files and the script's results, and that is
 everything you know.
 

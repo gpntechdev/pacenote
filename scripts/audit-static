@@ -218,7 +218,7 @@ def main(argv):
     i = argv.index("--dir")
     root = argv[i + 1] if i + 1 < len(argv) else ""
     if not os.path.isdir(root):
-        print("specd: no such directory: %s" % root, file=sys.stderr)
+        print("pacenote: no such directory: %s" % root, file=sys.stderr)
         return 1
     nfiles = scan(os.path.abspath(root))
     verdict = "block" if worst["block"] else ("warn" if counts else "clean")

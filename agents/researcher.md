@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: >
-  Use when a specd skill needs an external fact: the current recommended way to set up X, a
+  Use when a pacenote skill needs an external fact: the current recommended way to set up X, a
   library's supported versions, an official install or configuration command. Returns cited
   findings with dates; it never installs, edits or decides. Used by onboard for greenfield
   architecture questions and by toolsmith, which asks it to rank skill candidates from the

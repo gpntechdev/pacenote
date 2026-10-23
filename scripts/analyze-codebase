@@ -6,7 +6,7 @@ Usage: analyze-codebase scan --code-root D [--path P] [--since 12.months] [--top
 
 Reads the files git tracks under --code-root (narrowed to --path, relative to the root),
 skipping vendored and build folders (node_modules, vendor, dist, build, target, .venv,
-__pycache__, .git) and every --skip folder (the specd workspace in embedded mode). Writes
+__pycache__, .git) and every --skip folder (the pacenote workspace in embedded mode). Writes
 nothing; runs only read-only git commands.
 
 - hotspots: commits touching each source file since --since (`git log --since`) times its
@@ -59,7 +59,7 @@ RS_USE = re.compile(r"^\s*(?:pub\s+)?use\s+crate::([\w:]+)")
 
 
 def refuse(msg):
-    print("specd: %s" % msg, file=sys.stderr)
+    print("pacenote: %s" % msg, file=sys.stderr)
     return 1
 
 

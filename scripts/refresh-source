@@ -3,7 +3,7 @@
 
 Usage: refresh-source --file SNAPSHOT --diff OUT [--new FILE] [--state STATE_YML]
 
-Reads the snapshot's `<!-- specd:source ... -->` header. via="http": re-fetches `origin`
+Reads the snapshot's `<!-- pacenote:source ... -->` header. via="http": re-fetches `origin`
 with fetch-source's fetcher. Any other via (mcp:<server>, file): the caller supplies the
 new content with --new (a snapshot the intake agent wrote, or the local file); a header in
 it is dropped. via="paste": nothing to re-fetch. The new body is redacted and compared with
@@ -87,21 +87,21 @@ def main(argv):
         path, diff_out = opt(argv, "--file"), opt(argv, "--diff")
         new_path, state_path = opt(argv, "--new"), opt(argv, "--state")
     except ValueError as e:
-        print("specd: %s" % e, file=sys.stderr)
+        print("pacenote: %s" % e, file=sys.stderr)
         return 1
     if not path or not diff_out:
-        print("specd: --file SNAPSHOT and --diff OUT are required", file=sys.stderr)
+        print("pacenote: --file SNAPSHOT and --diff OUT are required", file=sys.stderr)
         return 1
     redact = load("redact")
     try:
         with open(path, encoding="utf-8") as f:
             old_text = f.read()
     except OSError as e:
-        print("specd: %s" % e, file=sys.stderr)
+        print("pacenote: %s" % e, file=sys.stderr)
         return 1
     attrs, old_body = split(redact, old_text)
     if attrs is None:
-        print("specd: %s has no specd:source header" % path, file=sys.stderr)
+        print("pacenote: %s has no pacenote:source header" % path, file=sys.stderr)
         return 1
     via, origin = attrs.get("via", "paste"), attrs.get("origin", "")
     report = {"status": "", "file": os.path.abspath(path), "origin": origin, "via": via,
