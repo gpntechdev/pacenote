@@ -76,9 +76,10 @@ docs/
   decisions/          0001-title.md … (context, decision, consequences) + README index
   data-models/        one file per domain, only if the project has them
   features/           README index + one file per shipped feature: what it does, its flows, where it lives; written by `docs`
+  research/           README index + dated notes from `/specd:research`, when the user chooses a note
 ```
 
-`lessons.md` stays a single capped file on purpose: it is a holding area, and growth is the signal to promote items into `conventions.md` or a decision, or prune them. In brownfield, existing project docs are linked from `architecture/overview.md`, not duplicated. `docs-clean` keeps the folder honest on demand: drifted `path:line` pointers (re-anchored when the name is found), broken links, files over their caps, leftover draft markers, index rows out of step with `features/` and `decisions/`, and snapshots nothing links (DECISIONS 2026-10-22 M7).
+`lessons.md` stays a single capped file on purpose: it is a holding area, and growth is the signal to promote items into `conventions.md` or a decision, or prune them. In brownfield, existing project docs are linked from `architecture/overview.md`, not duplicated. `docs-clean` keeps the folder honest on demand: drifted `path:line` pointers (re-anchored when the name is found), broken links, files over their caps, leftover draft markers, index rows out of step with `features/`, `decisions/` and `research/`, and snapshots nothing links (DECISIONS 2026-10-22 M7). `research` answers an external question through the `researcher` agent and writes the cited findings where the user chooses per run: a section of the feature's `research.md`, a note in `research/`, or nowhere; `specify` and `design` may offer it for an open question that is an external fact (DECISIONS 2026-10-23 M7).
 
 **`spec/<feature>/` — the working set, ephemeral.**
 
@@ -87,6 +88,7 @@ brief.md      what was asked: input condensed, with provenance (from intake)
 spec.md       what we agreed to build: problem, scope, acceptance criteria, open questions
 design.md     optional; only the sections the feature needs (see 3.3)
 tasks.md      ordered tasks with done-when criteria and test plan
+research.md   optional; dated, cited findings from `research`, read by specify and design
 review.md     reviewer findings
 state.yml     tier, current step, gate approvals, task checklist
 ```
