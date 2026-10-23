@@ -1,0 +1,386 @@
+#!/usr/bin/env python3
+"""Rank change hotspots, map module coupling and list untested files, printed as JSON.
+
+Usage: analyze-codebase scan --code-root D [--path P] [--since 12.months] [--top 10]
+                             [--depth 2] [--skip DIR ...]
+
+Reads the files git tracks under --code-root (narrowed to --path, relative to the root),
+skipping vendored and build folders (node_modules, vendor, dist, build, target, .venv,
+__pycache__, .git) and every --skip folder (the specd workspace in embedded mode). Writes
+nothing; runs only read-only git commands.
+
+- hotspots: commits touching each source file since --since (`git log --since`) times its
+  line count; the top --top with commits > 0 (empty files left out).
+- modules: a file's module is its folder cut to --depth components (root files: `.`). Per
+  module: files, lines, fan_in and fan_out (distinct modules), depends_on.
+- cycles: groups of modules that depend on each other (strongly connected components),
+  each with the import lines that close it (`file`, `line`, `text`), at most 6 per cycle.
+- test_gaps: source files no test file names by stem (`test_x`, `x_test`, `x.test`,
+  `x.spec`, `XTest`, `XTests`, `XSpec`, or `x` inside a test folder), ranked by hotspot
+  score then size, the top --top. `__init__`, `index`, `main`, `mod` and files under 5
+  lines are not counted as gaps.
+- unsupported: source-looking extensions whose imports are not parsed, with file counts.
+
+Imports are parsed by regex for Python, JavaScript/TypeScript (relative specifiers),
+Go (paths under the go.mod module), Java/Kotlin, PHP (`use`), Ruby (`require_relative`,
+`require`) and Rust (`mod`, `use crate::`). An import resolves when exactly one tracked
+file matches; external and ambiguous imports are ignored, so the map is a lower bound.
+Not a git repository: exit 1 with one line on stderr. Stdlib only.
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+
+LANG = {".py": "python", ".js": "js", ".jsx": "js", ".mjs": "js", ".cjs": "js",
+        ".ts": "js", ".tsx": "js", ".vue": "js", ".svelte": "js", ".go": "go",
+        ".java": "jvm", ".kt": "jvm", ".kts": "jvm", ".php": "php", ".rb": "ruby",
+        ".rs": "rust"}
+OTHER_SOURCE = {".c", ".h", ".cc", ".cpp", ".hpp", ".cs", ".swift", ".m", ".scala",
+                ".dart", ".ex", ".exs", ".erl", ".clj", ".lua", ".pl", ".r", ".jl",
+                ".fs", ".hs", ".ml", ".zig", ".groovy"}
+SKIP_DIRS = {"node_modules", "vendor", "dist", "build", "target", ".venv", "venv",
+             "__pycache__", ".git", ".next", ".nuxt", "coverage", ".dart_tool", "Pods"}
+JS_EXT = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".svelte")
+NOT_GAPS = {"__init__", "index", "main", "mod", "lib", "setup", "conftest"}
+TEST_DIRS = {"test", "tests", "__tests__", "spec", "specs", "testing"}
+
+PY_IMPORT = re.compile(r"^\s*import\s+([\w.]+(?:\s*,\s*[\w.]+)*)")
+PY_FROM = re.compile(r"^\s*from\s+(\.*)([\w.]*)\s+import\s+([\w*,\s()]+)")
+JS_SPEC = re.compile(r"""(?:\bfrom\s+|\bimport\s*\(?\s*|\brequire\s*\(\s*)['"](\.{1,2}/[^'"]+)['"]""")
+GO_SPEC = re.compile(r'^\s*(?:import\s+)?(?:[\w.]+\s+)?"([^"]+)"')
+JVM_IMPORT = re.compile(r"^\s*import\s+(?:static\s+)?([\w.]+)(\.\*)?\s*;?\s*$")
+PHP_USE = re.compile(r"^\s*use\s+([\w\\]+)")
+RB_REL = re.compile(r"""^\s*require_relative\s+['"]([^'"]+)['"]""")
+RB_REQ = re.compile(r"""^\s*require\s+['"]([^'"]+)['"]""")
+RS_MOD = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+(\w+)\s*;")
+RS_USE = re.compile(r"^\s*(?:pub\s+)?use\s+crate::([\w:]+)")
+
+
+def refuse(msg):
+    print("specd: %s" % msg, file=sys.stderr)
+    return 1
+
+
+def opt(argv, flag, default=None):
+    if flag in argv:
+        i = argv.index(flag)
+        if i + 1 >= len(argv):
+            sys.exit(refuse("%s needs a value" % flag) and 2)
+        return argv[i + 1]
+    return default
+
+
+def git(root, *args):
+    r = subprocess.run(["git", "-C", root] + list(args), capture_output=True, text=True)
+    return r.returncode, r.stdout
+
+
+def read_lines(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return f.read().splitlines()
+    except OSError:
+        return []
+
+
+def is_test(rel):
+    parts = rel.split("/")
+    if any(p in TEST_DIRS for p in parts[:-1]):
+        return True
+    stem = os.path.splitext(parts[-1])[0]
+    return bool(re.match(r"^test_|.*_test$|.*\.(test|spec)$|.*(Test|Tests|Spec)$", stem))
+
+
+def test_stem(rel):
+    stem = os.path.splitext(rel.rsplit("/", 1)[-1])[0]
+    stem = re.sub(r"^test_|_test$|\.(test|spec)$|(Tests|Test|Spec)$", "", stem)
+    return stem.lower()
+
+
+def module_of(rel, depth):
+    folder = os.path.dirname(rel)
+    return "/".join(folder.split("/")[:depth]) if folder else "."
+
+
+class Index:
+    """Tracked source files keyed for suffix lookup."""
+
+    def __init__(self, files):
+        self.files = set(files)
+        self.by_last = {}
+        for f in files:
+            key = os.path.splitext(f)[0].lower()
+            self.by_last.setdefault(key.rsplit("/", 1)[-1], []).append((key, f))
+
+    def suffix(self, parts, lang):
+        if not parts:
+            return None
+        want = "/".join(parts).lower()
+        hits = [f for key, f in self.by_last.get(parts[-1].lower(), [])
+                if (key == want or key.endswith("/" + want))
+                and LANG.get(os.path.splitext(f)[1]) == lang]
+        return hits[0] if len(hits) == 1 else None
+
+    def relative(self, base_dir, spec, exts):
+        path = os.path.normpath(os.path.join(base_dir, spec)).replace(os.sep, "/")
+        if path in self.files:
+            return path
+        for cand in [path + e for e in exts] + [path + "/index" + e for e in exts]:
+            if cand in self.files:
+                return cand
+        return None
+
+
+def go_module(root):
+    for line in read_lines(os.path.join(root, "go.mod")):
+        m = re.match(r"^module\s+(\S+)", line)
+        if m:
+            return m.group(1)
+    return None
+
+
+def imports_of(rel, lines, index, gomod, go_dirs):
+    """(line number, text, target file) for each import that resolves."""
+    lang = LANG.get(os.path.splitext(rel)[1])
+    base = os.path.dirname(rel)
+    out = []
+
+    def add(i, line, target):
+        if target and target != rel:
+            out.append((i, line.strip(), target))
+
+    for i, line in enumerate(lines, 1):
+        if lang == "python":
+            m = PY_FROM.match(line)
+            if m:
+                dots, mod, names = m.groups()
+                if dots:
+                    pkg = base.split("/") if base else []
+                    pkg = pkg[:len(pkg) - (len(dots) - 1)] if len(dots) > 1 else pkg
+                    head = pkg + (mod.split(".") if mod else [])
+                    if mod:
+                        add(i, line, index.relative("", "/".join(head), (".py", "/__init__.py")))
+                    else:
+                        for n in re.findall(r"\w+", names):
+                            add(i, line, index.relative("", "/".join(head + [n]), (".py",)))
+                else:
+                    parts = mod.split(".")
+                    first = re.findall(r"\w+", names)[:1]
+                    add(i, line, index.suffix(parts + first, "python")
+                        or index.suffix(parts, "python")
+                        or index.suffix(parts + ["__init__"], "python"))
+                continue
+            m = PY_IMPORT.match(line)
+            if m:
+                for mod in re.split(r"\s*,\s*", m.group(1)):
+                    parts = mod.split(".")
+                    add(i, line, index.suffix(parts, "python")
+                        or index.suffix(parts + ["__init__"], "python"))
+        elif lang == "js":
+            for spec in JS_SPEC.findall(line):
+                add(i, line, index.relative(base, spec, JS_EXT))
+        elif lang == "go":
+            m = GO_SPEC.match(line)
+            if m and gomod and (m.group(1) == gomod or m.group(1).startswith(gomod + "/")):
+                d = m.group(1)[len(gomod):].strip("/")
+                add(i, line, go_dirs.get(d))
+        elif lang == "jvm":
+            m = JVM_IMPORT.match(line)
+            if m:
+                add(i, line, index.suffix(m.group(1).split("."), "jvm"))
+        elif lang == "php":
+            m = PHP_USE.match(line)
+            if m:
+                parts = m.group(1).split("\\")
+                add(i, line, index.suffix(parts, "php") or index.suffix(parts[1:], "php"))
+        elif lang == "ruby":
+            m = RB_REL.match(line)
+            if m:
+                add(i, line, index.relative(base, m.group(1), (".rb",)))
+                continue
+            m = RB_REQ.match(line)
+            if m:
+                add(i, line, index.suffix(m.group(1).split("/"), "ruby"))
+        elif lang == "rust":
+            m = RS_MOD.match(line)
+            if m:
+                here = base if os.path.basename(rel) in ("mod.rs", "lib.rs", "main.rs") \
+                    else os.path.splitext(rel)[0]
+                add(i, line, index.relative(here, m.group(1), (".rs", "/mod.rs")))
+                continue
+            m = RS_USE.match(line)
+            if m:
+                parts = [p for p in m.group(1).split("::") if p]
+                for n in range(len(parts), 0, -1):
+                    t = index.suffix(parts[:n], "rust") or index.suffix(parts[:n] + ["mod"], "rust")
+                    if t:
+                        add(i, line, t)
+                        break
+    return out
+
+
+def sccs(graph):
+    """Tarjan's strongly connected components with more than one node."""
+    order, low, stack, on, out, counter = {}, {}, [], set(), [], [0]
+
+    def visit(v):
+        order[v] = low[v] = counter[0]
+        counter[0] += 1
+        stack.append(v)
+        on.add(v)
+        for w in sorted(graph.get(v, ())):
+            if w not in order:
+                visit(w)
+                low[v] = min(low[v], low[w])
+            elif w in on:
+                low[v] = min(low[v], order[w])
+        if low[v] == order[v]:
+            comp = []
+            while True:
+                w = stack.pop()
+                on.discard(w)
+                comp.append(w)
+                if w == v:
+                    break
+            if len(comp) > 1:
+                out.append(sorted(comp))
+
+    sys.setrecursionlimit(max(10000, sys.getrecursionlimit()))
+    for v in sorted(graph):
+        if v not in order:
+            visit(v)
+    return out
+
+
+def scan(root, path, since, top, depth, skips):
+    code, out = git(root, "rev-parse", "--is-inside-work-tree")
+    if code != 0 or out.strip() != "true":
+        return None
+    _, listed = git(root, "ls-files", "-z", "--", path or ".")
+    skip_rel = {s.strip("/") for s in skips}
+    files = []
+    for rel in listed.split("\0"):
+        if not rel or not os.path.isfile(os.path.join(root, rel)):
+            continue
+        parts = rel.split("/")
+        if any(p in SKIP_DIRS for p in parts[:-1]):
+            continue
+        if any(rel == s or rel.startswith(s + "/") for s in skip_rel if s):
+            continue
+        files.append(rel)
+
+    source = [f for f in files if os.path.splitext(f)[1] in LANG]
+    unsupported = {}
+    for f in files:
+        ext = os.path.splitext(f)[1].lower()
+        if ext in OTHER_SOURCE:
+            unsupported[ext] = unsupported.get(ext, 0) + 1
+
+    _, log = git(root, "log", "--since=%s" % since, "--format=", "--name-only", "--",
+                 path or ".")
+    commits = {}
+    for rel in log.splitlines():
+        if rel:
+            commits[rel] = commits.get(rel, 0) + 1
+
+    lines = {f: read_lines(os.path.join(root, f)) for f in source}
+    size = {f: len(v) for f, v in lines.items()}
+    score = {f: commits.get(f, 0) * size[f] for f in source}
+    hotspots = [{"file": f, "commits": commits[f], "lines": size[f], "score": score[f]}
+                for f in sorted(source, key=lambda x: (-score[x], x))
+                if commits.get(f, 0) > 0 and size[f] > 0][:top]
+
+    index = Index(source)
+    gomod = go_module(root)
+    go_dirs = {}
+    for f in sorted(source):
+        if f.endswith(".go") and not f.endswith("_test.go"):
+            go_dirs.setdefault(os.path.dirname(f), f)
+
+    tests = [f for f in source if is_test(f)]
+    edges = {}
+    for f in source:
+        if f in tests:
+            continue
+        for n, text, target in imports_of(f, lines[f], index, gomod, go_dirs):
+            if target in tests:
+                continue
+            a, b = module_of(f, depth), module_of(target, depth)
+            if a != b:
+                edges.setdefault((a, b), []).append({"file": f, "line": n, "text": text[:120]})
+
+    mods = {}
+    for f in source:
+        if f in tests:
+            continue
+        m = mods.setdefault(module_of(f, depth), {"files": 0, "lines": 0})
+        m["files"] += 1
+        m["lines"] += size[f]
+    graph = {}
+    for a, b in edges:
+        graph.setdefault(a, set()).add(b)
+        graph.setdefault(b, set())
+    modules = []
+    for name in sorted(mods):
+        deps = sorted(graph.get(name, ()))
+        fan_in = sorted(a for a, targets in graph.items() if name in targets)
+        modules.append(dict(module=name, files=mods[name]["files"], lines=mods[name]["lines"],
+                            fan_in=len(fan_in), fan_out=len(deps), depends_on=deps))
+    modules.sort(key=lambda m: (-(m["fan_in"] + m["fan_out"]), m["module"]))
+
+    cycles = []
+    for comp in sccs(graph):
+        closing = []
+        for (a, b), where in sorted(edges.items()):
+            if a in comp and b in comp:
+                closing.append(dict(where[0], **{"from": a, "to": b}))
+        cycles.append({"modules": comp, "edges": closing[:6]})
+
+    tested = {test_stem(t) for t in tests}
+    gaps = [f for f in source if f not in tests
+            and os.path.splitext(os.path.basename(f))[0] not in NOT_GAPS
+            and size[f] >= 5
+            and os.path.splitext(os.path.basename(f))[0].lower() not in tested]
+    gaps.sort(key=lambda f: (-score[f], -size[f], f))
+    test_gaps = [{"file": f, "lines": size[f], "commits": commits.get(f, 0)} for f in gaps[:top]]
+
+    return {"code_root": root, "path": path or ".", "since": since,
+            "counts": {"files": len(files), "source": len(source) - len(tests),
+                       "tests": len(tests), "modules": len(mods), "edges": len(edges),
+                       "cycles": len(cycles), "untested": len(gaps)},
+            "hotspots": hotspots, "modules": modules, "cycles": cycles,
+            "test_gaps": test_gaps, "unsupported": unsupported}
+
+
+def main(argv):
+    if len(argv) < 2 or "--help" in argv or "-h" in argv:
+        print(__doc__.strip())
+        return 0 if len(argv) >= 2 else 2
+    if argv[1] != "scan":
+        return refuse("unknown command %r; use scan" % argv[1])
+    root = opt(argv, "--code-root")
+    if not root:
+        return refuse("--code-root is required")
+    root = os.path.abspath(root)
+    path = opt(argv, "--path")
+    if path:
+        path = os.path.relpath(os.path.abspath(path), root) if os.path.isabs(path) else path
+        if path.startswith("..") or not os.path.exists(os.path.join(root, path)):
+            return refuse("%s is not inside %s" % (path, root))
+    skips = [argv[i + 1] for i, a in enumerate(argv[:-1]) if a == "--skip"]
+    skips = [os.path.relpath(os.path.abspath(s), root) if os.path.isabs(s) else s for s in skips]
+    try:
+        top, depth = int(opt(argv, "--top", "10")), int(opt(argv, "--depth", "2"))
+    except ValueError:
+        return refuse("--top and --depth take a number")
+    result = scan(root, path, opt(argv, "--since", "12.months"), top, depth, skips)
+    if result is None:
+        return refuse("%s is not a git repository" % root)
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

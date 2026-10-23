@@ -1,0 +1,281 @@
+#!/usr/bin/env python3
+"""Check that a feature's spec.md, design.md and tasks.md agree, printed as JSON.
+
+Usage: analyze scan --feature-dir D
+
+Reads <D>/spec.md, <D>/tasks.md (both required), <D>/design.md (optional: quick has none)
+and every tasks/T<n>.md an index line names. Writes nothing.
+
+Parsed:
+- spec.md: acceptance criteria, `- AC<n> ·` lines.
+- tasks.md: inline task blocks (`- T<n>` with indented `- covers:` and `- files:` lines),
+  index lines `- T<n> · <goal> · ... · covers <ids> · tasks/T<n>.md` (whose file gives
+  `Covers:` in its header line and paths under `## Files`), and the `## Coverage matrix`
+  rows `| AC<n> | <tasks> | ... |`.
+- design.md: `### D<n>: <title>` decisions, and the backticked paths in the Files column of
+  the `### Changes by area` table.
+
+Prints `counts`, `acs`, `tasks`, `decisions`, `findings` and `decision_candidates`. Each
+finding has `check`, `kind`, `file` (absolute), `line`, `text` (the line as read) and
+`detail`. Kinds:
+- `ac_uncovered`: an AC no task's covers names (`covers: all` on the Verify task does not
+  count).
+- `ac_no_row`: an AC with no matrix row. `row_unknown_ac`: a matrix row for an AC the spec
+  lacks. `row_task_mismatch`: a row naming a task that does not exist or whose covers
+  omits that AC.
+- `task_no_ac`: a task whose covers is empty or `none`, or names only unknown ids.
+  Finding ids from review and feedback (`F3`, `C2`, `SEC1`, ...) count as covered; a
+  prerequisite's `AC<n> (via T<m>)` needs T<m> to exist. `all` is accepted on the last
+  phase (Verify) only.
+- `unknown_ac`: covers names an AC the spec lacks.
+- `bad_via`: `(via T<m>)` names a task that does not exist.
+- `area_no_task`: a Changes-by-area path no task's files list (a path matches when one
+  is a suffix of the other, or the design names a folder the task path lies under).
+`decision_candidates` lists the D<n> that no task text names: input for the analyst agent,
+not findings. A missing spec.md or tasks.md exits 1 with one line on stderr. Stdlib only.
+"""
+import json
+import os
+import re
+import sys
+
+AC_LINE = re.compile(r"^\s*-\s*(AC\d+)\s*·")
+TASK_HEAD = re.compile(r"^-\s*(T\d+)\s*$")
+TASK_INDEX = re.compile(r"^-\s*(T\d+)\s*·.*·\s*(tasks/T\d+\.md)\s*$")
+INDEX_COVERS = re.compile(r"·\s*covers\s+([^·]+)·")
+FIELD = re.compile(r"^\s+-\s*(covers|files|goal|done-when):\s*(.*)$")
+HEADER_COVERS = re.compile(r"Covers:\s*([^·]+)")
+PHASE = re.compile(r"^##\s+Phase\b")
+DECISION = re.compile(r"^###\s+(D\d+):\s*(.*)$")
+ID = re.compile(r"\b([A-Z][A-Z0-9]*\d+)\b")
+VIA = re.compile(r"\(via\s+(T\d+)\)")
+TICKED = re.compile(r"`([^`]+)`")
+
+
+def refuse(msg):
+    print("specd: %s" % msg, file=sys.stderr)
+    return 1
+
+
+def read_lines(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read().splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def norm(path):
+    path = path.strip().strip("`").strip()
+    path = re.sub(r"\s*\((new|edit)\)$|\s+(new|edit)$", "", path)
+    return path[2:] if path.startswith("./") else path
+
+
+def split_files(value):
+    ticked = TICKED.findall(value)
+    items = ticked if ticked else value.split(",")
+    return [norm(p) for p in items if norm(p) and norm(p).lower() != "none"]
+
+
+def parse_spec(path):
+    acs = {}
+    for i, line in enumerate(read_lines(path) or [], 1):
+        m = AC_LINE.match(line)
+        if m and m.group(1) not in acs:
+            acs[m.group(1)] = {"line": i, "text": line}
+    return acs
+
+
+def task_file(feature_dir, rel):
+    """covers text and files of an externalised task."""
+    lines = read_lines(os.path.join(feature_dir, rel)) or []
+    covers, files, in_files = "", [], False
+    for line in lines:
+        m = HEADER_COVERS.search(line)
+        if m and not covers and "·" in line:
+            covers = m.group(1).strip()
+        if line.startswith("## "):
+            in_files = line.strip() == "## Files"
+            continue
+        if in_files and line.strip() and not line.lstrip().startswith("<!--"):
+            files.extend(split_files(line.lstrip("- ").strip()))
+    return covers, files, "\n".join(lines)
+
+
+def parse_tasks(path, feature_dir):
+    lines = read_lines(path) or []
+    tasks, current, phase_no, matrix = {}, None, 0, []
+    in_matrix = False
+    for i, line in enumerate(lines, 1):
+        if line.startswith("## "):
+            in_matrix = line.strip() == "## Coverage matrix"
+            if PHASE.match(line):
+                phase_no += 1
+            current = None
+            continue
+        if in_matrix:
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if line.lstrip().startswith("|") and cells and re.fullmatch(r"AC\d+", cells[0]):
+                matrix.append({"ac": cells[0], "tasks": re.findall(r"T\d+", cells[1])
+                               if len(cells) > 1 else [], "line": i, "text": line})
+            continue
+        m = TASK_INDEX.match(line)
+        if m:
+            covers_m = INDEX_COVERS.search(line + "·")
+            fcovers, files, body = task_file(feature_dir, m.group(2))
+            tasks[m.group(1)] = {"line": i, "text": line, "phase": phase_no,
+                                 "covers": fcovers or (covers_m.group(1).strip() if covers_m else ""),
+                                 "files": files, "body": line + "\n" + body}
+            current = None
+            continue
+        m = TASK_HEAD.match(line)
+        if m:
+            current = m.group(1)
+            tasks[current] = {"line": i, "text": line, "phase": phase_no, "covers": "",
+                              "files": [], "body": line}
+            continue
+        if current and line.startswith((" ", "\t")):
+            tasks[current]["body"] += "\n" + line
+            f = FIELD.match(line)
+            if f and f.group(1) == "covers":
+                tasks[current]["covers"] = f.group(2).strip()
+            elif f and f.group(1) == "files":
+                tasks[current]["files"] = split_files(f.group(2))
+        elif line.strip():
+            current = None
+    return tasks, matrix, phase_no
+
+
+def parse_design(path):
+    lines = read_lines(path)
+    if lines is None:
+        return None, []
+    decisions, areas, in_areas = {}, [], False
+    for i, line in enumerate(lines, 1):
+        m = DECISION.match(line)
+        if m:
+            decisions[m.group(1)] = {"line": i, "text": line, "title": m.group(2).strip()}
+        if line.startswith("#"):
+            in_areas = line.strip() == "### Changes by area"
+            continue
+        if in_areas and line.lstrip().startswith("|"):
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if len(cells) >= 2 and not re.fullmatch(r"[-: ]+", cells[1]) and cells[1] != "Files":
+                for p in TICKED.findall(cells[1]):
+                    if "{{" not in p:
+                        areas.append({"path": norm(p), "line": i, "text": line})
+    return decisions, areas
+
+
+def matches(design_path, task_path):
+    d, t = design_path.rstrip("/"), task_path.rstrip("/")
+    return (d == t or t.endswith("/" + d) or d.endswith("/" + t)
+            or t.startswith(d + "/") or ("/" + d + "/") in ("/" + t))
+
+
+def finding(kind, path, line, text, detail):
+    return {"check": "coverage" if kind != "area_no_task" else "design", "kind": kind,
+            "file": path, "line": line, "text": text, "detail": detail}
+
+
+def scan(feature_dir):
+    spec_p = os.path.join(feature_dir, "spec.md")
+    tasks_p = os.path.join(feature_dir, "tasks.md")
+    design_p = os.path.join(feature_dir, "design.md")
+    acs = parse_spec(spec_p)
+    tasks, matrix, phases = parse_tasks(tasks_p, feature_dir)
+    decisions, areas = parse_design(design_p)
+    findings = []
+
+    covered = {}
+    for tid, t in tasks.items():
+        cov = t["covers"]
+        ids = [x for x in ID.findall(cov)]
+        ac_ids = [x for x in ids if x.startswith("AC")]
+        others = [x for x in ids if not x.startswith("AC") and not x.startswith("T")]
+        for via in VIA.findall(cov):
+            if via not in tasks:
+                findings.append(finding("bad_via", tasks_p, t["line"], t["text"],
+                                        "%s covers via %s, which does not exist" % (tid, via)))
+        for ac in ac_ids:
+            if ac in acs:
+                covered.setdefault(ac, []).append(tid)
+            else:
+                findings.append(finding("unknown_ac", tasks_p, t["line"], t["text"],
+                                        "%s covers %s, which spec.md does not define" % (tid, ac)))
+        is_all = re.fullmatch(r"\s*all\s*", cov or "") is not None
+        known = [a for a in ac_ids if a in acs] or others
+        if is_all and t["phase"] != phases:
+            findings.append(finding("task_no_ac", tasks_p, t["line"], t["text"],
+                                    "%s covers all outside the Verify phase" % tid))
+        elif not is_all and not known:
+            findings.append(finding("task_no_ac", tasks_p, t["line"], t["text"],
+                                    "%s covers no acceptance criterion (covers: %s)"
+                                    % (tid, cov or "empty")))
+
+    rows = {}
+    for r in matrix:
+        rows.setdefault(r["ac"], r)
+        if r["ac"] not in acs:
+            findings.append(finding("row_unknown_ac", tasks_p, r["line"], r["text"],
+                                    "matrix row for %s, which spec.md does not define" % r["ac"]))
+            continue
+        for tid in r["tasks"]:
+            if tid not in tasks:
+                findings.append(finding("row_task_mismatch", tasks_p, r["line"], r["text"],
+                                        "row %s names %s, which does not exist" % (r["ac"], tid)))
+            elif tid not in covered.get(r["ac"], []):
+                findings.append(finding("row_task_mismatch", tasks_p, r["line"], r["text"],
+                                        "row %s names %s, whose covers omits %s"
+                                        % (r["ac"], tid, r["ac"])))
+
+    for ac, a in acs.items():
+        if ac not in covered:
+            findings.append(finding("ac_uncovered", spec_p, a["line"], a["text"],
+                                    "no task covers %s" % ac))
+        if ac not in rows:
+            findings.append(finding("ac_no_row", spec_p, a["line"], a["text"],
+                                    "the coverage matrix has no row for %s" % ac))
+
+    task_files = [p for t in tasks.values() for p in t["files"]]
+    for a in areas:
+        if not any(matches(a["path"], p) for p in task_files):
+            findings.append(finding("area_no_task", design_p, a["line"], a["text"],
+                                    "no task lists `%s` in its files" % a["path"]))
+
+    bodies = "\n".join(t["body"] for t in tasks.values())
+    candidates = [{"id": d, "line": v["line"], "title": v["title"]}
+                  for d, v in (decisions or {}).items()
+                  if not re.search(r"\b%s\b" % d, bodies)]
+
+    findings.sort(key=lambda f: (f["file"] != spec_p, f["file"] != tasks_p, f["line"]))
+    counts = {}
+    for f in findings:
+        counts[f["kind"]] = counts.get(f["kind"], 0) + 1
+    return {"feature_dir": feature_dir, "design": decisions is not None,
+            "counts": dict(total=len(findings), **counts),
+            "acs": sorted(acs, key=lambda x: int(x[2:])),
+            "tasks": {k: {"covers": v["covers"], "files": v["files"], "line": v["line"]}
+                      for k, v in tasks.items()},
+            "decisions": sorted(decisions or {}, key=lambda x: int(x[1:])),
+            "findings": findings, "decision_candidates": candidates}
+
+
+def main(argv):
+    if len(argv) < 2 or "--help" in argv or "-h" in argv:
+        print(__doc__.strip())
+        return 0 if len(argv) >= 2 else 2
+    if argv[1] != "scan":
+        return refuse("unknown command %r; use scan" % argv[1])
+    if "--feature-dir" not in argv or argv.index("--feature-dir") + 1 >= len(argv):
+        return refuse("--feature-dir is required")
+    d = os.path.abspath(argv[argv.index("--feature-dir") + 1])
+    for name, step in (("spec.md", "specify"), ("tasks.md", "tasks")):
+        if not os.path.isfile(os.path.join(d, name)):
+            return refuse("%s has no %s; run /specd:%s first" % (d, name, step))
+    print(json.dumps(scan(d), indent=2, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

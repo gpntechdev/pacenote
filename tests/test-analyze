@@ -1,0 +1,245 @@
+#!/usr/bin/env python3
+"""Tests for `scripts/analyze`: coverage and design-area checks across a feature's artifacts.
+
+Usage: test-analyze [--help]   (run from anywhere; stdlib unittest)
+"""
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT = os.path.join(ROOT, "scripts", "analyze")
+
+SPEC = """# Spec: export
+
+## Acceptance criteria
+
+- AC1 · `export --csv` writes a CSV file
+- AC2 · an empty table writes a header only
+- AC3 · a missing table exits 2
+"""
+
+TASKS = """# Tasks: export
+
+## Phase 1: Behaviour
+
+- T1
+  - goal: CSV writer
+  - files: `src/export/csv.py` (new), `src/cli.py`
+  - covers: AC1, AC2
+  - commit: feat(export): write csv
+
+- T2
+  - goal: shared helper
+  - files: `src/export/util.py`
+  - covers: AC1 (via T1)
+
+- T3 · error path for a missing table · risk low · covers AC3 · tasks/T3.md
+
+## Phase 2: Verify
+
+- T4
+  - goal: every project check passes on the finished feature
+  - files: none
+  - covers: all
+
+## Coverage matrix
+
+| AC | Task | Test | Evidence |
+|---|---|---|---|
+| AC1 | T1 | test_csv | |
+| AC2 | T1 | test_empty | |
+| AC3 | T3 | test_missing | |
+"""
+
+T3 = """# T3: error path for a missing table
+
+Phase: Behaviour · Risk: low · Layer: none · Covers: AC3 · Depends on: T1
+
+## Files
+
+- `src/export/errors.py` new
+"""
+
+DESIGN = """# Design: export
+
+## Approach
+
+### Changes by area
+
+| Area | Files | Change |
+|---|---|---|
+| export | `src/export/csv.py`, `src/export/` | writer |
+| cli | `src/cli.py` | flag |
+
+## Decisions
+
+### D1: CSV over JSON
+
+Context: x
+
+### D2: stream rows
+
+Context: y
+"""
+
+
+def write(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.f = os.path.join(self.dir.name, "export")
+        write(os.path.join(self.f, "spec.md"), SPEC)
+        write(os.path.join(self.f, "tasks.md"), TASKS)
+        write(os.path.join(self.f, "tasks", "T3.md"), T3)
+        write(os.path.join(self.f, "design.md"), DESIGN.replace("D1: CSV", "D1: CSV (T1)"))
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def edit(self, name, old, new):
+        p = os.path.join(self.f, name)
+        with open(p, encoding="utf-8") as fh:
+            text = fh.read()
+        self.assertIn(old, text)
+        write(p, text.replace(old, new))
+
+    def run_scan(self, code=0):
+        r = subprocess.run([SCRIPT, "scan", "--feature-dir", self.f],
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, code, r.stderr)
+        return json.loads(r.stdout) if code == 0 else r.stderr
+
+    def kinds(self, out):
+        return sorted(f["kind"] for f in out["findings"])
+
+
+class Clean(Base):
+    def test_clean_feature_has_no_findings(self):
+        out = self.run_scan()
+        self.assertEqual(out["findings"], [])
+        self.assertEqual(out["acs"], ["AC1", "AC2", "AC3"])
+        self.assertEqual(sorted(out["tasks"]), ["T1", "T2", "T3", "T4"])
+        self.assertEqual(out["tasks"]["T3"]["files"], ["src/export/errors.py"])
+        self.assertEqual(out["tasks"]["T3"]["covers"], "AC3")
+
+    def test_decision_named_by_no_task_is_a_candidate(self):
+        out = self.run_scan()
+        self.assertEqual([c["id"] for c in out["decision_candidates"]], ["D1", "D2"])
+        self.edit("tasks.md", "covers: AC1, AC2\n", "covers: AC1, AC2\n  - tests: per D2\n")
+        out = self.run_scan()
+        self.assertEqual([c["id"] for c in out["decision_candidates"]], ["D1"])
+
+    def test_quick_without_design(self):
+        os.remove(os.path.join(self.f, "design.md"))
+        out = self.run_scan()
+        self.assertFalse(out["design"])
+        self.assertEqual(out["findings"], [])
+
+
+class Coverage(Base):
+    def test_ac_with_no_task(self):
+        self.edit("spec.md", "- AC3 ·", "- AC4 · rows are quoted\n- AC3 ·")
+        out = self.run_scan()
+        self.assertEqual(self.kinds(out), ["ac_no_row", "ac_uncovered"])
+        f = [x for x in out["findings"] if x["kind"] == "ac_uncovered"][0]
+        self.assertTrue(f["file"].endswith("spec.md"))
+        self.assertEqual(f["line"], 7)
+        self.assertIn("AC4", f["text"])
+
+    def test_task_with_no_ac(self):
+        self.edit("tasks.md", "  - covers: AC1 (via T1)", "  - covers: none")
+        out = self.run_scan()
+        self.assertEqual(self.kinds(out), ["task_no_ac"])
+        self.assertEqual(out["findings"][0]["line"], 11)
+
+    def test_empty_covers(self):
+        self.edit("tasks.md", "  - covers: AC1 (via T1)\n", "")
+        self.assertEqual(self.kinds(self.run_scan()), ["task_no_ac"])
+
+    def test_finding_ids_count_as_covered(self):
+        self.edit("tasks.md", "  - covers: AC1 (via T1)", "  - covers: F3")
+        self.assertEqual(self.run_scan()["findings"], [])
+        self.edit("tasks.md", "  - covers: F3", "  - covers: SEC1, C2")
+        self.assertEqual(self.run_scan()["findings"], [])
+
+    def test_all_outside_verify(self):
+        self.edit("tasks.md", "  - covers: AC1 (via T1)", "  - covers: all")
+        self.assertEqual(self.kinds(self.run_scan()), ["task_no_ac"])
+
+    def test_bad_via(self):
+        self.edit("tasks.md", "(via T1)", "(via T9)")
+        self.assertEqual(self.kinds(self.run_scan()), ["bad_via"])
+
+    def test_unknown_ac(self):
+        self.edit("tasks.md", "covers: AC1, AC2", "covers: AC1, AC2, AC7")
+        self.assertEqual(self.kinds(self.run_scan()), ["unknown_ac"])
+
+    def test_index_line_covers_without_file(self):
+        os.remove(os.path.join(self.f, "tasks", "T3.md"))
+        out = self.run_scan()
+        self.assertEqual(out["tasks"]["T3"]["covers"], "AC3")
+
+
+class Matrix(Base):
+    def test_missing_row(self):
+        self.edit("tasks.md", "| AC3 | T3 | test_missing | |\n", "")
+        out = self.run_scan()
+        self.assertEqual(self.kinds(out), ["ac_no_row"])
+
+    def test_row_for_unknown_ac(self):
+        self.edit("tasks.md", "| AC3 | T3 | test_missing | |",
+                  "| AC3 | T3 | test_missing | |\n| AC9 | T1 | x | |")
+        self.assertEqual(self.kinds(self.run_scan()), ["row_unknown_ac"])
+
+    def test_row_task_mismatch(self):
+        self.edit("tasks.md", "| AC2 | T1 |", "| AC2 | T3 |")
+        out = self.run_scan()
+        self.assertEqual(self.kinds(out), ["row_task_mismatch"])
+        self.edit("tasks.md", "| AC2 | T3 |", "| AC2 | T8 |")
+        self.assertIn("does not exist", self.run_scan()["findings"][0]["detail"])
+
+
+class Design(Base):
+    def test_area_path_no_task_lists(self):
+        self.edit("design.md", "| cli | `src/cli.py` | flag |",
+                  "| cli | `src/cli.py`, `docs/usage.md` | flag |")
+        out = self.run_scan()
+        self.assertEqual(self.kinds(out), ["area_no_task"])
+        f = out["findings"][0]
+        self.assertTrue(f["file"].endswith("design.md"))
+        self.assertIn("docs/usage.md", f["detail"])
+
+    def test_suffix_and_folder_match(self):
+        self.edit("design.md", "`src/cli.py` | flag", "`cli.py` | flag")
+        self.assertEqual(self.run_scan()["findings"], [])
+
+
+class Refusals(Base):
+    def test_missing_tasks(self):
+        os.remove(os.path.join(self.f, "tasks.md"))
+        self.assertIn("/specd:tasks", self.run_scan(code=1))
+
+    def test_missing_spec(self):
+        os.remove(os.path.join(self.f, "spec.md"))
+        self.assertIn("/specd:specify", self.run_scan(code=1))
+
+    def test_writes_nothing(self):
+        before = sorted(os.listdir(self.f))
+        self.run_scan()
+        self.assertEqual(sorted(os.listdir(self.f)), before)
+
+
+if __name__ == "__main__":
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(__doc__.strip())
+        sys.exit(0)
+    unittest.main(verbosity=1)

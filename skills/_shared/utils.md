@@ -1,8 +1,8 @@
 # Utils
 
 **Reference-only.** Not a skill. The conventions every util follows (`lessons-prune`,
-`spec-clean`, `docs-clean`, `research`, `analyze`; `refresh` and `critique` predate this block
-and already behave this way). Written once in M7; read by each util's spine, which states only
+`spec-clean`, `docs-clean`, `research`, `analyze`, `analyze-codebase`; `refresh` and
+`critique` predate this block and already behave this way). Written once in M7; read by each util's spine, which states only
 its delta.
 
 ## What a util is
@@ -14,6 +14,9 @@ its delta.
 - Its deterministic part (counting, matching, listing, applying a plan) is a script in
   `scripts/` that prints JSON. `research` has none: its work is the `researcher` agent's. The spine reads the script's output, not the files it scanned,
   wherever the script can answer.
+- A read-only util (`analyze`, `analyze-codebase`, `critique`) prints its report and writes
+  nothing: "Nothing changes without a yes", "Branch" and "Commit" do not apply, and its
+  `Next` names the step or command that owns a fix.
 
 ## Nothing changes without a yes
 
