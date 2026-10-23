@@ -40,6 +40,8 @@ flow:
   specialists: ask           # ask | off: review proposes specialist passes from the diff
   retention: distill         # distill | clean | keep: docs + close policy for full tier
   keep_days: 30              # status warns about kept spec folders older than this
+  runtime_verify: ask        # ask | off: on the full tier verify asks whether to exercise the
+                             # running app (runtime-verify) when an AC is observable there
 
 models:                      # role -> model; the only place a model name may appear
   judgment: opus
@@ -52,6 +54,8 @@ commands:                    # empty = detected (config -> Makefile -> package.j
   format: ""
   typecheck: ""
   build: ""
+  serve: ""                  # starts the app for runtime-verify; empty = asked on first use
+  serve_url: ""              # base URL the app answers on once started, e.g. http://localhost:3000
 
 docs:
   lessons_max_lines: 80      # cap for lessons.md; lessons-prune enforces it
@@ -85,15 +89,17 @@ layers:                      # layer -> files implement and review add to "Read 
 | `git.pr_host` | `github`, `gitlab`, `none` | deliver picks the PR command |
 | `git.ticket_key` | prefix string | start (branch names), deliver |
 | `git.worktrees` | bool | start (`scripts/worktree add`), close (remove); wrapper mode only, embedded ignores it |
-| `git.wrapper_pr` | bool | deliver (wrapper draft PR), close (merge locally or leave it to the PR); wrapper mode only; a missing key means `false`. A file from before M7 lacks it: add the two lines above under `git:` by hand |
+| `git.wrapper_pr` | bool | deliver (wrapper draft PR), close (merge locally or leave it to the PR); wrapper mode only; a missing key means `false` |
 | `flow.gate_granularity` | `task`, `phase`, `end` | implement; risky tasks always stop |
 | `flow.tdd` | bool | tasks (tests block), implement (tests first) |
 | `flow.critic` | `gates` (before G1 and G2 on the full tier), `always` (quick's G1 too), `off` | specify, design; `critique` runs regardless |
 | `flow.specialists` | `ask` (review proposes security, performance, accessibility or tests passes from the diff and asks), `off` | review |
 | `flow.retention` | `distill`, `clean`, `keep` | docs (write the record on `distill`) and close; trivial and quick default to `clean` |
 | `flow.keep_days` | integer | status, spec-clean |
+| `flow.runtime_verify` | `ask` (verify asks per full-tier feature when an AC is observable in the running app, and records `runtime_verify` in `state.yml`), `off` (never; verify goes straight to docs) | verify, runtime-verify; a missing key means `ask` |
 | `models.<role>` | model name | any skill that spawns an agent; roles only elsewhere |
 | `commands.*` | shell command | implement, verify, scaffold; empty = detect |
+| `commands.serve`, `commands.serve_url` | shell command, `http(s)` URL | runtime-verify: started in `code_root`, polled until the URL answers, stopped after; never detected, asked on first use and saved on the user's yes |
 | `docs.lessons_max_lines` | integer | lessons-prune (enforces it), status (warns when `lessons.md` is over it) |
 | `sources.mcp` | `none`, `atlassian` | start, fix, onboard, refresh: a bare ticket key (and an `*.atlassian.net` URL) goes through this server ([`sources.md`](./sources.md)); `none` asks for a paste. A file from before M5 has `sources: []`: replace that line by hand with the two lines above |
 | `skills.allowlist` | list of GitHub `owner/repo` | toolsmith: the only repos it fetches from (`skill-fetch` refuses others); `config-set --add` / `--remove` |
@@ -118,6 +124,8 @@ into for the audit.
 ## Rules for writers (`init`, `config`)
 
 - Patch key by key. Never regenerate the file; comments, order and unknown keys survive.
+- A scalar key documented above but missing from an older file is inserted by `config-set`
+  at the end of its section, with its comment, when it is first set.
 - Write values in the documented form: bare `phase`, not `"phase"`; `false`, not `"false"`.
 - Show `old -> new` for each changed key, and mark values that were derived rather than asked.
 - Do not repair a malformed file silently; show the problem and ask.

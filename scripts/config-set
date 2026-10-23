@@ -10,7 +10,10 @@ and unknown keys survive. All-or-nothing: every key is checked before anything i
 Refuses list keys, unknown keys, duplicate keys and malformed lines.
 --add appends each value as a `- item` of a list key (skipped when already there) and
 --remove deletes it; scalar keys are refused. Under `layers` a missing key is created,
-so `--add layers.frontend=<path>` opens a new layer. Exit 1 with a one-line message on any
+so `--add layers.frontend=<path>` opens a new layer. A scalar `section.key` that the default
+in skills/_shared/specd-yml.md documents but the file lacks (a file from before the key) is
+first inserted at the end of its section, copied with its comment lines from the default,
+then set; a key the default does not document is still refused. Exit 1 with a one-line message on any
 refusal. Stdlib only.
 """
 import json
@@ -23,6 +26,8 @@ BARE = re.compile(r"^(true|false|-?\d+|[a-z_]+)$")
 LIST_KEYS = {"skills.allowlist"}
 OPEN_SECTIONS = {"layers"}  # sections whose keys are names chosen by the user
 ITEM = re.compile(r"^(\s*)-\s+(.*?)\s*$")
+REFERENCE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "skills", "_shared", "specd-yml.md")
 
 
 def fail(msg):
@@ -186,7 +191,15 @@ def main(argv):
         if '"' in value or "\n" in value:
             return fail("value for %s may not contain a double quote or newline" % key)
         if key not in found:
-            return fail("unknown key %s in %s" % (key, path))
+            block = documented(key)
+            section = key.split(".", 1)[0]
+            if not block or section not in found:
+                return fail("unknown key %s in %s" % (key, path))
+            end = section_end(lines, found[section])
+            lines[end:end] = block
+            found, _, _ = index(lines)
+            changes = [(k, found[k], LINE.match(lines[found[k]].rstrip("\n")), v)
+                       for k, _, _, v in changes]
         n = found[key]
         if key in LIST_KEYS or is_list(lines, n):
             return fail("%s is a list key; edit it by hand" % key)
@@ -210,6 +223,45 @@ def main(argv):
         f.writelines(lines)
     print(json.dumps({"file": os.path.abspath(path), "changes": out}, indent=2))
     return 0
+
+
+def documented(key):
+    """The default's lines for scalar KEY (its line plus following comment lines), or None."""
+    if "." not in key:
+        return None
+    try:
+        with open(REFERENCE, encoding="utf-8") as f:
+            blocks = re.findall(r"```yaml\n(.*?)```", f.read(), re.S)
+    except OSError:
+        return None
+    if len(blocks) != 1:
+        return None
+    ref = blocks[0].splitlines(True)
+    found, _, _ = index(ref)
+    if key not in found or is_list(ref, found[key]):
+        return None
+    n = found[key]
+    m = LINE.match(ref[n].rstrip("\n"))
+    if m.group(4) == "":
+        return None
+    out = [ref[n]]
+    for raw in ref[n + 1:]:
+        if raw.strip().startswith("#") and raw.startswith(" "):
+            out.append(raw)
+        else:
+            break
+    return out
+
+
+def section_end(lines, n):
+    """Index after the last indented line of the section starting at line N."""
+    end = n + 1
+    for i in range(n + 1, len(lines)):
+        if lines[i].startswith((" ", "\t")) and lines[i].strip():
+            end = i + 1
+        elif lines[i].strip():
+            break
+    return end
 
 
 if __name__ == "__main__":

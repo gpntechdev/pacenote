@@ -32,7 +32,7 @@ every re-run after a feedback cycle.
   `squash-wip` ([`../_shared/paths.md`](../_shared/paths.md): the opening sequence).
 - `<spec_root>/<feature>/state.yml` (`tier`, `fix`), `spec.md`, `design.md` (Changes by
   area, Changed contracts, Risks), `review.md`, `tasks.md` (matrix, review-fix phases),
-  each when present; `brief.md` (Sources; on trivial, the request itself) and the `origin`
+  `runtime.md` (which ACs ran against the live app), each when present; `brief.md` (Sources; on trivial, the request itself) and the `origin`
   header of each `<workspace_root>/sources/<feature>-*.md` it lists.
 - `<docs_root>/features/<feature>.md` and the `decisions/NNNN-*.md` files it names, when
   `docs` wrote them.
@@ -59,7 +59,7 @@ every re-run after a feedback cycle.
    has an upstream, `git log @{u}..HEAD --oneline` as "since the last push"), `git diff
    --stat <default>...HEAD`, the last review or PR round's verdict and accepted findings
    from `review.md`, the evidence (full: the matrix summary from `tasks.md`, ACs total, with
-   test evidence, with a check, manual, accepted; quick: the last review round's AC table,
+   test evidence, with a check, manual, accepted, plus how many also ran live per `runtime.md`; quick: the last review round's AC table,
    covered / partial / missing counts; trivial: the brief's words and the checks that ran),
    the docs written by `docs` or "none". Uncommitted changes in `<code_root>` or in
    `<workspace_root>`: list them and stop; they are committed by `implement` or by the

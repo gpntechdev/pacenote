@@ -15,7 +15,7 @@ Flat two-level YAML, like `specd.yml`, so the same parser rules apply. The only 
 feature: ""                  # folder name under spec_root: slug or ticket key
 tier: full                   # trivial | quick | full
 step: start                  # start | specify | design | tasks | implement | review | verify
-                             # | docs | deliver | close | closed
+                             # | runtime-verify | docs | deliver | close | closed
 retention: ""                # distill | clean | keep; empty = project default for the tier
 branch: ""                   # git branch created by start; empty when git.authority is none
 pr: ""                       # draft PR or MR URL written by deliver
@@ -45,6 +45,8 @@ fix:                         # written by fix; empty for every other feature
 
 tasks: {}                    # T1: todo | done | skipped; mirrors tasks.md, one key per task
 
+runtime_verify: ""           # on | off, asked by verify on the full tier; on adds runtime-verify
+
 created: ""                  # ISO-8601 UTC
 updated: ""                  # ISO-8601 UTC; every writer sets it
 ```
@@ -69,15 +71,16 @@ state list     --spec-root DIR [--worktrees DIR]    # every feature: step, next,
 reported with their `worktree` root. Outside wrapper mode the folder does not exist and the
 flag changes nothing.
 
-`set` may add `tasks.<id>` keys that do not exist yet; every other key must already be in
-the file. All-or-nothing: a refused key leaves the file untouched.
+`set` may add `tasks.<id>` keys that do not exist yet, and `runtime_verify` to a file that
+predates it (inserted before `created`); every other key must already be in the file. All-or-nothing: a refused key leaves the file untouched.
 
 ## Step order per tier
 
 The order lives in the script (`ORDERS`), nowhere in prose. Trivial: start, implement,
 deliver, close. Quick: start, specify, implement, review, deliver, close. Full: every step.
-`docs` joins a light order only when the feature's `retention` is `distill`. Once `pr` is
-set, `next` skips `review` and `docs` (the fix loop). `init` without `--step` and
+`docs` joins a light order only when the feature's `retention` is `distill`.
+`runtime-verify` joins the full order after `verify` only when `runtime_verify` is `on`.
+Once `pr` is set, `next` skips `review` and `docs` (the fix loop), not `runtime-verify`. `init` without `--step` and
 `set step=next` both read the order, so a skill never names the step after its own: it sets
 `step=next` and prints the step the script's output shows as `Next`. `check` refuses a step
 outside the tier's flow and names the escalation command.

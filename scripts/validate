@@ -22,7 +22,7 @@ LINK = re.compile(r"\]\(([^)\s#]+)\)")
 SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 PLUGIN_ROOT_REF = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\s\"'\\\\]+)")
 READ_ONLY_AGENTS = {"explorer", "researcher", "critic", "analyst", "reviewer", "skill-auditor",
-                    "specialist"}
+                    "specialist", "runtime-verifier"}  # no file writes and no shell
 WRITE_TOOLS = re.compile(r"\b(Write|Edit|MultiEdit|NotebookEdit|Bash)\b")
 # Agents that read external content: they may Write (fenced by hooks/source-guard) but get no
 # other way to act and no network, and MCP tools only when the tool name is a read verb.
