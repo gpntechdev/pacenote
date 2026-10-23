@@ -29,8 +29,10 @@ flow and the check names the step that is.
 - `<spec_root>/<feature>/spec.md` (ACs), `tasks.md` (matrix), `design.md` when present
   (`API and contracts`, `UX flows`), `state.yml`.
 - `<workspace_root>/specd.yml`: `commands.serve`, `commands.serve_url`, `models.execution`,
-  `git.authority`. `<workspace_root>/.mcp.json` (is `playwright` there).
-- `<docs_root>/project.md` (how to run, to suggest a serve command).
+  `git.authority`. `.mcp.json` at the MCP root (`wrapper_root` from `resolve-paths`, or the
+  repo holding `.specd/`): is `playwright` there.
+- `<docs_root>/project.md` (how to run, to suggest a serve command); route and page names
+  looked up in `<code_root>` per `checks.md`.
 - [`./references/checks.md`](./references/checks.md), [`../_shared/paths.md`](../_shared/paths.md),
   [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md).
 
@@ -56,12 +58,15 @@ flow and the check names the step that is.
 3. **Plan.** Classify every AC `http`, `browser` or `none` and draft the checks per
    `checks.md`. Show the proposal table; one question: run all, adjust (rows to change or
    skip, in free text; reprint and ask again), or cancel (step stays, handoff names it).
+   Ask on every run, a re-run included, and wait for the answer: the checks start a
+   process and send requests that may write data.
    Browser rows with no `playwright` server in `.mcp.json`: the same question offers
-   installing it (`init-workspace --root <workspace_root> --add-mcp playwright`; the server
+   installing it (`init-workspace --root <MCP root> --add-mcp playwright`; the server
    loads only after Claude Code restarts, so this run treats those rows as skipped and the
    handoff says to re-run), attesting by a manual note as `verify` does, or skipping.
 4. **Start.** `"${CLAUDE_PLUGIN_ROOT}/scripts/runtime-check" start --serve <cmd> --url
-   <url> --cwd <code_root> --state-dir <workspace_root>/.runtime`. Status `exited` or
+   <url> --cwd <code_root> --state-dir <workspace_root>/.runtime`, every path absolute
+   (no `$PWD`). Status `exited` or
    `timeout`: show the log tail; no evidence is written; handoff `Next:
    /specd:runtime-verify <feature>` after fixing the command (`/specd:config`) or the app
    (`/specd:implement <feature>`). `reused`: the app was already up and is left running.
@@ -69,17 +74,20 @@ flow and the check names the step that is.
    tool, then `runtime-check run --plan <that file> --url <url>`. Read only its JSON.
 6. **Browser.** Dispatch one `runtime-verifier` at `models.execution` with the prompt in
    `checks.md` for all `browser` rows. Never call the playwright tools from the main
-   thread. An answer missing an AC counts that AC as `blocked`.
+   thread. An answer missing an AC counts that AC as `blocked`. Note first whether
+   `<MCP root>/.playwright-mcp/` exists; the server writes page snapshots and console logs
+   there.
 7. **Stop.** `runtime-check stop --state-dir <workspace_root>/.runtime`, always, including
-   after a failure in 5 or 6.
+   after a failure in 5 or 6. Remove `<MCP root>/.playwright-mcp/` when step 6 created it.
 8. **Record** per `checks.md` ("Writing back"): `runtime.md` from
    `./templates/runtime.md`, `runtime:` parts on passed rows. Each `fail` or `blocked` AC:
    one grouped question per AC — add a fix task (append to `tasks.md` under `Runtime fixes`
    with a new id, `covers` the AC, a `commit:` line; `state set tasks.T<k>=todo
    step=implement`) or accept with a reason written into the cell.
 9. **Commit.** No fix task: `state set step=next`. `git -C <workspace_root>` add
-   `runtime.md`, `tasks.md`, `state.yml` and `specd.yml` when step 2 saved it; commit
-   `spec(<feature>): runtime-verify`.
+   `runtime.md`, `tasks.md`, `state.yml`, `specd.yml` when step 2 saved it and `.mcp.json`
+   when step 3 installed playwright (its own repo's commit when that is another repo);
+   commit `spec(<feature>): runtime-verify`.
 10. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: failed,
     blocked and accepted ACs, `none` rows worth a manual look, a server that was reused.
     `Next: /specd:<step> <feature>` with the step the script reports.
@@ -88,6 +96,7 @@ flow and the check names the step that is.
 
 - `curl`, WebFetch or a browser MCP tool in the main thread; the script and the agent are
   the only callers, so responses and pages stay bounded.
+- Running the checks on a proposal the user has not answered in this run.
 - Leaving a server running that this step started; step 7 runs whatever happened.
 - A `runtime:` pass for an AC that did not run, or copied from test results.
 - A request or a page outside `commands.serve_url`'s origin, or a production URL.
