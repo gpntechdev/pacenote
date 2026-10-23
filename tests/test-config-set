@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""Tests for `scripts/config-set`: scalar patches, and documented keys missing from an older
+specd.yml being inserted at the end of their section before they are set.
+
+Usage: test-config-set [--help]   (run from anywhere; stdlib unittest)
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT = os.path.join(ROOT, "scripts", "config-set")
+REFERENCE = os.path.join(ROOT, "skills", "_shared", "specd-yml.md")
+DROPPED = ("  wrapper_pr:", "  runtime_verify:", "  serve:", "  serve_url:")
+
+
+def default_lines():
+    with open(REFERENCE, encoding="utf-8") as f:
+        return re.findall(r"```yaml\n(.*?)```", f.read(), re.S)[0].splitlines(True)
+
+
+def older_file():
+    """The default minus the newer keys and their comment lines, as a file from before them."""
+    out, skip = [], False
+    for line in default_lines():
+        if line.startswith(DROPPED):
+            skip = True
+            continue
+        if skip and line.startswith(" ") and line.strip().startswith("#"):
+            continue
+        skip = False
+        out.append(line)
+    return out
+
+
+def run(*args):
+    p = subprocess.run([SCRIPT] + list(args), capture_output=True, text=True)
+    return p.returncode, p.stdout, p.stderr
+
+
+class ConfigSet(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.path = os.path.join(self.dir.name, "specd.yml")
+        with open(self.path, "w") as f:
+            f.writelines(older_file())
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def text(self):
+        with open(self.path) as f:
+            return f.read()
+
+    def test_scalar_patch(self):
+        code, out, err = run("--file", self.path, "flow.tdd=true")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(json.loads(out)["changes"][0]["new"], "true")
+        self.assertRegex(self.text(), r"\n  tdd: true +# tests first")
+
+    def test_missing_documented_keys_are_inserted_in_their_section(self):
+        self.assertNotIn("  serve:", self.text())
+        code, _, err = run("--file", self.path, "commands.serve=python3 app.py",
+                           "commands.serve_url=http://127.0.0.1:8000", "flow.runtime_verify=off",
+                           "git.wrapper_pr=true", "flow.tdd=true")
+        self.assertEqual(code, 0, err)
+        text = self.text()
+        commands = text[text.index("\ncommands:"):text.index("\ndocs:")]
+        self.assertIn('  serve: "python3 app.py"', commands)
+        self.assertIn('  serve_url: "http://127.0.0.1:8000"', commands)
+        self.assertLess(commands.index("build:"), commands.index("serve:"))
+        flow = text[text.index("\nflow:"):text.index("\nmodels:")]
+        self.assertIn("  runtime_verify: off", flow)
+        self.assertIn("# running app (runtime-verify)", flow)
+        git = text[text.index("\ngit:"):text.index("\nflow:")]
+        self.assertIn("  wrapper_pr: true", git)
+        self.assertIn("  tdd: true", flow)
+
+    def test_undocumented_and_list_keys_refused_and_file_untouched(self):
+        before = self.text()
+        self.assertEqual(run("--file", self.path, "commands.serve=x", "commands.nonsense=1")[0], 1)
+        self.assertEqual(run("--file", self.path, "skills.allowlist=x")[0], 1)
+        self.assertEqual(run("--file", self.path, "nosection.key=x")[0], 1)
+        self.assertEqual(self.text(), before)
+
+
+if __name__ == "__main__":
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(__doc__.strip())
+        sys.exit(0)
+    unittest.main(verbosity=1)
