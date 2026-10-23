@@ -12,7 +12,7 @@ Usage:
   state list     --spec-root DIR [--worktrees DIR]
 
 Keys are `top` or `section.key`. `set` patches lines in place (comments, order and unknown
-keys survive), may add missing `tasks.<id>` keys, accepts `now` as an ISO-8601 UTC timestamp
+keys survive), may add missing `tasks.<id>` keys and a missing `runtime_verify`, accepts `now` as an ISO-8601 UTC timestamp
 and `step=next` as the step that follows the current one in the tier's order (skipping
 review and docs once a PR is recorded), always sets `updated`, and is all-or-nothing.
 `init` without `--step` picks the first step after start for the tier. `check` exits 1 with
@@ -24,7 +24,8 @@ done task. `find` resolves the feature by name, then by branch, then as the only
 `list` reports every feature. Both also scan the feature worktrees under `--worktrees DIR`
 (`DIR/<name>/`, each a workspace of its own, resolved through resolve-paths), so the
 wrapper root sees features that live in worktrees; rows carry `worktree`.
-The step order per tier lives here and nowhere else.
+The step order per tier lives here and nowhere else; `runtime-verify` joins the full order
+after verify only when `runtime_verify` is `on`.
 Every command prints JSON; refusals print one line on stderr and exit 1. Stdlib only.
 """
 import glob
@@ -40,19 +41,23 @@ REFERENCE = os.path.join(PLUGIN_ROOT, "skills", "_shared", "state-yml.md")
 RESOLVE_PATHS = os.path.join(PLUGIN_ROOT, "scripts", "resolve-paths")
 LINE = re.compile(r"^(\s*)([A-Za-z_][\w-]*):(\s*)(.*?)(\s*#.*)?$")
 BARE = re.compile(r"^(true|false|-?\d+|[a-z_]+|[A-Z]\d+)$")
-STEPS = ["start", "specify", "design", "tasks", "implement", "review", "verify", "docs",
-         "deliver", "close", "closed"]
+STEPS = ["start", "specify", "design", "tasks", "implement", "review", "verify",
+         "runtime-verify", "docs", "deliver", "close", "closed"]
+OPTIONAL = ("runtime-verify",)  # full only, and only when state.yml says runtime_verify: on
 SIDE_STEPS = ("feedback",)  # not a position in the order: checked on their own condition
 TIERS = ("trivial", "quick", "full")
 ORDERS = {  # the step order per tier; docs joins a light order when retention is distill
     "trivial": ["start", "implement", "deliver", "close", "closed"],
     "quick": ["start", "specify", "implement", "review", "deliver", "close", "closed"],
-    "full": STEPS,
+    "full": [s for s in STEPS if s not in OPTIONAL],
 }
 PR_SKIPS = ("review", "docs")  # once a PR is recorded, the fix loop skips these
 STEP_GATE = {"specify": "G1", "design": "G2", "tasks": "G3", "implement": "G4", "deliver": "G5"}
 RETENTIONS = ("", "distill", "clean", "keep")
 ADDABLE_SECTIONS = ("tasks",)
+ADDABLE_KEYS = ("runtime_verify",)  # top-level keys newer than some state files; added before
+                                    # `created` when missing
+RUNTIME = ("", "on", "off")
 
 
 def fail(msg):
@@ -163,8 +168,12 @@ def patch(path, pairs):
             if sec not in sections:
                 raise ValueError("no %s section in %s" % (sec, path))
             additions.append((key, value))
+        elif key in ADDABLE_KEYS:
+            additions.append((key, value))
         else:
             raise ValueError("unknown key %s in %s" % (key, path))
+        if key == "runtime_verify" and value not in RUNTIME:
+            raise ValueError("runtime_verify must be on, off or empty")
     out = []
     for key, n, value in changes:
         m = LINE.match(lines[n].rstrip("\n"))
@@ -178,6 +187,12 @@ def patch(path, pairs):
         lines[n] = "%s%s:%s%s%s\n" % (m.group(1), m.group(2), gap, new, comment)
         out.append({"key": key, "old": old.strip(), "new": new})
     for key, value in additions:
+        if "." not in key:
+            found, _, _ = index(lines)
+            at = found.get("created", len(lines))
+            lines[at:at] = ["%s: %s\n" % (key, render(value)), "\n"]
+            out.append({"key": key, "old": "", "new": render(value)})
+            continue
         sec, sub = key.split(".", 1)
         found, sections, _ = index(lines)
         n = sections[sec]
@@ -193,18 +208,22 @@ def patch(path, pairs):
     return out
 
 
-def order_for(tier, retention=""):
-    """The step order of a tier; light tiers run docs only when retention is distill."""
+def order_for(tier, retention="", runtime=""):
+    """The step order of a tier; light tiers run docs only when retention is distill, full
+    runs runtime-verify after verify only when the feature switched it on."""
     if tier not in ORDERS:
         raise ValueError("state.yml has unknown tier %r" % tier)
     steps = list(ORDERS[tier])
     if tier != "full" and retention == "distill":
         steps.insert(steps.index("deliver"), "docs")
+    if tier == "full" and runtime == "on":
+        steps.insert(steps.index("verify") + 1, "runtime-verify")
     return steps
 
 
 def order(data):
-    return order_for(str(data.get("tier", "full")), str(data.get("retention", "")))
+    return order_for(str(data.get("tier", "full")), str(data.get("retention", "")),
+                     str(data.get("runtime_verify", "")))
 
 
 def next_step(data, current=None):
@@ -225,7 +244,9 @@ def resolve_next(path, pairs):
     """Replace `step=next` with the real successor, read from the file as it is."""
     if ("step", "next") not in pairs:
         return pairs
-    target = next_step(load(path))
+    data = load(path)
+    data.update((k, v) for k, v in pairs if k == "runtime_verify")  # switched in the same call
+    target = next_step(data)
     return [(k, target if (k, v) == ("step", "next") else v) for k, v in pairs]
 
 
@@ -387,7 +408,8 @@ def cmd_escalate(argv):
         raise ValueError("%s is already %s; escalation only goes up" % (data.get("feature"), tier))
     if current == "closed":
         raise ValueError("%s is closed" % data.get("feature"))
-    old, new = order(data), order_for(to, str(data.get("retention", "")))
+    old = order(data)
+    new = order_for(to, str(data.get("retention", "")), str(data.get("runtime_verify", "")))
     if current not in old:
         raise ValueError("state.yml has step %r, not in the %s flow" % (current, tier))
     added = [s for s in new if s not in old and new.index(s) < new.index(current)]

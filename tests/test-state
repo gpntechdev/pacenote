@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""Tests for `scripts/state`: the step order per tier, the optional runtime-verify step,
+`step=next`, `check`, the PR loop and adding `runtime_verify` to an older file.
+
+Usage: test-state [--help]   (run from anywhere; stdlib unittest)
+"""
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT = os.path.join(ROOT, "scripts", "state")
+
+
+def run(*args):
+    p = subprocess.run([SCRIPT] + list(args), capture_output=True, text=True)
+    return p.returncode, p.stdout, p.stderr
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.path = os.path.join(self.dir.name, "f", "state.yml")
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def init(self, tier="full", step="verify", retention=""):
+        args = ["init", "--file", self.path, "--feature", "f", "--tier", tier, "--step", step]
+        if retention:
+            args += ["--retention", retention]
+        code, _, err = run(*args)
+        self.assertEqual(code, 0, err)
+
+    def set(self, *pairs):
+        return run("set", "--file", self.path, *pairs)
+
+    def get(self, key):
+        return json.loads(run("get", "--file", self.path, key)[1])[key]
+
+    def check(self, step):
+        code, out, _ = run("check", "--file", self.path, "--step", step)
+        return code, json.loads(out) if out.strip() else {}
+
+
+class RuntimeOrder(Base):
+    def test_off_by_default_verify_goes_to_docs(self):
+        self.init()
+        self.assertEqual(self.set("step=next")[0], 0)
+        self.assertEqual(self.get("step"), "docs")
+
+    def test_on_inserts_runtime_verify_after_verify(self):
+        self.init()
+        self.assertEqual(self.set("runtime_verify=on")[0], 0)
+        self.set("step=next")
+        self.assertEqual(self.get("step"), "runtime-verify")
+        self.set("step=next")
+        self.assertEqual(self.get("step"), "docs")
+
+    def test_switch_and_next_in_one_call(self):
+        self.init()
+        self.set("runtime_verify=on", "step=next")
+        self.assertEqual(self.get("step"), "runtime-verify")
+
+    def test_explicit_off(self):
+        self.init()
+        self.set("runtime_verify=off", "step=next")
+        self.assertEqual(self.get("step"), "docs")
+
+    def test_check_refuses_when_off(self):
+        self.init(step="docs")
+        code, out = self.check("runtime-verify")
+        self.assertEqual(code, 1)
+        self.assertIn("not in the full flow", out["reason"])
+
+    def test_check_passes_when_on(self):
+        self.init()
+        self.set("runtime_verify=on", "step=next")
+        code, out = self.check("runtime-verify")
+        self.assertEqual(code, 0)
+        self.assertFalse(out["rerun"])
+        self.assertEqual(self.check("docs")[0], 1)
+
+    def test_quick_never_runs_it(self):
+        self.init(tier="quick", step="review")
+        self.set("runtime_verify=on", "step=next")
+        self.assertEqual(self.get("step"), "deliver")
+
+    def test_pr_loop_keeps_runtime_verify(self):
+        self.init()
+        self.set("runtime_verify=on", "pr=https://example.test/pr/1", "step=next")
+        self.assertEqual(self.get("step"), "runtime-verify")
+        self.set("step=next")
+        self.assertEqual(self.get("step"), "deliver")
+
+    def test_bad_value_refused(self):
+        self.init()
+        self.assertEqual(self.set("runtime_verify=maybe")[0], 1)
+        self.assertEqual(self.get("runtime_verify"), "")
+
+    def test_init_accepts_the_step(self):
+        self.init(step="runtime-verify")
+        with open(self.path) as f:
+            self.assertIn('step: "runtime-verify"', f.read())
+
+
+class OlderFile(Base):
+    def test_missing_key_is_added_before_created(self):
+        self.init()
+        with open(self.path) as f:
+            lines = [l for l in f if not l.startswith("runtime_verify:")]
+        with open(self.path, "w") as f:
+            f.writelines(lines)
+        code, _, err = self.set("runtime_verify=on")
+        self.assertEqual(code, 0, err)
+        with open(self.path) as f:
+            text = f.read()
+        self.assertLess(text.index("runtime_verify: on"), text.index("created:"))
+        self.assertEqual(self.get("runtime_verify"), "on")
+
+    def test_other_unknown_keys_still_refused(self):
+        self.init()
+        self.assertEqual(self.set("nonsense=1")[0], 1)
+
+
+class Escalation(Base):
+    def test_quick_to_full_still_rewinds_to_design(self):
+        self.init(tier="quick", step="implement")
+        code, _, err = run("escalate", "--file", self.path, "--to", "full")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.get("step"), "design")
+
+
+if __name__ == "__main__":
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(__doc__.strip())
+        sys.exit(0)
+    unittest.main(verbosity=1)
