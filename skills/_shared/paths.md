@@ -7,29 +7,29 @@ hardcodes a path.
 
 | Root | Meaning | Embedded default | Wrapper default |
 |---|---|---|---|
-| `workspace_root` | folder holding `specd.yml` | `<repo>/.specd` | `<wrapper>` |
+| `workspace_root` | folder holding `pacenote.yml` | `<repo>/.pacenote` | `<wrapper>` |
 | `code_root` | the code | `<repo>` (`paths.code_root: ".."`) | `<wrapper>/<project>` |
 | `docs_root` | persistent knowledge | `<workspace_root>/docs` | `<workspace_root>/docs`, or inside the code repo if chosen at init |
 | `spec_root` | working set | `<workspace_root>/spec` | `<workspace_root>/spec` |
 
-`paths.*` in `specd.yml` are relative to `workspace_root`. Absolute paths work but do not survive
+`paths.*` in `pacenote.yml` are relative to `workspace_root`. Absolute paths work but do not survive
 a clone, so `init` never writes them.
 
 ## Feature worktrees (wrapper mode, `git.worktrees: true`)
 
 `<wrapper>/.worktrees/<feature>/` is a worktree of the wrapper repo on the feature branch,
 holding a worktree of the code repo on the same branch at `<project>/` inside it. A worktree is
-therefore a complete wrapper layout (`specd.yml`, `CLAUDE.md`, `spec/`, `docs/`, code), and
+therefore a complete wrapper layout (`pacenote.yml`, `CLAUDE.md`, `spec/`, `docs/`, code), and
 resolving from inside it yields its own roots: `workspace_root` is the worktree, `code_root` the
 code worktree. `scripts/worktree` creates and removes them (`start`, `close`); the folder is
 gitignored. The wrapper root sees the features inside worktrees through `state find` and
 `state list --worktrees <wrapper_root>/.worktrees`.
 
-## Finding specd.yml
+## Finding pacenote.yml
 
-From the current directory upward, at each level: `<dir>/specd.yml` (wrapper), then
-`<dir>/.specd/specd.yml` (embedded). The first hit wins. No hit means the workspace is not
-initialised: stop and suggest `/specd:init`.
+From the current directory upward, at each level: `<dir>/pacenote.yml` (wrapper), then
+`<dir>/.pacenote/pacenote.yml` (embedded). The first hit wins. No hit means the workspace is not
+initialised: stop and suggest `/pacenote:init`.
 
 ## The script
 
@@ -44,7 +44,7 @@ It prints one JSON object: `mode`, `project`, `workspace_root`, `code_root`, `do
 one, else empty), `feature` (its name, else empty) and `wrapper_root` (the main checkout;
 equals `workspace_root` outside a worktree). `--feature NAME` resolves from
 `<wrapper_root>/.worktrees/NAME/` when that worktree exists. All paths are absolute. Exit
-code 1 with a one-line message when no `specd.yml` is found.
+code 1 with a one-line message when no `pacenote.yml` is found.
 
 ## Resolving for a feature
 

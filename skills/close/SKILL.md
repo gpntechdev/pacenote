@@ -2,7 +2,7 @@
 name: close
 description: >
   Invoke whenever the user asks to close, finish, wrap up or clean up a delivered feature
-  whose pull request is settled, or runs `/specd:close [feature]`; the last step before the
+  whose pull request is settled, or runs `/pacenote:close [feature]`; the last step before the
   merge. It applies the retention policy: distill (the docs step must have written the
   feature record; then delete the spec folder), clean (delete the spec folder) or keep
   (mark closed and leave it), commits and pushes so the open PR carries the result; in a
@@ -32,7 +32,7 @@ again to clean it). A merged PR is refused: the folder is already on the default
   ([`../_shared/paths.md`](../_shared/paths.md): the opening sequence, which repo holds what).
 - `<spec_root>/<feature>/state.yml` (`retention`, `tier`, `pr`, `branch`, `worktree`).
 - `<docs_root>/features/<feature>.md` (must exist for `distill`).
-- `<workspace_root>/specd.yml`: `flow.retention`, `git.authority`, `git.pr_host`,
+- `<workspace_root>/pacenote.yml`: `flow.retention`, `git.authority`, `git.pr_host`,
   `git.wrapper_pr`.
 - [`../_shared/state-yml.md`](../_shared/state-yml.md),
   [`../deliver/references/git.md`](../deliver/references/git.md) ("Wrapper": the push rule).
@@ -54,17 +54,17 @@ again to clean it). A merged PR is refused: the folder is already on the default
    in `state.yml`, else `clean` for trivial and quick, `flow.retention` for full. Confirm in
    one question: distill / clean / keep, with the default first.
 2. **distill.** `<docs_root>/features/<feature>.md` missing: stop, handoff `Next:
-   /specd:docs <feature>` (the record is written there, then close again). Present:
+   /pacenote:docs <feature>` (the record is written there, then close again). Present:
    `git -C <workspace_root> rm -r <spec_root>/<feature>`.
 3. **clean.** `git -C <workspace_root> rm -r <spec_root>/<feature>`.
 4. **keep.** `state set step=closed retention=keep worktree=`. The folder stays; `status`
-   warns after `flow.keep_days` and `/specd:spec-clean` clears it in a batch.
+   warns after `flow.keep_days` and `/pacenote:spec-clean` clears it in a batch.
 5. **Commit** `docs(<feature>): close (<policy>)` with `git -C <workspace_root>`; push when
    authority ≥ `push` and `branch` is set: the same push as `deliver` in embedded mode, the
    `git.md` "Wrapper" rule when the wrapper is a second repo.
 6. **Wrapper branch** (only when `<workspace_root>` is another repo than `<code_root>`).
    `worktree` set: the session must not sit inside the worktree it removes (`resolve-paths`
-   without `--feature` reports a `worktree`): say `run /specd:close <feature> from
+   without `--feature` reports a `worktree`): say `run /pacenote:close <feature> from
    <wrapper_root>` and stop before anything is removed. Then
    `"${CLAUDE_PLUGIN_ROOT}/scripts/worktree" remove --feature <feature> --from
    <wrapper_root>`; a refusal (dirty code tree) is printed as is and the run stops here,
@@ -81,7 +81,7 @@ again to clean it). A merged PR is refused: the folder is already on the default
    touching `features/README.md`) stops with the files named; resolving or aborting is the
    user's. The code repo is never merged here.
 7. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Produced`: the removal
-   or the closed marker; the merge, when one ran. `Review`: none. `Next: /specd:status`;
+   or the closed marker; the merge, when one ran. `Review`: none. `Next: /pacenote:status`;
    say that merging the PR (from `pr`, if any) is the user's call: in embedded mode the PR
    now carries the removal; in a wrapper the spec history is on the wrapper's default
    branch (or on the wrapper PR's branch until the user merges it) and the code PR is

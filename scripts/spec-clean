@@ -36,14 +36,14 @@ def opt(argv, flag, default=None):
     if flag in argv:
         i = argv.index(flag)
         if i + 1 >= len(argv):
-            print("specd: %s needs a value" % flag, file=sys.stderr)
+            print("pacenote: %s needs a value" % flag, file=sys.stderr)
             sys.exit(2)
         return argv[i + 1]
     return default
 
 
 def refuse(msg):
-    print("specd: %s" % msg, file=sys.stderr)
+    print("pacenote: %s" % msg, file=sys.stderr)
     return 1
 
 
@@ -77,7 +77,7 @@ def scan(spec_root, docs_root, worktrees, days, today):
         if f.get("worktree"):
             out["blocked"].append({"feature": name, "worktree": f["worktree"],
                                    "reason": "close stopped before removing the worktree; "
-                                             "run /specd:close %s from the wrapper root" % name})
+                                             "run /pacenote:close %s from the wrapper root" % name})
             continue
         date = updated_date(f.get("updated", ""))
         if date is None:

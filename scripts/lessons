@@ -42,14 +42,14 @@ def opt(argv, flag, default=None):
     if flag in argv:
         i = argv.index(flag)
         if i + 1 >= len(argv):
-            print("specd: %s needs a value" % flag, file=sys.stderr)
+            print("pacenote: %s needs a value" % flag, file=sys.stderr)
             sys.exit(2)
         return argv[i + 1]
     return default
 
 
 def refuse(msg):
-    print("specd: %s" % msg, file=sys.stderr)
+    print("pacenote: %s" % msg, file=sys.stderr)
     return 1
 
 

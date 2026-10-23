@@ -61,7 +61,7 @@ RUNTIME = ("", "on", "off")
 
 
 def fail(msg):
-    print("specd: %s" % msg, file=sys.stderr)
+    print("pacenote: %s" % msg, file=sys.stderr)
     return 1
 
 
@@ -342,7 +342,7 @@ def cmd_check(argv):
     if step not in STEPS + list(SIDE_STEPS) or step == "closed":
         raise ValueError("unknown step %s" % step)
     if not os.path.isfile(path):
-        return {"ok": False, "reason": "no state file at %s" % path, "run_first": "/specd:start"}
+        return {"ok": False, "reason": "no state file at %s" % path, "run_first": "/pacenote:start"}
     data = load(path)
     current = str(data.get("step", "start"))
     steps = order(data)
@@ -352,28 +352,28 @@ def cmd_check(argv):
     feature = data.get("feature", "")
     if step == "feedback":
         if current == "closed":
-            return {"ok": False, "reason": "%s is closed" % feature, "run_first": "/specd:start"}
+            return {"ok": False, "reason": "%s is closed" % feature, "run_first": "/pacenote:start"}
         if not str(data.get("pr", "")).strip():
             return {"ok": False, "reason": "no PR recorded for %s" % feature,
-                    "run_first": "/specd:deliver %s" % feature}
+                    "run_first": "/pacenote:deliver %s" % feature}
         return {"ok": True, "feature": feature, "step": current, "rerun": False}
     if current == "closed" and step != "close":
-        return {"ok": False, "reason": "%s is closed" % feature, "run_first": "/specd:start"}
+        return {"ok": False, "reason": "%s is closed" % feature, "run_first": "/pacenote:start"}
     if step not in steps:
         out = {"ok": False, "reason": "%s is not in the %s flow" % (step, tier),
-               "run_first": "/specd:%s %s" % (current, feature)}
+               "run_first": "/pacenote:%s %s" % (current, feature)}
         if tier != "full":
-            out["escalate"] = "/specd:start %s --tier %s" % (feature, TIERS[TIERS.index(tier) + 1])
+            out["escalate"] = "/pacenote:start %s --tier %s" % (feature, TIERS[TIERS.index(tier) + 1])
         return out
     cur_i, want_i = steps.index(current), steps.index(step)
     if cur_i < want_i:
         return {"ok": False, "reason": "step is %s, not yet %s" % (current, step),
-                "run_first": "/specd:%s %s" % (current, feature)}
+                "run_first": "/pacenote:%s %s" % (current, feature)}
     fix = data.get("fix") if isinstance(data.get("fix"), dict) else {}
     if step in ("specify", "implement") and str(fix.get("symptom", "")).strip() \
             and not str(fix.get("reproduced", "")).strip():
         return {"ok": False, "reason": "%s is a fix without a reproduction" % feature,
-                "run_first": "/specd:fix %s" % feature}
+                "run_first": "/pacenote:fix %s" % feature}
     needs = []
     if step == "design":
         needs = [("G1", "specify")]
@@ -386,11 +386,11 @@ def cmd_check(argv):
     elif step == "deliver" and current != "deliver":
         before = steps[steps.index("deliver") - 1]
         return {"ok": False, "reason": "step is %s; deliver runs once %s is done" % (current, before),
-                "run_first": "/specd:%s %s" % (current, feature)}
+                "run_first": "/pacenote:%s %s" % (current, feature)}
     for gate, cmd in needs:
         if not gate_ok(data, gate):
             return {"ok": False, "reason": "%s not approved" % gate,
-                    "run_first": "/specd:%s %s" % (cmd, feature)}
+                    "run_first": "/pacenote:%s %s" % (cmd, feature)}
     return {"ok": True, "feature": feature, "step": current, "rerun": cur_i > want_i}
 
 

@@ -1,4 +1,4 @@
-<!-- Written by /specd:research to <docs_root>/research/<YYYY-MM-DD>-<slug>.md when the user
+<!-- Written by /pacenote:research to <docs_root>/research/<YYYY-MM-DD>-<slug>.md when the user
      chooses a docs note; read by anyone who meets the question again. The findings are the
      researcher's answer verbatim: every claim has a URL and the date it was seen. The note
      is not refreshed; a newer answer is a new note. At most 60 lines. -->

@@ -1,4 +1,4 @@
-<!-- Written by /specd:docs to <docs_root>/features/<feature>.md before the PR opens; refreshed
+<!-- Written by /pacenote:docs to <docs_root>/features/<feature>.md before the PR opens; refreshed
      after a feedback cycle; read by later features, by fix and by onboard refreshes. Two
      readers: a person who wants to know what the feature is, and an agent about to change it.
      Only the sections the sources have are written: User flow and How it works need the UX

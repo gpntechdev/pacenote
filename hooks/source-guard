@@ -6,7 +6,7 @@ Usage: source-guard [--help]   (reads the hook JSON on stdin)
 
 1. A Write from the `intake` agent (agent_type `intake` or `<plugin>:intake`) is denied
    (exit 2) unless it writes a `sources/<name>.md` snapshot whose content starts with the
-   `<!-- specd:source ... -->` header.
+   `<!-- pacenote:source ... -->` header.
 2. Any Write whose content starts with that header, from any caller, is redacted with
    scripts/redact before it reaches disk: the hook returns `updatedInput` with the
    redacted content and the header's `redactions=` count. If redaction fails, the write
@@ -31,15 +31,15 @@ import sys
 from importlib.machinery import SourceFileLoader
 
 SCRIPTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
-HEADER = "<!-- specd:source "
+HEADER = "<!-- pacenote:source "
 SNAPSHOT = re.compile(r"(^|/)sources/[^/]+\.md$")
 DIFF = re.compile(r"(^|/)(source-refresh-[^/]*|\.refresh-[^/]*)\.diff$")
-FETCHED = re.compile(r'^<!-- specd:source .*\bvia="(http|mcp:[^"]*)"')
+FETCHED = re.compile(r'^<!-- pacenote:source .*\bvia="(http|mcp:[^"]*)"')
 QUARANTINE = re.compile(r"(^|/)\.quarantine(/|$)")
 
 
 def deny(msg):
-    print("specd source-guard: %s" % msg, file=sys.stderr)
+    print("pacenote source-guard: %s" % msg, file=sys.stderr)
     return 2
 
 
@@ -109,7 +109,7 @@ def main(argv):
     if intake:
         if not SNAPSHOT.search(path) or not is_snapshot:
             return deny("the intake agent may only write sources/<name>.md snapshots with "
-                        "a specd:source header; refused %s" % (path or "a write without a path"))
+                        "a pacenote:source header; refused %s" % (path or "a write without a path"))
     if not is_snapshot:
         return 0
     try:

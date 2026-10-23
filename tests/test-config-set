@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Tests for `scripts/config-set`: scalar patches, and documented keys missing from an older
-specd.yml being inserted at the end of their section before they are set.
+pacenote.yml being inserted at the end of their section before they are set.
 
 Usage: test-config-set [--help]   (run from anywhere; stdlib unittest)
 """
@@ -14,7 +14,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, "scripts", "config-set")
-REFERENCE = os.path.join(ROOT, "skills", "_shared", "specd-yml.md")
+REFERENCE = os.path.join(ROOT, "skills", "_shared", "pacenote-yml.md")
 DROPPED = ("  wrapper_pr:", "  runtime_verify:", "  serve:", "  serve_url:")
 
 
@@ -45,7 +45,7 @@ def run(*args):
 class ConfigSet(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
-        self.path = os.path.join(self.dir.name, "specd.yml")
+        self.path = os.path.join(self.dir.name, "pacenote.yml")
         with open(self.path, "w") as f:
             f.writelines(older_file())
 

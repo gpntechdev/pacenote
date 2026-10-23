@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Patch keys in a specd.yml in place and print what changed as JSON.
+"""Patch keys in a pacenote.yml in place and print what changed as JSON.
 
 Usage: config-set --file PATH key=value [key=value ...]
        config-set --file PATH --add|--remove key=value [key=value ...]
@@ -11,7 +11,7 @@ Refuses list keys, unknown keys, duplicate keys and malformed lines.
 --add appends each value as a `- item` of a list key (skipped when already there) and
 --remove deletes it; scalar keys are refused. Under `layers` a missing key is created,
 so `--add layers.frontend=<path>` opens a new layer. A scalar `section.key` that the default
-in skills/_shared/specd-yml.md documents but the file lacks (a file from before the key) is
+in skills/_shared/pacenote-yml.md documents but the file lacks (a file from before the key) is
 first inserted at the end of its section, copied with its comment lines from the default,
 then set; a key the default does not document is still refused. Exit 1 with a one-line message on any
 refusal. Stdlib only.
@@ -27,11 +27,11 @@ LIST_KEYS = {"skills.allowlist"}
 OPEN_SECTIONS = {"layers"}  # sections whose keys are names chosen by the user
 ITEM = re.compile(r"^(\s*)-\s+(.*?)\s*$")
 REFERENCE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                         "skills", "_shared", "specd-yml.md")
+                         "skills", "_shared", "pacenote-yml.md")
 
 
 def fail(msg):
-    print("specd: %s" % msg, file=sys.stderr)
+    print("pacenote: %s" % msg, file=sys.stderr)
     return 1
 
 

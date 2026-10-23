@@ -5,12 +5,12 @@ description: >
   change, fix, refactor, clean up or review code, tests, scripts or configuration in any language
   or stack, however small the task. It sets the working method (restate the goal and done-when,
   state assumptions, minimal surgical change, verify before reporting) and produces no files.
-  Also on `/specd:principles`. Skip only for questions that change nothing.
+  Also on `/pacenote:principles`. Skip only for questions that change nothing.
 ---
 
 # Skill: principles
 
-Sets how code is written. Produces no artifact. Every specd skill that writes code
+Sets how code is written. Produces no artifact. Every pacenote skill that writes code
 (`implement`, `fix`, `scaffold`) applies this block; it also runs on its own for any coding
 request outside the flow.
 

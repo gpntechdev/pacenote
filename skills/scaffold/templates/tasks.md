@@ -1,4 +1,4 @@
-<!-- Written by /specd:scaffold to <spec_root>/scaffold/tasks.md from architecture/overview.md.
+<!-- Written by /pacenote:scaffold to <spec_root>/scaffold/tasks.md from architecture/overview.md.
      Phases are fixed; tasks are at most 12, ids T1.. in order, each with goal, files and a
      done-when that a command can prove. Nothing here that overview.md does not name: no extra
      tooling, no second smoke test. state.yml mirrors the ids. -->

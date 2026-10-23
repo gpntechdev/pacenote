@@ -3,12 +3,12 @@ name: analyze-codebase
 description: >
   Invoke whenever the user asks where the risky or tangled parts of the codebase are: change
   hotspots, the files that change most, how modules depend on each other, import cycles,
-  coupling, which code has no tests, or runs `/specd:analyze-codebase [path]`. A script ranks
+  coupling, which code has no tests, or runs `/pacenote:analyze-codebase [path]`. A script ranks
   files by commits times size from git history, maps imports to a module graph with fan-in,
   fan-out and cycles, and lists source files no test names; one `explorer` run at the cheap
   role then says what the top hotspots and each cycle are, with `path:line`. It prints one
-  report and writes nothing. Not for a feature's artifacts (that is `/specd:analyze`) or for
-  writing the architecture docs (that is `/specd:onboard architecture`).
+  report and writes nothing. Not for a feature's artifacts (that is `/pacenote:analyze`) or for
+  writing the architecture docs (that is `/pacenote:onboard architecture`).
 ---
 
 # Skill: analyze-codebase
@@ -22,7 +22,7 @@ check`, no write, no commit.
 
 - `resolve-paths` ([`../_shared/paths.md`](../_shared/paths.md)); the argument: a path
   under `<code_root>` to narrow the scan, or none.
-- `<workspace_root>/specd.yml`: `models.cheap`.
+- `<workspace_root>/pacenote.yml`: `models.cheap`.
 - `"${CLAUDE_PLUGIN_ROOT}/scripts/analyze-codebase" scan` output: hotspots, modules,
   cycles with their import lines, test gaps, unsupported languages.
 - `<docs_root>/architecture/overview.md` when present: its area names, to label modules.
@@ -35,7 +35,7 @@ check`, no write, no commit.
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths` (no config: `run /specd:init first`). The argument, when
+1. **Resolve.** `resolve-paths` (no config: `run /pacenote:init first`). The argument, when
    given, must lie under `<code_root>`; else say so and stop.
 2. **Scan.** `"${CLAUDE_PLUGIN_ROOT}/scripts/analyze-codebase" scan --code-root
    <code_root> [--path <argument>]`, plus `--skip <root>` for each of `<workspace_root>`,
@@ -53,7 +53,7 @@ check`, no write, no commit.
 5. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Produced: none`.
    `Review`: the cycles, the hotspots with no test, and that imports are a lower bound
    (unparsed languages and aliased paths are missing). `State: analyze-codebase`. `Next`:
-   `/specd:onboard architecture` when the module graph contradicts
+   `/pacenote:onboard architecture` when the module graph contradicts
    `architecture/overview.md`, else the command the user was running, or `none`.
 
 ## Anti-patterns
@@ -63,4 +63,4 @@ check`, no write, no commit.
 - Turning the report into tasks, docs or a refactoring plan; the user decides what to act on
   and starts a feature for it.
 - Presenting a missing edge as proof of independence; unresolved imports are ignored.
-- Running it per feature; it maps the codebase, `/specd:analyze` checks a feature.
+- Running it per feature; it maps the codebase, `/pacenote:analyze` checks a feature.

@@ -1,5 +1,5 @@
-<!-- specd:draft -->
-<!-- Written by /specd:onboard data-models to <docs_root>/data-models/<domain>.md, one per
+<!-- pacenote:draft -->
+<!-- Written by /pacenote:onboard data-models to <docs_root>/data-models/<domain>.md, one per
      domain. Answers D2..D4. At most 60 lines. Brownfield: entities are one line each with a
      path:line pointer and no fields; the code is the schema. Greenfield: key fields and
      defaults are listed until the code exists; the next refresh replaces them with pointers.

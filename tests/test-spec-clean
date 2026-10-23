@@ -105,7 +105,7 @@ class Scan(Base):
         wts = os.path.join(self.dir.name, ".worktrees")
         wt = os.path.join(wts, "parallel")
         os.makedirs(wt)
-        with open(os.path.join(wt, "specd.yml"), "w") as f:
+        with open(os.path.join(wt, "pacenote.yml"), "w") as f:
             f.write("mode: wrapper\nproject: x\n")
         seed(os.path.join(wt, "spec"), "parallel")
         r = self.scan("--worktrees", wts)

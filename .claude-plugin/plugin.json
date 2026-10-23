@@ -1,13 +1,13 @@
 {
-  "name": "specd",
+  "name": "pacenote",
   "version": "0.1.0",
-  "description": "Spec-driven development workflow for AI coding assistants: intake, spec, design, tasks, implement, review, verify, docs, deliver, feedback, close, fix and critique as /specd: skills, with trivial, quick and full tiers. Stack-agnostic; runs embedded in a code repo or as a wrapper around it.",
+  "description": "Spec-driven development workflow for AI coding assistants: intake, spec, design, tasks, implement, review, verify, docs, deliver, feedback, close, fix and critique as /pacenote: skills, with trivial, quick and full tiers. Stack-agnostic; runs embedded in a code repo or as a wrapper around it.",
   "author": {
     "name": "Andrii Hapon",
     "email": "gpn.techdev@gmail.com"
   },
-  "homepage": "https://github.com/gpntechdev/specd",
-  "repository": "https://github.com/gpntechdev/specd",
+  "homepage": "https://github.com/gpntechdev/pacenote",
+  "repository": "https://github.com/gpntechdev/pacenote",
   "license": "MIT",
-  "keywords": ["specd", "spec-driven-development", "workflow", "claude-code", "plugin"]
+  "keywords": ["pacenote", "spec-driven-development", "workflow", "claude-code", "plugin"]
 }

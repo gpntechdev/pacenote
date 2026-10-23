@@ -5,7 +5,7 @@ should read before writing code there, phrased so a skill could meet it.
 
 ## Layers
 
-- Take the layer names already in `specd.yml` `layers` first; they are the vocabulary
+- Take the layer names already in `pacenote.yml` `layers` first; they are the vocabulary
   `tasks` uses, so never rename one.
 - Add layers from `<docs_root>/architecture/overview.md` (areas, stack table) and the
   detection output (`detect-repo` languages and manifests, `detect-commands` runner):

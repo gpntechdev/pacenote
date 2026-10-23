@@ -1,7 +1,7 @@
 # Analyst prompt and report
 
 One `analyst` dispatch per run at the `judgment` model role (read `models.judgment` from
-`specd.yml` and pass it as the agent's model). Every path absolute. The agent gets files and
+`pacenote.yml` and pass it as the agent's model). Every path absolute. The agent gets files and
 the script's results, never the conversation.
 
 ## Dispatch
@@ -30,7 +30,7 @@ analyze: <feature> · <S count> coverage · <A count> judged
 S<n> · <kind> · <file>:<line> · <detail> · owner: <step>
 A<n> · <kind> · <pointers> · <sentence> · resolve: <question> · owner: <step>
 
-Owners: /specd:tasks <feature> — S1, S3, A2 · /specd:design <feature> — A1
+Owners: /pacenote:tasks <feature> — S1, S3, A2 · /pacenote:design <feature> — A1
 ```
 
 - `S` rows come from the script in its order, `A` rows from the agent as returned (its

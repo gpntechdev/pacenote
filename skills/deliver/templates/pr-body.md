@@ -1,4 +1,4 @@
-<!-- Rendered by /specd:deliver into the draft PR or MR body, and re-rendered on every
+<!-- Rendered by /pacenote:deliver into the draft PR or MR body, and re-rendered on every
      re-deliver (the host CLI updates the open PR's description). Written for a reviewer who
      has not read the spec: plain prose in the voice of a colleague; no attribution, no tool or
      command names, no task, finding or AC ids, no commit messages, no review rounds. Sections

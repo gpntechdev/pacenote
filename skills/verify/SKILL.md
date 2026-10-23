@@ -2,12 +2,12 @@
 name: verify
 description: >
   Invoke whenever the user asks to verify the feature, check acceptance-criteria coverage,
-  fill the evidence matrix, or runs `/specd:verify [feature]`; also as the next step after a
-  clean `/specd:review`. It runs the project checks, confirms every acceptance criterion has
+  fill the evidence matrix, or runs `/pacenote:verify [feature]`; also as the next step after a
+  clean `/pacenote:review`. It runs the project checks, confirms every acceptance criterion has
   evidence (a passing named test, a green check, or a manual note you give), writes that
   evidence into the coverage matrix in `tasks.md`, asks whether to exercise the running app
   next, and hands off to runtime-verify, docs, or deliver when the feature is already on a
-  PR. Not for running the app end to end; that is `/specd:runtime-verify`.
+  PR. Not for running the app end to end; that is `/pacenote:runtime-verify`.
 ---
 
 # Skill: verify
@@ -25,7 +25,7 @@ review's AC table stands as evidence, trivial has no acceptance criteria).
 
 - `resolve-paths`, `state find`, `state check`, `run-checks`.
 - `<spec_root>/<feature>/tasks.md` (matrix), `spec.md` (AC text), `state.yml`.
-- `<workspace_root>/specd.yml`: `git.authority`, `flow.runtime_verify`.
+- `<workspace_root>/pacenote.yml`: `git.authority`, `flow.runtime_verify`.
 - [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md).
 
 ## Outputs
@@ -39,7 +39,7 @@ review's AC table stands as evidence, trivial has no acceptance criteria).
 1. **Resolve** per `paths.md` ("Resolving for a feature"), `state check --step verify` per
    `gates.md`. Set `step=verify`.
 2. **Run.** `"${CLAUDE_PLUGIN_ROOT}/scripts/run-checks" --from <code_root>`. Any red check:
-   stop, show its tail, handoff `Next: /specd:implement <feature>`.
+   stop, show its tail, handoff `Next: /pacenote:implement <feature>`.
 3. **Automated evidence.** For each matrix row whose Test names a test case: `grep` the
    name under `<code_root>` (skip vendored folders); found and the test suite green →
    `test <name> passed (<test command>, <date>)`; not found → `missing`. Rows whose Test
@@ -49,7 +49,7 @@ review's AC table stands as evidence, trivial has no acceptance criteria).
    seen); record `manual: <note> (<date>)`. Never write a note the user did not give.
 5. **Gaps.** Show the matrix. A row still `missing`: offer to add a task (append to
    `tasks.md` under `Verify fixes`, `state set tasks.T<k>=todo step=implement`, handoff to
-   `/specd:implement`) or to accept it with a reason written into the cell. All rows filled:
+   `/pacenote:implement`) or to accept it with a reason written into the cell. All rows filled:
    go on.
 6. **Runtime.** Full tier, `flow.runtime_verify` not `off` (a missing key means `ask`), and
    an AC a running app can show (a request and its response, or what a page shows): one
@@ -59,8 +59,8 @@ review's AC table stands as evidence, trivial has no acceptance criteria).
    `deliver` when `pr` is set: the record was written before the PR), then commit with
    `git -C <workspace_root>`.
 7. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: manual and
-   accepted rows. `Next: /specd:<step> <feature>` with the step reported; when it is
-   `deliver` on a PR, one line: run `/specd:docs` first if the fixes changed what the
+   accepted rows. `Next: /pacenote:<step> <feature>` with the step reported; when it is
+   `deliver` on a PR, one line: run `/pacenote:docs` first if the fixes changed what the
    feature record says.
 
 ## Anti-patterns

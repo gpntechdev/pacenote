@@ -3,10 +3,10 @@
 
 Usage: detect-commands [--from DIR] [--config PATH]
 
-Cascade per command, first hit wins: specd.yml `commands.*` override -> Makefile targets ->
+Cascade per command, first hit wins: pacenote.yml `commands.*` override -> Makefile targets ->
 package.json scripts -> language manifests. A command is only reported when the tool is
-evidenced; nothing is invented. --config defaults to the specd.yml found upward from DIR
-(`<dir>/specd.yml`, then `<dir>/.specd/specd.yml`). Stdlib only.
+evidenced; nothing is invented. --config defaults to the pacenote.yml found upward from DIR
+(`<dir>/pacenote.yml`, then `<dir>/.pacenote/pacenote.yml`). Stdlib only.
 """
 import json
 import os
@@ -36,7 +36,7 @@ LOCKFILES = [("pnpm-lock.yaml", "pnpm"), ("yarn.lock", "yarn"), ("bun.lockb", "b
 def find_config(start):
     d = os.path.abspath(start)
     while True:
-        for rel in ("specd.yml", os.path.join(".specd", "specd.yml")):
+        for rel in ("pacenote.yml", os.path.join(".pacenote", "pacenote.yml")):
             p = os.path.join(d, rel)
             if os.path.isfile(p):
                 return p
@@ -55,7 +55,7 @@ def read_text(path):
 
 
 def config_commands(path):
-    """Return the `commands:` section of a flat specd.yml as {key: value}."""
+    """Return the `commands:` section of a flat pacenote.yml as {key: value}."""
     out, section = {}, None
     for raw in read_text(path).splitlines():
         line = raw.split("#", 1)[0].rstrip()
@@ -197,7 +197,7 @@ def main(argv):
         if flag in argv:
             i = argv.index(flag)
             if i + 1 >= len(argv):
-                print("specd: %s needs a value" % flag, file=sys.stderr)
+                print("pacenote: %s needs a value" % flag, file=sys.stderr)
                 return 2
             if flag == "--from":
                 start = argv[i + 1]
@@ -205,7 +205,7 @@ def main(argv):
                 config = argv[i + 1]
     start = os.path.abspath(start)
     if not os.path.isdir(start):
-        print("specd: cannot read directory %s" % start, file=sys.stderr)
+        print("pacenote: cannot read directory %s" % start, file=sys.stderr)
         return 1
     try:
         r = subprocess.run(["git", "-C", start, "rev-parse", "--show-toplevel"],
@@ -216,7 +216,7 @@ def main(argv):
     if config is None:
         config = find_config(start)
     elif not os.path.isfile(config):
-        print("specd: config not found: %s" % config, file=sys.stderr)
+        print("pacenote: config not found: %s" % config, file=sys.stderr)
         return 1
     warnings = []
     runner, commands = detect(root, config, warnings)

@@ -25,7 +25,7 @@ re-anchorable pointer or link on that line, so one plan step per line covers the
   architecture/<area>.md 60, data-models/<domain>.md 60, features/<feature>.md 150,
   decisions/NNNN-*.md 40, research/<note>.md 60. At the cap is not over. lessons.md is
   lessons-prune's.
-- drafts: files whose line 1 is the `<!-- specd:draft -->` marker, with the onboard section.
+- drafts: files whose line 1 is the `<!-- pacenote:draft -->` marker, with the onboard section.
 - readmes: features/, decisions/ and research/ against their README.md: `missing_row` (a
   file no row names; with its H1, and for a decision its Date and Status), `stale_row` (a row naming a
   file that is gone), `no_readme`. A row names a file by a link to it, or by its first cell
@@ -50,7 +50,7 @@ import os
 import re
 import sys
 
-DRAFT = "<!-- specd:draft -->"
+DRAFT = "<!-- pacenote:draft -->"
 POINTER = re.compile(r"`([^`\s:]+):(\d+)(?:-(\d+))?`")
 TICKED = re.compile(r"`([^`]+)`")
 LINK = re.compile(r"\]\(([^)\s#]+)(#[^)\s]*)?\)")
@@ -70,14 +70,14 @@ def opt(argv, flag, default=None):
     if flag in argv:
         i = argv.index(flag)
         if i + 1 >= len(argv):
-            print("specd: %s needs a value" % flag, file=sys.stderr)
+            print("pacenote: %s needs a value" % flag, file=sys.stderr)
             sys.exit(2)
         return argv[i + 1]
     return default
 
 
 def refuse(msg):
-    print("specd: %s" % msg, file=sys.stderr)
+    print("pacenote: %s" % msg, file=sys.stderr)
     return 1
 
 
@@ -356,7 +356,7 @@ def unlinked_sources(sources, docs_root, spec_root):
             with open(p, encoding="utf-8") as f:
                 first = f.readline()
             header = {k: v for k, v in SOURCE_HEADER.findall(first)
-                      if k in ("title", "origin", "via")} if first.startswith("<!-- specd:source") else {}
+                      if k in ("title", "origin", "via")} if first.startswith("<!-- pacenote:source") else {}
         except (OSError, UnicodeDecodeError):
             pass
         out.append(dict({"check": "sources", "kind": "unlinked", "file": p}, **header))

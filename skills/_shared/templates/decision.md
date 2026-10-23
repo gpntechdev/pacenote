@@ -1,4 +1,4 @@
-<!-- specd:draft -->
+<!-- pacenote:draft -->
 <!-- One decision, to <docs_root>/decisions/NNNN-<kebab-title>.md, four digits, next free
      number. Status: proposed | accepted | superseded by NNNN. At most 40 lines: context is
      the forces, decision is one paragraph, consequences are honest, including the bad ones.

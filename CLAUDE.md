@@ -1,4 +1,4 @@
-# specd
+# pacenote
 
 Spec-driven development workflow for AI coding assistants, packaged as a Claude Code plugin.
 Stack-agnostic; works embedded in a code repo or as a wrapper around it.
@@ -34,7 +34,7 @@ docs/             PLAN.md, DECISIONS.md, AUTHORING.md
 - Subagents return a bounded summary with file:line pointers, never file dumps.
 - Deterministic work (command detection, static audit, state validation) is a script in
   `scripts/`, not a prompt.
-- No skill hardcodes paths; resolve `workspace_root`, `code_root`, `docs_root` from `specd.yml`.
+- No skill hardcodes paths; resolve `workspace_root`, `code_root`, `docs_root` from `pacenote.yml`.
 - Model tiers are roles (`judgment`, `execution`, `cheap`), never model names.
 
 ## Coding principles (apply to this repo too)
@@ -46,7 +46,7 @@ task has a verifiable done-when.
 
 ## Working here
 
-- Naming: prefix `/specd:`, config `specd.yml`, embedded folder `.specd/`.
+- Naming: prefix `/pacenote:`, config `pacenote.yml`, embedded folder `.pacenote/`.
 - Use plan mode for anything that sets a convention others will copy.
 - Run `scripts/validate`, `tests/test-*` and `claude plugin validate .` before finishing a task.
 - Commits: Conventional Commits, no AI attribution lines.

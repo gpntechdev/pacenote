@@ -27,7 +27,7 @@ def opt(argv, flag, default=None):
     if flag in argv:
         i = argv.index(flag)
         if i + 1 >= len(argv):
-            print("specd: %s needs a value" % flag, file=sys.stderr)
+            print("pacenote: %s needs a value" % flag, file=sys.stderr)
             sys.exit(2)
         return argv[i + 1]
     return default
@@ -39,7 +39,7 @@ def git(root, *args):
 
 
 def refuse(msg):
-    print("specd: %s" % msg, file=sys.stderr)
+    print("pacenote: %s" % msg, file=sys.stderr)
     return 1
 
 
@@ -98,7 +98,7 @@ def main(argv):
         print(json.dumps(out, indent=2))
         return 0
 
-    fd, path = tempfile.mkstemp(prefix="specd-squash-", suffix=".txt")
+    fd, path = tempfile.mkstemp(prefix="pacenote-squash-", suffix=".txt")
     try:
         with os.fdopen(fd, "w") as f:
             f.write(out["message"])

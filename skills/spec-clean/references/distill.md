@@ -22,7 +22,7 @@ file states only what differs when the feature shipped weeks ago and its branch 
 - `How to verify`: test names from `tasks.md` whose file still exists; drop the rest.
 - No architecture or data-model deltas: the code has moved on since, and a patch from an old
   design would state stale facts. One Notes line instead: `Architecture and data models not
-  updated from this record; /specd:onboard architecture refreshes them.`
+  updated from this record; /pacenote:onboard architecture refreshes them.`
 - Decisions: the `### D<n>` blocks were already judged in the proposal (step 3) by the
   durability test; write only the approved ones, numbered after the highest existing file,
   dated today, with `Consequences` drafted from `review.md` and the record's Notes. A title

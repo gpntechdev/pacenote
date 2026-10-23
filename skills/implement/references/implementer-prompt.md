@@ -1,6 +1,6 @@
 # Implementer prompt
 
-One dispatch per task at the `execution` model role (read `models.execution` from `specd.yml`
+One dispatch per task at the `execution` model role (read `models.execution` from `pacenote.yml`
 and pass it as the agent's model). Every path absolute. Nothing beyond what is listed.
 
 ```
@@ -64,6 +64,6 @@ layers the feature's tasks name, or "none">. Code root: <code_root>. Do not comm
 Answer in the fixed four-section shape, at most 30 lines.
 ```
 
-Layer files come from `specd.yml` `layers.<name>`, one list per layer, paths relative to
+Layer files come from `pacenote.yml` `layers.<name>`, one list per layer, paths relative to
 `code_root`; the main thread resolves them to absolute paths and drops, with a note for the
 handoff, any that do not exist. The agent reads them; their text never enters the prompt.

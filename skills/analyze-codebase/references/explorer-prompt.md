@@ -1,7 +1,7 @@
 # Explorer prompt and report
 
 One `explorer` dispatch per run at the `cheap` model role (read `models.cheap` from
-`specd.yml` and pass it as the agent's model). Every path absolute. The agent gets the files
+`pacenote.yml` and pass it as the agent's model). Every path absolute. The agent gets the files
 the script pointed at, never the conversation or the whole tree.
 
 ## Dispatch

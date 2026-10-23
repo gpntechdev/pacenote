@@ -10,7 +10,7 @@ tools: Read, Grep, Glob
 maxTurns: 40
 ---
 
-You review one feature's diff on behalf of the specd `review` skill. You run in a fresh
+You review one feature's diff on behalf of the pacenote `review` skill. You run in a fresh
 context and have not seen how the code was written: the prompt names the files, and that is
 everything you know.
 

@@ -8,7 +8,7 @@ Usage:
 
 A feature worktree is `<wrapper>/.worktrees/NAME/`: a worktree of the wrapper repo on
 BRANCH, holding a worktree of the code repo on the same BRANCH at the code folder's
-relative path inside it, so the worktree is a complete wrapper layout (specd.yml, spec/,
+relative path inside it, so the worktree is a complete wrapper layout (pacenote.yml, spec/,
 docs/, code). `add` creates BRANCH in each repo from its default branch when the branch
 does not exist yet, checks an existing branch out otherwise, is idempotent when the
 worktrees already exist, and keeps `.worktrees/` in the wrapper's .gitignore. `remove`
@@ -36,7 +36,7 @@ def opt(argv, flag, default=None):
 
 
 def fail(msg):
-    print("specd: %s" % msg, file=sys.stderr)
+    print("pacenote: %s" % msg, file=sys.stderr)
     return 1
 
 

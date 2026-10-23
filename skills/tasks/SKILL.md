@@ -2,11 +2,11 @@
 name: tasks
 description: >
   Invoke whenever the user asks to break a designed feature into tasks, plan the work, write
-  the task list or test plan, or runs `/specd:tasks [feature]`; also as the next step after
-  `/specd:design`. It reads the spec and design, writes `tasks.md` (phases, tasks of at most
+  the task list or test plan, or runs `/pacenote:tasks [feature]`; also as the next step after
+  `/pacenote:design`. It reads the spec and design, writes `tasks.md` (phases, tasks of at most
   a day with a verifiable done-when, a fixed commit message, a tests block when TDD is on)
   and the acceptance-criterion coverage matrix, asks you to approve the list (G3), mirrors
-  the task ids into `state.yml` and commits. Not for writing code; that is `/specd:implement`.
+  the task ids into `state.yml` and commits. Not for writing code; that is `/pacenote:implement`.
 ---
 
 # Skill: tasks
@@ -25,7 +25,7 @@ clears G3..G5 on write; tasks already `done` stay `done`.
 - `resolve-paths`, `detect-repo`, `state find`, `state check`.
 - `<spec_root>/<feature>/spec.md`, `design.md` (when present), `state.yml`.
 - `<docs_root>/conventions.md` (test layout, naming, commit scopes), `project.md` (commands).
-- `<workspace_root>/specd.yml`: `flow.tdd`, `flow.gate_granularity`, `git.authority`,
+- `<workspace_root>/pacenote.yml`: `flow.tdd`, `flow.gate_granularity`, `git.authority`,
   `layers.*` (the `layer` vocabulary).
 - [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md).
 - `./templates/tasks.md`, [`./references/breakdown.md`](./references/breakdown.md).
@@ -45,7 +45,7 @@ clears G3..G5 on write; tasks already `done` stay `done`.
    full or from an earlier run, is revised in place: ids and `done` tasks stay, new tasks
    get new ids): phases in build order, tasks `T1..` in dependency order, each with
    `goal`, `files`, `done-when`, `depends-on`, `risk`, `commit`, `covers`, a `layer` when
-   `specd.yml` `layers` names one it touches, and with `flow.tdd: true` a `tests:` block
+   `pacenote.yml` `layers` names one it touches, and with `flow.tdd: true` a `tests:` block
    naming the test cases derived from the ACs it covers.
    The last phase is always `Verify` with one task: every project check green. **Heavy
    tasks:** a task whose body would pass about 100 lines first gets the split question (is
@@ -64,8 +64,8 @@ clears G3..G5 on write; tasks already `done` stay `done`.
    `spec(<feature>): tasks`.
 5. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: the high-risk
    tasks and any AC left without automated evidence. State the granularity in force
-   (`flow.gate_granularity`) and that `/specd:config flow.gate_granularity=task|phase|end`
-   changes it. `Next: /specd:implement <feature>`.
+   (`flow.gate_granularity`) and that `/pacenote:config flow.gate_granularity=task|phase|end`
+   changes it. `Next: /pacenote:implement <feature>`.
 
 ## Anti-patterns
 

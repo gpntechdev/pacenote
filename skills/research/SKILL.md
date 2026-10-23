@@ -4,14 +4,14 @@ description: >
   Invoke first, before any web search or fetch, whenever the user asks to research, look
   up or check an external fact (the current recommended way to do X in a library, which
   versions are supported, whether an API is deprecated, a documented limit), asks "what do
-  the docs say about", or runs `/specd:research "<question>" [--feature <name>]`. It sends
+  the docs say about", or runs `/pacenote:research "<question>" [--feature <name>]`. It sends
   each question (at most three) to the `researcher` agent at the judgment role, Context7
   first, and prints its cited findings with the date each source was seen. Then it asks
   where the answer goes: a section in the active feature's `research.md`, a dated note
   under `<docs_root>/research/`, or nowhere, and commits once, never on a default branch.
   The main thread never fetches a page itself. Not for questions about this codebase (that
   is an explorer scan) or for taking in a ticket or page as a feature source (that is
-  `/specd:start --from`).
+  `/pacenote:start --from`).
 ---
 
 # Skill: research
@@ -30,7 +30,7 @@ written without a yes. The dispatch and both write formats are in
 - `resolve-paths` and, softly, `state find` ([`../_shared/paths.md`](../_shared/paths.md)):
   a refusal, an ambiguity or a closed feature means no feature, not a stop.
   `detect-repo --from <root>` for the repo that will change.
-- `<workspace_root>/specd.yml`: `models.judgment`, `git.authority`.
+- `<workspace_root>/pacenote.yml`: `models.judgment`, `git.authority`.
 - `<docs_root>/project.md`: the stack and versions line, for the constraints.
 - `<docs_root>/research/README.md`, to check whether the question was asked before and to
   add a row; the feature's `research.md` when appending to it.
@@ -48,13 +48,13 @@ written without a yes. The dispatch and both write formats are in
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths` (no config: `run /specd:init first`). `state find
+1. **Resolve.** `resolve-paths` (no config: `run /pacenote:init first`). `state find
    --spec-root <spec_root> --worktrees <wrapper_root>/.worktrees [--feature <name>]`; keep
    the feature only when it resolves to one whose `step` is not `closed`. A named
    `--feature` that does not resolve: say so in one line and go on without it.
 2. **Frame.** Turn the argument into at most three one-sentence questions; more: ask which
    three. A question about this codebase is not researched: say it is an explorer scan
-   (`/specd:onboard`, or the feature's own steps) and drop it. When `research/README.md`
+   (`/pacenote:onboard`, or the feature's own steps) and drop it. When `research/README.md`
    already has a row for the same question, name that note and its date in one line, then
    go on: a newer answer is a new note.
 3. **Dispatch** `researcher` per `research.md` "Dispatch", one per question, in parallel,

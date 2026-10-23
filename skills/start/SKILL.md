@@ -3,15 +3,15 @@ name: start
 description: >
   Invoke whenever the user asks to start, open or kick off a feature, task, ticket or piece
   of work with the workflow, hands over a ticket text or file to build from, asks to
-  escalate a feature to a bigger tier, or runs `/specd:start <feature> [--from
+  escalate a feature to a bigger tier, or runs `/pacenote:start <feature> [--from
   <path|url|TICKET-KEY>] [--tier trivial|quick|full]`. It opens `<spec_root>/<feature>/`,
   distils the input (a sentence, pasted text, a local file, a web page or a Jira ticket with
   its linked pages, fetched by an isolated agent) into `brief.md`, sizes the work with one codebase
   scan and proposes a tier you confirm (or takes the one given), writes `state.yml`, creates
   the feature branch (in a feature worktree when the wrapper uses them) and commits; on a
   feature that already exists, `--tier` raises its tier and carries the work over. Not for
-  writing the spec itself; that is `/specd:specify`, which it hands off to, and not for
-  bugs with a reproduction step; that is `/specd:fix`.
+  writing the spec itself; that is `/pacenote:specify`, which it hands off to, and not for
+  bugs with a reproduction step; that is `/pacenote:fix`.
 ---
 
 # Skill: start
@@ -26,7 +26,7 @@ runs every step (`state-yml.md`, "Step order per tier").
 
 - `"${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths"`, `detect-repo --from <code_root>`,
   `detect-commands --from <code_root>` (the runner, for the dependency line).
-- `<workspace_root>/specd.yml`: `git.authority`, `git.ticket_key`, `git.worktrees`,
+- `<workspace_root>/pacenote.yml`: `git.authority`, `git.ticket_key`, `git.worktrees`,
   `models.cheap`, `flow.retention`, `sources.mcp`.
 - The arguments: feature name, `--tier <tier>` (optional), and the input: `--from
   <path|url|KEY>`, pasted text, or a sentence.
@@ -50,12 +50,12 @@ runs every step (`state-yml.md`, "Step order per tier").
 
 ## Protocol
 
-1. **Resolve.** Run `resolve-paths` (no config: `run /specd:init first`, stop) and
+1. **Resolve.** Run `resolve-paths` (no config: `run /pacenote:init first`, stop) and
    `detect-repo --from <code_root>`. The feature name is the argument: a kebab-case slug or a
    ticket key. None given: ask for one. The branch name follows `no-attribution.md`
    (`<KEY>-<n>-<slug>` when `git.ticket_key` is set, else `feat/<slug>`; empty when authority
    is `none`). `state find --feature <feature> --worktrees <wrapper_root>/.worktrees` finds
-   it: with `--tier`, go to step 10; without, say `already started; run /specd:status` and
+   it: with `--tier`, go to step 10; without, say `already started; run /pacenote:status` and
    end with the handoff block.
 2. **Place.** `git.worktrees` true and authority ≠ `none`: run
    `"${CLAUDE_PLUGIN_ROOT}/scripts/worktree" add --feature <feature> --branch <branch>` (it
@@ -97,8 +97,8 @@ runs every step (`state-yml.md`, "Step order per tier").
    `spec(<feature>): start`, no attribution.
 9. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: the gaps list and
    the tier; with a worktree, its path and "the code worktree is a fresh checkout: install
-   dependencies in `<code_root>` before `/specd:implement`" (`<runner> install` when
-   `detect-commands` reported a runner). `Next: /specd:<step> <feature>` with the step
+   dependencies in `<code_root>` before `/pacenote:implement`" (`<runner> install` when
+   `detect-commands` reported a runner). `Next: /pacenote:<step> <feature>` with the step
    `state init` reported; with a worktree, a second line: "or launch a session in
    `<worktree>` and run it there without the name".
 10. **Escalate** (existing feature, `--tier`). `state find`, then `"${CLAUDE_PLUGIN_ROOT}/
@@ -106,7 +106,7 @@ runs every step (`state-yml.md`, "Step order per tier").
     closed) is printed as is. Show its output in at most six lines: from → to, the step it
     rewound to, the gates cleared, the files kept, the tasks already done. Commit `state.yml`
     as `spec(<feature>): escalate to <tier>` (authority ≠ `none`). Handoff: `Review` says
-    what the new tier adds (a spec, a design, a review); `Next: /specd:<step> <feature>` with
+    what the new tier adds (a spec, a design, a review); `Next: /pacenote:<step> <feature>` with
     the step the script reported.
 
 ## Anti-patterns

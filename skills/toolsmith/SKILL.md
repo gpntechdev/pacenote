@@ -3,17 +3,17 @@ name: toolsmith
 description: >
   Invoke whenever the user asks to find, install, vet, audit, update or generate project
   skills for this codebase, asks which MCP servers the project should use, says the stack
-  changed (a new framework, a new layer), or runs `/specd:toolsmith [<need>] [--from
-  <skill folder>] [--update]`; also as the last step after `/specd:onboard` or `/specd:scaffold`.
+  changed (a new framework, a new layer), or runs `/pacenote:toolsmith [<need>] [--from
+  <skill folder>] [--update]`; also as the last step after `/pacenote:onboard` or `/pacenote:scaffold`.
   Per need of the detected stack it finds candidates in the skills.sh index (the search
   behind find-skills), offers repos you have not allowlisted yet for the allowlist, fetches
   the best candidate from an allowlisted repo into a quarantine Claude Code never loads, runs the two-stage audit (a static
   script, then an isolated auditor agent), shows you the report and installs only on your
   yes, pinned to a commit in `skills.lock`; when nothing passes it generates a project skill
   from the codebase's conventions and current library docs. Every skill is registered under
-  its layer in `specd.yml`, so implement and review read it. Then it proposes MCP servers
+  its layer in `pacenote.yml`, so implement and review read it. Then it proposes MCP servers
   for the stack and installs the ones you confirm. Not for changing other settings; that is
-  `/specd:config`.
+  `/pacenote:config`.
 ---
 
 # Skill: toolsmith
@@ -29,7 +29,7 @@ Not a flow step: no `state.yml`, no gate.
 
 - `"${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths"`, `detect-repo --from <code_root>`,
   `detect-commands --from <code_root>`.
-- `<workspace_root>/specd.yml`: `skills.allowlist`, `skills.discovery`, `layers.*`, `models.*`,
+- `<workspace_root>/pacenote.yml`: `skills.allowlist`, `skills.discovery`, `layers.*`, `models.*`,
   `git.authority`, `sources.mcp`. `<workspace_root>/skills.lock` through `skill-lock`.
 - `<docs_root>/project.md`, `<docs_root>/architecture/overview.md`,
   `<docs_root>/conventions.md` when present; the `.mcp.json` server names.
@@ -45,13 +45,13 @@ Not a flow step: no `state.yml`, no gate.
   `<repo>/.claude/skills/<name>/` (embedded), `<wrapper>/.claude/skills/<name>/`
   (wrapper), `<workspace_root>/skills/<name>/` (private).
 - `<workspace_root>/skills.lock` (written by `skill-lock` only); `layers.<layer>` items in
-  `specd.yml` (by `config-set --add`); servers in `.mcp.json` (by `init-workspace`).
+  `pacenote.yml` (by `config-set --add`); servers in `.mcp.json` (by `init-workspace`).
 - One commit `chore(skills): <what was added>` in the repo holding the skill home (none in
   private mode or with authority `none`). The quarantine is removed before it.
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths` (no config: `run /specd:init first`, stop),
+1. **Resolve.** `resolve-paths` (no config: `run /pacenote:init first`, stop),
    `detect-repo` and `detect-commands --from <code_root>`. Run
    `"${CLAUDE_PLUGIN_ROOT}/scripts/skill-lock" verify --workspace <workspace_root>`;
    `modified` or `missing` entries go to step 10 first. `--update`: step 10 only, then 12.
@@ -104,16 +104,16 @@ Not a flow step: no `state.yml`, no gate.
 11. **MCP.** Propose servers per `mcp.md` from the stack, the layers and `sources.mcp`,
     skipping those already in `.mcp.json`; one multi-select question with a reason each.
     For each yes: `"${CLAUDE_PLUGIN_ROOT}/scripts/init-workspace" --root <root> --add-mcp
-    <name>` (`<root>`: `wrapper_root`, or the repo holding `.specd/`); show its report and
+    <name>` (`<root>`: `wrapper_root`, or the repo holding `.pacenote/`); show its report and
     the follow-up line `mcp.md` gives for the server.
 12. **Clean and commit.** `skill-fetch clean --workspace <workspace_root>`. Stage exactly
-    the skill folders written, `skills.lock`, `specd.yml` and `.mcp.json` when changed;
+    the skill folders written, `skills.lock`, `pacenote.yml` and `.mcp.json` when changed;
     commit `chore(skills): <names and layers>` with `git -C` the repo holding them, no
     attribution. Private mode or authority `none`: no commit, say so.
 13. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Produced`: skill
     folders, lock, config, `.mcp.json`. `Review`: every `warn` accepted, every refusal and
     why, generated skills to read once. `State`: `toolsmith`. `Next`: what the user was
-    doing; `/specd:start <feature>` by default.
+    doing; `/pacenote:start <feature>` by default.
 
 ## Anti-patterns
 

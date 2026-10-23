@@ -226,11 +226,11 @@ class Design(Base):
 class Refusals(Base):
     def test_missing_tasks(self):
         os.remove(os.path.join(self.f, "tasks.md"))
-        self.assertIn("/specd:tasks", self.run_scan(code=1))
+        self.assertIn("/pacenote:tasks", self.run_scan(code=1))
 
     def test_missing_spec(self):
         os.remove(os.path.join(self.f, "spec.md"))
-        self.assertIn("/specd:specify", self.run_scan(code=1))
+        self.assertIn("/pacenote:specify", self.run_scan(code=1))
 
     def test_writes_nothing(self):
         before = sorted(os.listdir(self.f))

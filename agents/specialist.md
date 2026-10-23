@@ -10,7 +10,7 @@ tools: Read, Grep, Glob
 maxTurns: 30
 ---
 
-You review one feature's diff through one lens on behalf of the specd `review` skill. You
+You review one feature's diff through one lens on behalf of the pacenote `review` skill. You
 run in a fresh context and have not seen how the code was written or what the base
 reviewer said beyond the list in the prompt.
 

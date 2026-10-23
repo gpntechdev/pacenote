@@ -2,11 +2,11 @@
 name: design
 description: >
   Invoke whenever the user asks to design, architect or plan how a specified feature will be
-  built, or runs `/specd:design [feature]`; also as the next step after `/specd:specify`. It
+  built, or runs `/pacenote:design [feature]`; also as the next step after `/pacenote:specify`. It
   decides which design sections the feature needs from the spec's signals, has the architect
   agent draft `design.md` from the spec, the project docs and the code, walks you through its
   decisions and open questions, asks you to approve it (G2) and commits. Not for writing
-  requirements (`/specd:specify`) or for breaking work into tasks (`/specd:tasks`).
+  requirements (`/pacenote:specify`) or for breaking work into tasks (`/pacenote:tasks`).
 ---
 
 # Skill: design
@@ -27,7 +27,7 @@ signal fires). `rerun: true` clears G2..G5 on write; ask first.
   present (dated findings, per [`../_shared/research.md`](../_shared/research.md)).
 - `<docs_root>/project.md`, `architecture/overview.md` and the area files it names,
   `conventions.md`, `data-models/` when present.
-- `<workspace_root>/specd.yml`: `models.judgment`, `flow.critic`, `git.authority`.
+- `<workspace_root>/pacenote.yml`: `models.judgment`, `flow.critic`, `git.authority`.
 - [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md),
   [`../_shared/critic.md`](../_shared/critic.md).
 - [`./references/sections.md`](./references/sections.md),
@@ -67,7 +67,7 @@ signal fires). `rerun: true` clears G2..G5 on write; ask first.
    step=tasks`, clear G3..G5 when re-running, commit `spec(<feature>): design`
    (with `research.md` when it was appended).
 7. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Review`: the decisions
-   that could go another way. `Next: /specd:tasks <feature>`.
+   that could go another way. `Next: /pacenote:tasks <feature>`.
 
 ## Anti-patterns
 

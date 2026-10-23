@@ -2,8 +2,8 @@
 name: docs
 description: >
   Invoke whenever the user asks to write the feature record, distil the feature into the
-  project docs, record its decisions, or runs `/specd:docs [feature]`; also as the next step
-  after `/specd:verify`. It writes what survives the feature into `<docs_root>/`: the
+  project docs, record its decisions, or runs `/pacenote:docs [feature]`; also as the next step
+  after `/pacenote:verify`. It writes what survives the feature into `<docs_root>/`: the
   feature record, decision files, architecture and data-model deltas, so the pull request
   carries them from the start. It leaves the spec folder in place; `close` removes it after
   the PR is settled. Not for user-facing documentation inside the code; that is a task.
@@ -28,7 +28,7 @@ refresh the record.
   `<code_root>`.
 - `<docs_root>/decisions/README.md`, `architecture/overview.md` and areas, `data-models/`,
   `features/` and its `README.md`.
-- `<workspace_root>/specd.yml`: `flow.retention`, `git.authority`.
+- `<workspace_root>/pacenote.yml`: `flow.retention`, `git.authority`.
 - [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/state-yml.md`](../_shared/state-yml.md),
   `./templates/feature.md`,
   `./templates/features-README.md`,
@@ -73,7 +73,7 @@ refresh the record.
    paths), when anything was written; `state.yml` with `git -C <workspace_root>` when that is
    another repo. `state set step=deliver`.
 5. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Produced`: the docs
-   written, or none. `Review`: decisions recorded, deltas applied. `Next: /specd:deliver
+   written, or none. `Review`: decisions recorded, deltas applied. `Next: /pacenote:deliver
    <feature>`.
 
 ## Anti-patterns

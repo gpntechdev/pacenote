@@ -53,7 +53,7 @@ TICKED = re.compile(r"`([^`]+)`")
 
 
 def refuse(msg):
-    print("specd: %s" % msg, file=sys.stderr)
+    print("pacenote: %s" % msg, file=sys.stderr)
     return 1
 
 
@@ -272,7 +272,7 @@ def main(argv):
     d = os.path.abspath(argv[argv.index("--feature-dir") + 1])
     for name, step in (("spec.md", "specify"), ("tasks.md", "tasks")):
         if not os.path.isfile(os.path.join(d, name)):
-            return refuse("%s has no %s; run /specd:%s first" % (d, name, step))
+            return refuse("%s has no %s; run /pacenote:%s first" % (d, name, step))
     print(json.dumps(scan(d), indent=2, ensure_ascii=False))
     return 0
 

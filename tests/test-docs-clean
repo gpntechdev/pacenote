@@ -12,7 +12,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, "scripts", "docs-clean")
-DRAFT = "<!-- specd:draft -->"
+DRAFT = "<!-- pacenote:draft -->"
 
 CODE = {
     "app/models/user.py": "import os\n\n\nclass User:\n    name = 'u'\n",
@@ -38,7 +38,7 @@ class Base(unittest.TestCase):
         self.dir = tempfile.TemporaryDirectory()
         d = self.dir.name
         self.code = os.path.join(d, "repo")
-        self.ws = os.path.join(d, "repo", ".specd")
+        self.ws = os.path.join(d, "repo", ".pacenote")
         self.docs = os.path.join(self.ws, "docs")
         self.spec = os.path.join(self.ws, "spec")
         self.sources = os.path.join(self.ws, "sources")
@@ -75,11 +75,11 @@ class Base(unittest.TestCase):
               "# Decisions\n\n| # | Title | Date | Status |\n|---|---|---|---|\n"
               "| 0001 | Use SQLite | 2026-01-02 | accepted |\n"
               "| [0003](./0003-old.md) | Old | 2026-04-01 | accepted |\n")
-        write(os.path.join(self.sources, "kept.md"), '<!-- specd:source origin="x" via="file" -->\n')
+        write(os.path.join(self.sources, "kept.md"), '<!-- pacenote:source origin="x" via="file" -->\n')
         write(os.path.join(self.sources, "brief-src.md"),
-              '<!-- specd:source origin="https://w/p" title="Page" via="http" -->\nbody\n')
+              '<!-- pacenote:source origin="https://w/p" title="Page" via="http" -->\nbody\n')
         write(os.path.join(self.sources, "orphan.md"),
-              '<!-- specd:source origin="https://w/o" title="Old page" via="http" -->\nbody\n')
+              '<!-- pacenote:source origin="https://w/o" title="Old page" via="http" -->\nbody\n')
         write(os.path.join(self.sources, "orphan.new.md"), "pending\n")
         write(os.path.join(self.spec, "feat", "brief.md"), "From sources/brief-src.md\n")
 

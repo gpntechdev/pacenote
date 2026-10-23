@@ -14,7 +14,7 @@ Produced:
 Review:
 - <what to look at>  one line each, most important first; never a restatement of the file
 State: <feature> · <step> · gates approved: <G1, G2 …> or none
-Next: /specd:<command> [args]   after `/clear`
+Next: /pacenote:<command> [args]   after `/clear`
 ```
 
 ## Rules

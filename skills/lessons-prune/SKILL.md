@@ -4,7 +4,7 @@ description: >
   Invoke whenever the user asks to prune, clean up, trim or tidy `lessons.md`, says the
   lessons file is too long or over its cap, wants recurring lessons promoted into the
   conventions or a decision, follows the `status` warning about the lessons cap, or runs
-  `/specd:lessons-prune`. It counts the file against `docs.lessons_max_lines`, flags
+  `/pacenote:lessons-prune`. It counts the file against `docs.lessons_max_lines`, flags
   near-duplicate and malformed lines with a script, proposes per lesson keep, promote (to
   `conventions.md` or a decision file), merge or delete, and applies only the rows you
   approve, then commits once. Not for adding a lesson; append the line yourself.
@@ -22,7 +22,7 @@ without a yes.
 
 - `resolve-paths` ([`../_shared/paths.md`](../_shared/paths.md)); `detect-repo --from
   <docs_root>` (branch rule).
-- `<workspace_root>/specd.yml`: `docs.lessons_max_lines` (default 80), `git.authority`.
+- `<workspace_root>/pacenote.yml`: `docs.lessons_max_lines` (default 80), `git.authority`.
 - `"${CLAUDE_PLUGIN_ROOT}/scripts/lessons" scan` output; `<docs_root>/lessons.md`.
 - `<docs_root>/conventions.md` (its section headings and existing rules, to place a promotion
   and to spot lessons it already states).
@@ -43,7 +43,7 @@ without a yes.
 
 ## Protocol
 
-1. **Resolve.** `resolve-paths` (no config: `run /specd:init first`). Read the two keys.
+1. **Resolve.** `resolve-paths` (no config: `run /pacenote:init first`). Read the two keys.
 2. **Scan.** `"${CLAUDE_PLUGIN_ROOT}/scripts/lessons" scan --file <docs_root>/lessons.md
    --max <docs.lessons_max_lines>`. Print `lessons.md: <lines>/<max> lines, <n> lessons,
    <d> duplicate pairs, <m> malformed`. No lessons and nothing malformed: say so, end with the
@@ -64,7 +64,7 @@ without a yes.
      as one line, in that file's style (rules only, no explanation);
    - decision: copy the template to `<docs_root>/decisions/NNNN-<kebab-title>.md` with the
      next free number, status accepted, today's date, context and consequences drafted from
-     the lesson; drop the `specd:draft` line (the approval is the sign-off) and append the
+     the lesson; drop the `pacenote:draft` line (the approval is the sign-off) and append the
      README row. A title already in the README is not written again; the lesson is deleted.
 8. **Apply** the lesson lines: Write the plan as JSON to `<workspace_root>/.lessons-plan.json`
    (`[{line, expect, action, text}]`, one step per promoted, merged-away, deleted,

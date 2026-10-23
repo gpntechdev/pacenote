@@ -2,11 +2,11 @@
 name: scaffold
 description: >
   Invoke whenever the user asks to scaffold, bootstrap or build the project skeleton, set up
-  the initial structure and tooling of a new project, or runs `/specd:scaffold`. Greenfield
-  only, after `/specd:onboard architecture` is signed off: it turns the architecture overview
+  the initial structure and tooling of a new project, or runs `/pacenote:scaffold`. Greenfield
+  only, after `/pacenote:onboard architecture` is signed off: it turns the architecture overview
   into a task list you approve (G3), builds structure, tooling, one smoke test and hygiene
   files in the main thread, proves build, test and lint pass, asks you to approve the diff
-  (G5), records the commands in `specd.yml` and commits. Not for adding features to an
+  (G5), records the commands in `pacenote.yml` and commits. Not for adding features to an
   existing codebase.
 ---
 
@@ -22,8 +22,8 @@ Before anything else, run `"${CLAUDE_PLUGIN_ROOT}/scripts/detect-repo"` and read
 `<spec_root>/scaffold/state.yml` if it exists. Refuse with one line and the handoff block when:
 
 - kind is `brownfield` (the repo already has code): `scaffold is for greenfield repos`;
-- `<docs_root>/architecture/overview.md` is missing or starts with `<!-- specd:draft -->`:
-  `run /specd:onboard architecture first`;
+- `<docs_root>/architecture/overview.md` is missing or starts with `<!-- pacenote:draft -->`:
+  `run /pacenote:onboard architecture first`;
 - `state.yml` exists with `step: closed`: `already scaffolded`.
 
 A `state.yml` with another `step` means resume from that step.
@@ -33,7 +33,7 @@ A `state.yml` with another `step` means resume from that step.
 - `"${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths"` output.
 - `<docs_root>/architecture/overview.md`: `## Stack`, `## Structure`, `## Tooling`,
   `## Testing strategy`. `<docs_root>/conventions.md` when present.
-- `<workspace_root>/specd.yml`: `project`, `flow.tdd`.
+- `<workspace_root>/pacenote.yml`: `project`, `flow.tdd`.
 - [`../_shared/principles.md`](../_shared/principles.md), read before writing any file.
 - [`../_shared/paths.md`](../_shared/paths.md) (which repo commits what),
   [`../_shared/gates.md`](../_shared/gates.md), [`../_shared/state-yml.md`](../_shared/state-yml.md).
@@ -44,7 +44,7 @@ A `state.yml` with another `step` means resume from that step.
 - `<spec_root>/scaffold/tasks.md` and `state.yml`.
 - The skeleton under `<code_root>`: structure, tooling configs, one smoke test, `.gitignore`,
   README stub.
-- `commands.*` in `specd.yml`; `## Run, test, lint` and `## Layout` in `<docs_root>/project.md`.
+- `commands.*` in `pacenote.yml`; `## Run, test, lint` and `## Layout` in `<docs_root>/project.md`.
 - One commit `chore: scaffold project skeleton`.
 
 ## Protocol
@@ -71,10 +71,10 @@ A `state.yml` with another `step` means resume from that step.
    skeleton, and the spec folder and docs change with it when they are in the same repo
    (embedded); in a wrapper those two go in a second commit of the same message with
    `git -C <workspace_root>`. No attribution.
-8. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Next`: `/specd:toolsmith`
-   (project skills per layer, MCP servers), then `/specd:start <feature>` as the alternative. Note that
+8. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Next`: `/pacenote:toolsmith`
+   (project skills per layer, MCP servers), then `/pacenote:start <feature>` as the alternative. Note that
    `<spec_root>/scaffold/` is a closed quick feature with `retention: clean`;
-   `/specd:close scaffold` removes it.
+   `/pacenote:close scaffold` removes it.
 
 ## Anti-patterns
 

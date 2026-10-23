@@ -5,7 +5,7 @@ Usage: redact --file PATH        rewrite PATH in place; print {file, count, kind
        redact --stdin            read text on stdin; print {count, kinds, text}
 
 The value is replaced with [redacted] and the key is kept (`api_key=[redacted]`). The
-first line of a snapshot, its `<!-- specd:source ... -->` header, is never redacted; its
+first line of a snapshot, its `<!-- pacenote:source ... -->` header, is never redacted; its
 `redactions=` is set to the number of [redacted] markers in the result, so a second run
 counts the same and changes nothing. Header attributes are sanitised (no quotes, no
 comment terminators, title at most 60 characters). Also imported by fetch-source,
@@ -25,7 +25,7 @@ PATTERNS = [
     ("github_token", re.compile(r"\b(?:ghp_|github_pat_)\w+"), None),
     ("openai_style_key", re.compile(r"\bsk-[A-Za-z0-9_-]{20,}"), None),
 ]
-HEADER = re.compile(r"^<!-- specd:source (.*?) -->$")
+HEADER = re.compile(r"^<!-- pacenote:source (.*?) -->$")
 ATTR = re.compile(r'(\w+)=(?:"([^"]*)"|(\S+))')
 ORDER = ["origin", "via", "title", "captured", "section", "redactions"]
 
@@ -63,7 +63,7 @@ def render_header(attrs):
     for k in keys:
         v = attrs[k]
         parts.append("%s=%s" % (k, v) if k == "redactions" else '%s="%s"' % (k, clean(v)))
-    return "<!-- specd:source %s -->" % " ".join(parts)
+    return "<!-- pacenote:source %s -->" % " ".join(parts)
 
 
 def process(text):
@@ -93,7 +93,7 @@ def main(argv):
             with open(path, encoding="utf-8") as f:
                 text = f.read()
         except OSError as e:
-            print("specd: %s" % e, file=sys.stderr)
+            print("pacenote: %s" % e, file=sys.stderr)
             return 1
         out, count, kinds = process(text)
         if out != text:
@@ -101,7 +101,7 @@ def main(argv):
                 f.write(out)
         print(json.dumps({"file": path, "count": count, "kinds": kinds}, indent=2))
         return 0
-    print("specd: expected --file PATH or --stdin", file=sys.stderr)
+    print("pacenote: expected --file PATH or --stdin", file=sys.stderr)
     return 1
 
 

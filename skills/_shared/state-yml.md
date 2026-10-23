@@ -3,7 +3,7 @@
 **Reference-only.** Not a skill. The per-feature state file at `<spec_root>/<feature>/state.yml`.
 Created by the step that opens the feature (`start`, or `scaffold` for the skeleton) and
 patched by every later step; read by every step that needs to know where the feature stands.
-Flat two-level YAML, like `specd.yml`, so the same parser rules apply. The only writer is
+Flat two-level YAML, like `pacenote.yml`, so the same parser rules apply. The only writer is
 `"${CLAUDE_PLUGIN_ROOT}/scripts/state"`; no skill edits this file with a text tool.
 
 ## Default file

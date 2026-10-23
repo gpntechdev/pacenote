@@ -1,4 +1,4 @@
-<!-- Written by /specd:runtime-verify to <spec_root>/<feature>/runtime.md, replaced whole on
+<!-- Written by /pacenote:runtime-verify to <spec_root>/<feature>/runtime.md, replaced whole on
      every run; read by deliver (how to verify) and by the user. One section per AC that ran,
      in AC order; excerpts come from runtime-check (redacted, at most 400 characters) or the
      runtime-verifier's `saw`, never typed by hand. At most 150 lines. Leaves with the spec

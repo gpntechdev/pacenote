@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Detect repository facts for /specd:init and /specd:onboard, printed as JSON.
+"""Detect repository facts for /pacenote:init and /pacenote:onboard, printed as JSON.
 
 Usage: detect-repo [--from DIR]
 
 Reports: root, git facts (branches, remote host, ticket key convention), whether the
 project is greenfield or brownfield, languages by extension, manifests, project name,
 which docs already exist and `nested_repos` (immediate subfolders that are git repos of
-their own: wrapper candidates). A repo whose skeleton specd built
-(`.specd/spec/scaffold/state.yml` with `step: closed`) is brownfield whatever its file
+their own: wrapper candidates). A repo whose skeleton pacenote built
+(`.pacenote/spec/scaffold/state.yml` with `step: closed`) is brownfield whatever its file
 count; `scaffolded` says so. Git facts degrade to empty values outside a repository.
 Exit 1 when DIR cannot be read. Stdlib only.
 """
@@ -25,7 +25,7 @@ SOURCE_EXT = {
 }
 SKIP_DIRS = {
     ".git", "node_modules", "vendor", "dist", "build", "target", ".venv", "venv",
-    "__pycache__", ".specd", ".worktrees", "coverage", ".next", ".idea", ".cache",
+    "__pycache__", ".pacenote", ".worktrees", "coverage", ".next", ".idea", ".cache",
 }
 MANIFESTS = [
     "package.json", "pyproject.toml", "setup.py", "requirements.txt", "go.mod", "Cargo.toml",
@@ -35,7 +35,7 @@ DOCS_DIRS = ["docs", "doc", "documentation", "adr", "adrs"]
 TICKET = re.compile(r"\b([A-Z][A-Z0-9]{1,9})-\d+\b")
 TICKET_STOPLIST = {"UTF", "SHA", "ISO", "RFC", "CVE", "HTTP", "MD5", "SHA1", "SHA256", "UTF8"}
 GREENFIELD_MAX_SOURCE_FILES = 5
-SCAFFOLD_STATE = os.path.join(".specd", "spec", "scaffold", "state.yml")
+SCAFFOLD_STATE = os.path.join(".pacenote", "spec", "scaffold", "state.yml")
 
 
 def git(root, *args):
@@ -159,12 +159,12 @@ def main(argv):
     if "--from" in argv:
         i = argv.index("--from")
         if i + 1 >= len(argv):
-            print("specd: --from needs a directory", file=sys.stderr)
+            print("pacenote: --from needs a directory", file=sys.stderr)
             return 2
         start = argv[i + 1]
     start = os.path.abspath(start)
     if not os.path.isdir(start) or not os.access(start, os.R_OK):
-        print("specd: cannot read directory %s" % start, file=sys.stderr)
+        print("pacenote: cannot read directory %s" % start, file=sys.stderr)
         return 1
     root = git(start, "rev-parse", "--show-toplevel") or start
     out = {"root": root}
@@ -192,7 +192,7 @@ def main(argv):
         "AGENTS.md": os.path.isfile(os.path.join(root, "AGENTS.md")),
         "README.md": os.path.isfile(os.path.join(root, "README.md")),
         "docs_dirs": [d for d in DOCS_DIRS if os.path.isdir(os.path.join(root, d))],
-        "claude_md_has_specd_block": "<!-- specd:begin -->" in read_text(claude_md),
+        "claude_md_has_pacenote_block": "<!-- pacenote:begin -->" in read_text(claude_md),
     }
     print(json.dumps(out, indent=2))
     return 0

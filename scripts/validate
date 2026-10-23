@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the specd plugin against docs/AUTHORING.md. Run from the repo root.
+"""Validate the pacenote plugin against docs/AUTHORING.md. Run from the repo root.
 
 Usage: validate [--help]
 
@@ -16,7 +16,7 @@ SPINE_MAX_LINES = 150
 DESCRIPTION_MAX = 1536
 CLAUDE_MD_MAX_LINES = 60
 MODEL_NAME = re.compile(r"\b(opus|sonnet|haiku)\b|claude-")
-MODEL_NAME_ALLOWED = {"skills/_shared/specd-yml.md"}
+MODEL_NAME_ALLOWED = {"skills/_shared/pacenote-yml.md"}
 HARDCODED_PATH = re.compile(r"(^|[\s`(\"'])~/|/Users/")
 LINK = re.compile(r"\]\(([^)\s#]+)\)")
 SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
@@ -102,16 +102,16 @@ def check_manifests():
     market = load_json(".claude-plugin/marketplace.json")
     if not plugin or not market:
         return
-    check(plugin.get("name") == "specd", "plugin.json name is specd")
+    check(plugin.get("name") == "pacenote", "plugin.json name is pacenote")
     check(SEMVER.match(plugin.get("version", "")) is not None, "plugin.json version is semver")
     check(len(plugin.get("description", "")) >= 50, "plugin.json description present")
     check(bool(plugin.get("license")), "plugin.json license present")
     check(bool(plugin.get("author", {}).get("name")), "plugin.json author.name present")
     check(isinstance(plugin.get("repository"), str), "plugin.json repository is a string")
-    check(market.get("name") == "specd", "marketplace.json name is specd")
+    check(market.get("name") == "pacenote", "marketplace.json name is pacenote")
     check(bool(market.get("owner", {}).get("name")), "marketplace.json owner.name present")
     entries = market.get("plugins", [])
-    check(len(entries) == 1 and entries[0].get("name") == "specd", "marketplace lists specd")
+    check(len(entries) == 1 and entries[0].get("name") == "pacenote", "marketplace lists pacenote")
     if entries:
         e = entries[0]
         check(e.get("source") == "./", "marketplace source is ./")

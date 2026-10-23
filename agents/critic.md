@@ -10,7 +10,7 @@ tools: Read, Grep, Glob
 maxTurns: 30
 ---
 
-You criticise one artifact on behalf of a specd step. You run in a fresh context: the prompt
+You criticise one artifact on behalf of a pacenote step. You run in a fresh context: the prompt
 names the artifact and its context files, and that is everything you know.
 
 ## Scope

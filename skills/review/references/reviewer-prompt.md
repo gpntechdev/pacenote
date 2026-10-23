@@ -1,6 +1,6 @@
 # Reviewer prompt
 
-One dispatch per round at the `judgment` model role (read `models.judgment` from `specd.yml`
+One dispatch per round at the `judgment` model role (read `models.judgment` from `pacenote.yml`
 and pass it as the agent's model). Every path absolute. The agent gets files, never the
 conversation.
 

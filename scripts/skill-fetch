@@ -7,15 +7,15 @@ Usage: skill-fetch find  --workspace W --query TEXT [--owner OWNER]
        skill-fetch stage --workspace W --dir DIR [--name NAME]
        skill-fetch clean --workspace W [--dir QUARANTINE_DIR]
 
-W is workspace_root (the folder holding specd.yml). `list` and `fetch` refuse a repo that
-is not in specd.yml `skills.allowlist`; GitHub repos only.
+W is workspace_root (the folder holding pacenote.yml). `list` and `fetch` refuse a repo that
+is not in pacenote.yml `skills.allowlist`; GitHub repos only.
 find:  searches the skills.sh index, the search behind find-skills' `npx skills find`
        (same endpoint, limit 20, sorted by installs), and groups the hits by repo:
        {query, dropped, repos: [{repo, allowlisted, installs, skills: [{name, installs}],
        stars, license, pushed_at}]}. Hits whose source is not a GitHub owner/repo are
        dropped and counted; archived repos are dropped. GitHub metadata is added for at
        most 8 repos that are not allowlisted. Names only, no skill content. Refused when
-       specd.yml `skills.discovery` is `off`.
+       pacenote.yml `skills.discovery` is `off`.
 list:  resolves REF (default: the default branch) to a commit and prints the folders that
        hold a SKILL.md: {repo, commit, skills: [{name, path}]}. Names and paths only, no
        file content.
@@ -71,11 +71,11 @@ def opt(argv, flag, default=None):
 
 
 def read_skills(workspace):
-    """Return (skills.allowlist, skills.discovery) from W/specd.yml (flat subset: section,
+    """Return (skills.allowlist, skills.discovery) from W/pacenote.yml (flat subset: section,
     key, `- item` lines)."""
-    path = os.path.join(workspace, "specd.yml")
+    path = os.path.join(workspace, "pacenote.yml")
     if not os.path.isfile(path):
-        raise Refused("no specd.yml in %s" % workspace)
+        raise Refused("no pacenote.yml in %s" % workspace)
     items, discovery, section, key = [], "skills.sh", None, None
     with open(path, encoding="utf-8") as f:
         for raw in f:
@@ -106,7 +106,7 @@ def check_repo(workspace, repo):
         raise Refused("--repo must be OWNER/REPO")
     allowed = [a.lower() for a in allowlist(workspace)]
     if repo.lower() not in allowed:
-        raise Refused("%s is not in skills.allowlist (%s); add it with /specd:config first"
+        raise Refused("%s is not in skills.allowlist (%s); add it with /pacenote:config first"
                       % (repo, ", ".join(allowed) or "empty"))
 
 
@@ -129,7 +129,7 @@ def get(url, accept="application/vnd.github+json", limit=MAX_TARBALL):
     """Fetch URL. For api.github.com: anonymous first, a GITHUB_TOKEN or GH_TOKEN from the
     environment when set (sent to api.github.com only, never printed), then `gh api` on a
     403 or 429, as the skills CLI does."""
-    headers = {"Accept": accept, "User-Agent": "specd-skill-fetch"}
+    headers = {"Accept": accept, "User-Agent": "pacenote-skill-fetch"}
     github_api = url.startswith(API_ROOT)
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     if github_api and token:
@@ -368,10 +368,10 @@ def main(argv):
     try:
         workspace = opt(argv, "--workspace")
         if not workspace or not os.path.isdir(workspace):
-            raise Refused("--workspace W (the folder holding specd.yml) is required")
+            raise Refused("--workspace W (the folder holding pacenote.yml) is required")
         result = COMMANDS[argv[0]](os.path.abspath(workspace), argv[1:])
     except Refused as e:
-        print("specd: %s" % e, file=sys.stderr)
+        print("pacenote: %s" % e, file=sys.stderr)
         return 1
     print(json.dumps(result, indent=2))
     return 0
