@@ -26,7 +26,9 @@ before continuing.
 ## Inputs
 
 - `resolve-paths`, `detect-repo` (current branch), `state find`, `state check`.
-- `<spec_root>/<feature>/brief.md` and `state.yml` (tier, triage signals, `fix.*`).
+- `<spec_root>/<feature>/brief.md` and `state.yml` (tier, triage signals, `fix.*`);
+  `research.md` when present (dated findings, per
+  [`../_shared/research.md`](../_shared/research.md)).
 - `<docs_root>/project.md`, `<docs_root>/conventions.md` when present; `sources/<feature>-*.md`
   the brief cites as `via file` or `paste`. A fetched one (`http`, `mcp:*`) is never opened:
   its content is the brief ([`../_shared/sources.md`](../_shared/sources.md); a hook denies
@@ -42,6 +44,7 @@ before continuing.
 
 - `<spec_root>/<feature>/spec.md`; `gates.G1` and `step` in `state.yml`. Quick: also
   `tasks.md`, `gates.G3` and the `tasks.T<n>` keys.
+- `<spec_root>/<feature>/research.md`, appended only when the user chose to research.
 - One commit `spec(<feature>): specify` (authority ≠ `none`).
 
 ## Protocol
@@ -56,7 +59,8 @@ before continuing.
    an open question, not an AC. A fix feature's AC1 is its reproduction (`lite.md`).
 3. **Interview** per `interview.md`: at most three rounds (one on quick) of at most four
    grouped questions, aimed at the open questions and at ACs that are still vague. Write
-   each answer into the file as it arrives. "Don't know" becomes an open question with an
+   each answer into the file as it arrives. An open question that is an external fact may
+   be researched on the user's yes (`interview.md`, "Research"). "Don't know" becomes an open question with an
    owner and stays.
 4. **Re-triage** (quick only) per `lite.md`: a design signal or more than five tasks means
    one question, escalate to full (`state escalate`) or stay quick. Escalated: continue
