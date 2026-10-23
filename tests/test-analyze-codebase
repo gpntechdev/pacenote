@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""Tests for `scripts/analyze-codebase`: hotspots, module coupling, cycles and test gaps.
+
+Usage: test-analyze-codebase [--help]   (run from anywhere; stdlib unittest)
+"""
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT = os.path.join(ROOT, "scripts", "analyze-codebase")
+
+FILES = {
+    "app/orders/service.py": "from app.billing import invoice\n\n\ndef place():\n    return invoice.make()\n",
+    "app/orders/__init__.py": "",
+    "app/billing/invoice.py": "from app.orders.service import place\n\n\ndef make():\n    return 1\n\n# x\n",
+    "app/billing/__init__.py": "",
+    "app/users/model.py": "class User:\n    pass\n\n\n# end\n",
+    "tests/test_model.py": "from app.users.model import User\n",
+    "web/src/api.ts": "import { fmt } from './util/format'\nexport const a = 1\n\n\n\n",
+    "web/src/util/format.ts": "export function fmt() {\n  return 1\n}\n\n\n",
+    "web/src/util/format.test.ts": "import { fmt } from './format'\n",
+    "node_modules/x/index.js": "require('./y')\n",
+    ".specd/spec/a/spec.md": "# spec\n",
+    "native/lib.c": "int main() {}\n",
+}
+
+
+def write(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+
+def git(root, *args):
+    subprocess.run(["git", "-C", root] + list(args), check=True, capture_output=True)
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.root = os.path.join(self.dir.name, "repo")
+        os.makedirs(self.root)
+        git(self.root, "init", "-q", "-b", "main")
+        git(self.root, "config", "user.email", "t@example.com")
+        git(self.root, "config", "user.name", "t")
+        for rel, text in FILES.items():
+            write(os.path.join(self.root, rel), text)
+        git(self.root, "add", "-A", "-f")
+        git(self.root, "commit", "-qm", "init")
+        for n in range(3):
+            with open(os.path.join(self.root, "app/billing/invoice.py"), "a") as f:
+                f.write("# change %d\n" % n)
+            git(self.root, "commit", "-qam", "churn %d" % n)
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def run_scan(self, *extra, code=0):
+        r = subprocess.run([SCRIPT, "scan", "--code-root", self.root, "--skip", ".specd"]
+                           + list(extra), capture_output=True, text=True)
+        self.assertEqual(r.returncode, code, r.stderr)
+        return json.loads(r.stdout) if code == 0 else r.stderr
+
+
+class Hotspots(Base):
+    def test_churned_file_ranks_first(self):
+        out = self.run_scan()
+        top = out["hotspots"][0]
+        self.assertEqual(top["file"], "app/billing/invoice.py")
+        self.assertEqual(top["commits"], 4)
+        self.assertEqual(top["score"], top["commits"] * top["lines"])
+
+    def test_skipped_folders_are_not_counted(self):
+        files = [h["file"] for h in self.run_scan()["hotspots"]]
+        self.assertFalse(any(f.startswith(("node_modules/", ".specd/")) for f in files))
+
+    def test_top_limits(self):
+        self.assertEqual(len(self.run_scan("--top", "1")["hotspots"]), 1)
+
+
+class Coupling(Base):
+    def test_cycle_between_modules(self):
+        out = self.run_scan()
+        self.assertEqual(len(out["cycles"]), 1)
+        cyc = out["cycles"][0]
+        self.assertEqual(cyc["modules"], ["app/billing", "app/orders"])
+        where = {(e["from"], e["file"], e["line"]) for e in cyc["edges"]}
+        self.assertIn(("app/billing", "app/billing/invoice.py", 1), where)
+        self.assertIn(("app/orders", "app/orders/service.py", 1), where)
+
+    def test_relative_js_import_resolves(self):
+        mods = {m["module"]: m for m in self.run_scan("--depth", "3")["modules"]}
+        self.assertEqual(mods["web/src"]["depends_on"], ["web/src/util"])
+        self.assertEqual(mods["web/src/util"]["fan_in"], 1)
+
+    def test_test_imports_are_not_edges(self):
+        mods = {m["module"]: m for m in self.run_scan()["modules"]}
+        self.assertNotIn("tests", mods)
+        self.assertEqual(mods["app/users"]["fan_in"], 0)
+
+    def test_unsupported_languages_listed(self):
+        self.assertEqual(self.run_scan()["unsupported"], {".c": 1})
+
+
+class Gaps(Base):
+    def test_untested_files(self):
+        out = self.run_scan()
+        gaps = [g["file"] for g in out["test_gaps"]]
+        self.assertIn("app/billing/invoice.py", gaps)
+        self.assertIn("app/orders/service.py", gaps)
+        self.assertNotIn("app/users/model.py", gaps)       # tests/test_model.py
+        self.assertNotIn("web/src/util/format.ts", gaps)   # format.test.ts
+        self.assertNotIn("app/orders/__init__.py", gaps)
+        self.assertEqual(gaps[0], "app/billing/invoice.py")  # the hotspot ranks first
+
+
+class Options(Base):
+    def test_path_narrows(self):
+        out = self.run_scan("--path", "web")
+        self.assertTrue(all(h["file"].startswith("web/") for h in out["hotspots"]))
+        self.assertEqual(out["cycles"], [])
+
+    def test_path_outside_refused(self):
+        self.assertIn("not inside", self.run_scan("--path", "../x", code=1))
+
+    def test_not_a_repo(self):
+        r = subprocess.run([SCRIPT, "scan", "--code-root", self.dir.name],
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("not a git repository", r.stderr)
+
+    def test_writes_nothing(self):
+        before = subprocess.run(["git", "-C", self.root, "status", "--porcelain"],
+                                capture_output=True, text=True).stdout
+        self.run_scan()
+        after = subprocess.run(["git", "-C", self.root, "status", "--porcelain"],
+                               capture_output=True, text=True).stdout
+        self.assertEqual(before, after)
+
+
+if __name__ == "__main__":
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(__doc__.strip())
+        sys.exit(0)
+    unittest.main(verbosity=1)
