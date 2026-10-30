@@ -16,7 +16,7 @@ Non-goals: a big fixed agent roster, a mandatory heavyweight document pipeline p
 
 | Topic | Decision |
 |---|---|
-| Target tools | Claude Code first; logic kept in portable `SKILL.md` skills so Codex/Cursor adapters can follow |
+| Target tools | Claude Code first; logic kept in portable `SKILL.md` skills; Codex and Cursor load the same repo as native plugins (DECISIONS 2026-10-30 M8) |
 | Distribution | Claude Code plugin served from this repo as its own marketplace; only the generated project layer lands in a workspace |
 | Modes (v2) | Two: **wrapper** and **embedded**. AI attribution removed from commits in both |
 | External sources | Pluggable adapters; v1 = local files and paste/URL per task; MCP adapters added per project; pure in-repo flow stays possible |
@@ -257,7 +257,7 @@ Each milestone ends in something you use on a real task; findings go to `DECISIO
 | M5 | Sources | `url` adapter, first MCP adapter, snapshot + refresh | A ticket becomes an approved spec without copy-paste | done 2026-10-12; headless smoke run on URL, injection, refresh, paste and wrapper paths; live Atlassian fetch not exercised (see DECISIONS) |
 | M6 | Toolsmith + audit | `toolsmith` command, allowlist search, quarantine, two-stage audit, `skills.lock`, generation fallback, specialist reviewers, MCP recommendations | Audit catches a seeded malicious test skill; one community skill installed via the pipeline | built 2026-10-12; headless smoke run: seeded skill refused by both stages, `anthropics/skills` `frontend-design` installed and pinned, generation fallback, `dbhub` MCP, one specialist pass (see DECISIONS) |
 | M7 | Utils | research, analyze, analyze-codebase, docs-clean, spec-clean, lessons-prune, runtime-verify | Each util runs once with its changes landing only on a yes, and one feature passes runtime-verify over HTTP and through a browser | built 2026-10-23; headless smoke run per util and of runtime-verify over HTTP, playwright, a failure and the off path (see DECISIONS) |
-| M8 | Portability + team | `install.sh` for Codex/Cursor, team-sharing guide, evals for key skills | Full flow runs on a second assistant | |
+| M8 | Portability + team | Native plugins for Codex and Cursor (no `install.sh`), team-sharing guide with `pacenote.local.yml`, evals for key skills via `claude plugin eval` (breakdown: `docs/M8.md`) | Full flow runs start → close on Codex and on Cursor, embedded and wrapper (DECISIONS 2026-10-30 M8) | planned 2026-10-30 |
 
 After M2 pacenote is developed with pacenote.
 

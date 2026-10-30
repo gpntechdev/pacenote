@@ -1637,3 +1637,26 @@ take the new name. `skills/_shared/specd-yml.md` becomes `pacenote-yml.md`.
 Consequences: no migration; a workspace initialised under the old name keeps `specd.yml`,
 `.specd/` and `specd:` markers that the plugin no longer reads, and is re-run through
 `/pacenote:init`. Earlier entries in this file were rewritten to the new name.
+
+## 2026-10-30 M8: native plugins, both assistants, fail closed; scope of evals and team sharing
+
+Context: M8 kickoff. PLAN 2 and 5 assumed Codex and Cursor need an `install.sh` that copies
+skills into their layout. As of 2026-10-29 both load `SKILL.md` skills and plugins from a git
+repo: Codex reads `.claude-plugin/marketplace.json` and sets `CLAUDE_PLUGIN_ROOT` for hooks,
+Cursor reads `.claude/skills/` and `.claude/agents/`. Codex has no per-agent tool allowlist.
+`docs/M8.md` holds the goal breakdown (evals, portability, team guide, in that order); the
+user answered its open questions in one round.
+Decision:
+- Native plugin manifests for Codex and Cursor next to `.claude-plugin/`; no `install.sh`
+  unless the probe finds an assistant that can't load a plugin from git.
+- M8 is done only when the full flow runs start → close on both Codex and Cursor, in embedded
+  and wrapper mode (amends PLAN 5's "a second assistant").
+- Fail closed where a runtime can't fence an agent's tools: no third-party `toolsmith`
+  installs and no URL/MCP `start` there, until the runtime offers a read-only agent.
+- Evals: all ten cases in `docs/M8.md` via `claude plugin eval`; deterministic cases at 1.0,
+  LLM-graded at 0.67; a `smoke` tag before every PR, the full suite at milestone end.
+- Team: a gitignored `pacenote.local.yml` for personal keys (model mapping, G4 granularity),
+  team policy refused there; `init` offers the team-install settings keys for a committed
+  workspace.
+Consequences: PLAN 5 row M8 changes scope and done-when. Cursor parity is now blocking, so a
+Cursor gap the probe finds becomes M8 work, not a recorded limitation.
