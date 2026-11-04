@@ -18,7 +18,8 @@ scripts/          deterministic helpers: validate, resolve-paths, detect-*, conf
                   init-workspace, state, worktree, run-checks, squash-wip, pr-comments,
                   redact, fetch-source, refresh-source, audit-static, skill-fetch, skill-lock,
                   lessons, spec-clean, docs-clean, analyze, analyze-codebase, runtime-check
-tests/            test-audit, test-skill-find, test-lessons, test-spec-clean, test-docs-clean,
+evals/            claude plugin eval cases; _lib/ holds the shared scaffold and fixture app
+tests/            run-evals, test-audit, test-skill-find, test-lessons, test-spec-clean, test-docs-clean,
                   test-analyze, test-analyze-codebase, test-runtime-check, test-state,
                   test-config-set + fixtures
 docs/             PLAN.md, DECISIONS.md, AUTHORING.md
@@ -48,5 +49,6 @@ task has a verifiable done-when.
 
 - Naming: prefix `/pacenote:`, config `pacenote.yml`, embedded folder `.pacenote/`.
 - Use plan mode for anything that sets a convention others will copy.
-- Run `scripts/validate`, `tests/test-*` and `claude plugin validate .` before finishing a task.
+- Run `scripts/validate`, `tests/test-*`, `claude plugin validate .` and `tests/run-evals`
+  (smoke) before finishing a task; re-run the eval cases covering a changed skill with `--case`.
 - Commits: Conventional Commits, no AI attribution lines.
