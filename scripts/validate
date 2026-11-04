@@ -211,6 +211,32 @@ def check_claude_md():
             check(lines <= CLAUDE_MD_MAX_LINES, "%s <= %d lines" % (r, CLAUDE_MD_MAX_LINES), str(lines))
 
 
+def check_evals():
+    # A case is a folder under evals/ holding prompt.md or case.yaml (docs/AUTHORING.md 13).
+    base = os.path.join(ROOT, "evals")
+    for d, dirs, files in sorted(os.walk(base)):
+        dirs[:] = sorted(x for x in dirs if x not in ("_lib", "results", "mocks"))
+        if "prompt.md" not in files and "case.yaml" not in files:
+            continue
+        dirs[:] = []
+        r = rel(d)
+        case = read(os.path.join(d, "case.yaml")) if "case.yaml" in files else ""
+        name = re.search(r"^name:\s*(\S+)\s*$", case, re.M)
+        check(name is not None, "%s case.yaml names the case" % r)
+        tags = re.search(r"^tags:\s*\[(.*)\]\s*$", case, re.M)
+        kinds = {t.strip() for t in tags.group(1).split(",")} & {"deterministic", "judged"} if tags else set()
+        check(len(kinds) == 1, "%s is tagged deterministic or judged" % r)
+        graders = glob.glob(os.path.join(d, "graders", "*.md"))
+        check(bool(graders), "%s has a grader" % r)
+        script = re.search(r"^\s*scaffold_script:\s*(\S+)\s*$", case, re.M)
+        if script:
+            path = os.path.join(d, script.group(1))
+            ok = os.path.exists(path) and os.access(path, os.X_OK)
+            check(ok, "%s scaffold is executable" % r)
+            if ok:
+                check("_lib/workspace.sh" in read(path), "%s scaffold sources _lib/workspace.sh" % r)
+
+
 def main(argv):
     if "--help" in argv or "-h" in argv:
         print(__doc__.strip())
@@ -222,6 +248,7 @@ def main(argv):
     check_scripts()
     check_state_reference()
     check_claude_md()
+    check_evals()
     print("\n%d failure(s)" % len(failures) if failures else "\nall checks passed")
     return 1 if failures else 0
 
