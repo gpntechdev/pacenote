@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: deliver-no-attribution
+description: deliver drafts a change summary with no AI attribution, ids or WIP subjects, and commits or pushes nothing before G5.
+tags: [deterministic]
+context:
+  scaffold_script: scaffold.sh
