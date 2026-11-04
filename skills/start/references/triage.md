@@ -56,7 +56,9 @@ the flow (`scripts/state` owns the order; `_shared/state-yml.md` describes it):
 | quick | specify (spec and tasks, one gate) → implement → review → deliver → close | G1+G3, G4, G5 |
 | full | specify → design → tasks → implement → review → verify → docs → deliver → close | G1..G5 |
 
-Say this in one line when asking for confirmation. A tier can only go up later: `specify`
+The proposal opens with the line `Proposed tier: <tier> (signals: <list, or none>)`, so it
+reads the same in every run. Say what the tier means in one line when asking for
+confirmation. A tier can only go up later: `specify`
 and `implement` propose escalation when a signal fires mid-flow, and `/pacenote:start <feature>
 --tier <tier>` escalates by hand; what exists is carried over. `--tier` on a new feature
 skips the scan: the user already knows the size.
