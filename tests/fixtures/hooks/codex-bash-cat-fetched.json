@@ -1,0 +1,13 @@
+{
+  "runtime": "codex",
+  "guard": "source-guard",
+  "expect": "deny",
+  "payload": {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "cwd": "{tmp}",
+    "tool_input": {
+      "command": "cat sources/page.md"
+    }
+  }
+}

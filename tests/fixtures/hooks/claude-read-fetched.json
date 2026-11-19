@@ -1,0 +1,12 @@
+{
+  "runtime": "claude",
+  "guard": "source-guard",
+  "expect": "deny",
+  "payload": {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_input": {
+      "file_path": "{tmp}/sources/page.md"
+    }
+  }
+}

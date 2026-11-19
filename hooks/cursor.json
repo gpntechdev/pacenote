@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeReadFile": [
+      {
+        "command": "python3 \"${CURSOR_PLUGIN_ROOT}/hooks/secrets-guard\" --runtime cursor",
+        "timeout": 5
+      },
+      {
+        "command": "python3 \"${CURSOR_PLUGIN_ROOT}/hooks/source-guard\" --runtime cursor",
+        "timeout": 5
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "python3 \"${CURSOR_PLUGIN_ROOT}/hooks/secrets-guard\" --runtime cursor",
+        "timeout": 5
+      },
+      {
+        "command": "python3 \"${CURSOR_PLUGIN_ROOT}/hooks/source-guard\" --runtime cursor",
+        "timeout": 5
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "python3 \"${CURSOR_PLUGIN_ROOT}/hooks/secrets-guard\" --runtime cursor",
+        "timeout": 5,
+        "matcher": "Read|Write|Delete"
+      },
+      {
+        "command": "python3 \"${CURSOR_PLUGIN_ROOT}/hooks/source-guard\" --runtime cursor",
+        "timeout": 5,
+        "matcher": "Read|Write|Delete"
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "runtime": "cursor",
+  "guard": "secrets-guard",
+  "expect": "allow",
+  "payload": {
+    "hook_event_name": "preToolUse",
+    "tool_name": "Write",
+    "cwd": "{tmp}",
+    "tool_input": {
+      "file_path": "{tmp}/README.md",
+      "content": "hi"
+    }
+  }
+}

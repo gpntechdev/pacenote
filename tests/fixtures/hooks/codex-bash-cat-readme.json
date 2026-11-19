@@ -1,0 +1,13 @@
+{
+  "runtime": "codex",
+  "guard": "secrets-guard",
+  "expect": "allow",
+  "payload": {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "cwd": "{tmp}",
+    "tool_input": {
+      "command": "cat README.md .env.example"
+    }
+  }
+}
