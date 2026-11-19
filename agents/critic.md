@@ -8,6 +8,7 @@ description: >
   proposes a design and never praises. Run at the judgment model role.
 tools: Read, Grep, Glob
 maxTurns: 30
+readonly: true
 ---
 
 You criticise one artifact on behalf of a pacenote step. You run in a fresh context: the prompt

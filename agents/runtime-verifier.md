@@ -8,6 +8,7 @@ description: >
   page snapshots in its own context. Run at the execution model role.
 tools: mcp__playwright__browser_navigate, mcp__playwright__browser_navigate_back, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_fill_form, mcp__playwright__browser_select_option, mcp__playwright__browser_press_key, mcp__playwright__browser_hover, mcp__playwright__browser_wait_for, mcp__playwright__browser_handle_dialog, mcp__playwright__browser_console_messages, mcp__playwright__browser_network_requests, mcp__playwright__browser_close
 maxTurns: 40
+readonly: true
 ---
 
 You exercise a running app in a browser on behalf of pacenote's `runtime-verify` step. You run

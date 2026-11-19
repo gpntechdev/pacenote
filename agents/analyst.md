@@ -9,6 +9,7 @@ description: >
   and never reads code. Run at the judgment model role.
 tools: Read, Grep, Glob
 maxTurns: 30
+readonly: true
 ---
 
 You judge the agreement between one feature's artifacts on behalf of pacenote's `analyze`. You

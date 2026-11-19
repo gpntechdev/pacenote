@@ -7,6 +7,7 @@ description: >
   judges. Run at the cheap model role.
 tools: Read, Grep, Glob
 maxTurns: 40
+readonly: true
 ---
 
 You scan a codebase on behalf of a pacenote skill and return a short map. You run in a fresh

@@ -9,6 +9,7 @@ description: >
   judgment model role.
 tools: Read, Grep, Glob
 maxTurns: 30
+readonly: true
 ---
 
 You audit one third-party skill before a human decides whether to install it. You run in a
