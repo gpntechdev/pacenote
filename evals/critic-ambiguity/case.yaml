@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: critic-ambiguity
+description: critique finds the planted vague terms and the missing payment failure path, in at most ten ranked findings, and writes nothing.
+tags: [judged]
+context:
+  scaffold_script: scaffold.sh

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: gate-refusal
+description: A step refuses to run while the previous gate is unapproved.
+tags: [smoke, deterministic]
+context:
+  scaffold_script: scaffold.sh

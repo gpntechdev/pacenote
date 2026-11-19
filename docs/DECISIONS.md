@@ -1660,3 +1660,59 @@ Decision:
   workspace.
 Consequences: PLAN 5 row M8 changes scope and done-when. Cursor parity is now blocking, so a
 Cursor gap the probe finds becomes M8 work, not a recorded limitation.
+
+## 2026-11-04 M8: evals run through `claude plugin eval`; smoke only for now
+
+Context: M8 Goal 1 (`docs/M8.md`). The 2026-10-30 round fixed ten cases, thresholds 1.0 and
+0.67 and a `smoke` tag before PRs. At this goal's kickoff the user said they are on a
+subscription with no budget: eval runs count against plan usage, not a bill, so a dollar
+ceiling (`--max-cost-usd`, a list-price estimate) protects nothing. The user chose smoke
+only for now. Scratch probes on 2026-10-30 showed how a run behaves:
+- plugin skills load as `pacenote:<name>` and agents as `pacenote:<agent>`; `scripts/` run
+  under the eval sandbox from the real repo path; a scaffold reaches the plugin through its
+  own path;
+- `/usr/bin/git` (the macOS xcrun shim) fails inside the sandbox (cache write refused,
+  exit 72); the CommandLineTools git works when it is first on `PATH`;
+- the question tool is never available in a run, even when a case lists it: the skill asks
+  in prose and the run ends there; nothing can be answered mid-run;
+- there are no custom-code graders, so `scripts/analyze` cannot grade; a slash-command
+  prompt loads its skill without the `Skill` tool, so `tool_used: Skill` fits only natural
+  prompts; project `.claude/` and `.mcp.json` never load, plugin hooks and agents do.
+Decision:
+- `evals/` holds eleven cases: `gate-refusal`, `triage/trivial`, `triage/full`,
+  `principles-trigger`, `critic-ambiguity`, `tasks-coverage`, `reviewer-seeded-bug`,
+  `verify-honest`, `intake-injection`, `auditor-seeded-skill`, `deliver-no-attribution`.
+  Each grades what its step leaves before the first question, plus that no gate was stamped.
+- `evals/_lib/workspace.sh` builds every fixture through the plugin's own scripts; a stdlib
+  Python app with a `make test` target is the shared code. `tests/run-evals` wraps the
+  command (CommandLineTools git first on macOS, `--scaffold --trust-plugin --no-publish`,
+  Bash/Write/Edit granted under the sandbox; `--smoke`, `--case`, `--full`).
+- Tags: `deterministic` (1.0) or `judged` (0.67), validated; `smoke` =
+  `gate-refusal`, `triage-trivial`, `principles-trigger`. `verify-honest` turned out
+  deterministic (verify writes the evidence cells before it asks), so only
+  `critic-ambiguity` and `reviewer-seeded-bug` are judged.
+- `start`'s triage proposal now opens with the fixed line `Proposed tier: <tier> (signals:
+  …)`, so the tier can be graded by regex.
+- `intake-injection` plants the fetched snapshot (the sandbox has no network). The trace
+  showed the main thread never read it, not even the header; only `intake` did. No grader
+  can separate main-thread from subagent calls, so that check stays manual.
+- `principles-trigger` passed: the M0 question (does `principles` fire on an ad-hoc
+  request?) has its first measured yes, at one run.
+- `AUTHORING.md` 13 holds the case rules; CLAUDE.md adds the smoke run before finishing a task.
+Results: each case passed once (`--runs 1`, no baseline), at list-price estimates of
+$0.24 to $0.59 per run; smoke takes 76 s, about $0.84.
+Sensitivity check: three weakenings did not fail their case, and no weakening that did was
+found:
+- `gate-refusal` survived both `gates.md`'s refusal rule turned advisory and `state check`
+  faked to always answer `ok`. The tasks spine repeats the G1 requirement and the model read
+  `state.yml` itself.
+- `verify-honest` survived verify's "not found → missing" rule removed: the model still
+  wrote `missing`.
+So these cases catch a changed outcome, not a reworded instruction the model already
+compensates for. Whether the plugin moves an outcome at all is the Δ the deferred baseline
+run measures.
+Not exercised: `--full` (three runs, both arms), run-to-run variance, any Δ, `--json` in CI.
+Consequences: amends `docs/M8.md` Goal 1's done-when to the deferred form. Before a PR,
+`tests/run-evals` costs three short runs of plan usage. The full suite is the first thing to
+run when usage allows; until then a low Δ, a skill that doesn't change the outcome, would go
+unnoticed.

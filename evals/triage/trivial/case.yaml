@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: triage-trivial
+description: start proposes the trivial tier for this request.
+tags: [smoke, deterministic]
+context:
+  scaffold_script: scaffold.sh

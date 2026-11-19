@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: reviewer-seeded-bug
+description: review finds the planted off-by-one in delete at its file:line and asks for a fix, without praise.
+tags: [judged]
+context:
+  scaffold_script: scaffold.sh

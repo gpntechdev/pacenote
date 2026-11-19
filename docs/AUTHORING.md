@@ -103,7 +103,34 @@ context-engineering rules in `docs/PLAN.md` section 3.9. Each rule is tagged `[v
 
 ## 12. Definition of done for a change to this repo
 
-- `scripts/validate`, every `tests/test-*` and `claude plugin validate .` pass.
+- `scripts/validate`, every `tests/test-*` and `claude plugin validate .` pass, and
+  `tests/run-evals` (the smoke cases) passes. A changed skill also re-runs the cases that
+  cover it with `--case`.
 - A changed convention or a new decision is recorded in `docs/DECISIONS.md`, not in chat and
   not in commit messages alone.
 - Commits follow Conventional Commits and carry no AI attribution line.
+
+## 13. Evals
+
+- The suite lives in `evals/` and runs with `claude plugin eval` through `tests/run-evals`:
+  `--smoke` (default), `--case <name>`, `--full`. Runs count against plan usage; a run cut
+  off by a usage limit scores 0, so re-run that case later rather than loosening it.
+- A case is a folder with `case.yaml` (`name`, `tags`, `context.scaffold_script`),
+  `prompt.md`, `scaffold.sh` and `graders/`; its fixture files sit in `files/`. Nest cases
+  under a plain folder to group them (`evals/triage/`). `[validated]`
+- Tags: exactly one of `deterministic` (threshold 1.0) or `judged` (has an `llm` grader;
+  0.67, two runs of three). `smoke` marks the cheap cases run before every PR: deterministic
+  graders only. `[validated: kind tag]`
+- `scaffold.sh` sources `evals/_lib/workspace.sh` and builds the workspace with the plugin's
+  own scripts (`ws_repo`, `ws_init`, `ws_config`, `ws_feature`, `ws_copy`, `ws_commit`),
+  never by writing `pacenote.yml` or `state.yml` by hand. `[validated: sources the lib]`
+- A run cannot answer a question: the question tool is absent and the run ends at the first
+  one. Grade what the step leaves on disk before its first question, and that it stamped no
+  gate. Set the config a step would otherwise ask about (`flow.specialists=off`,
+  `flow.runtime_verify=off`) in the scaffold.
+- Prefer graders that cost nothing: `regex` over a file's contents (`target: { source:
+  file, path: … }`), `file_exists`, `tool_used` with `min: 0, max: 0` for "never".
+  Keep `llm` graders for findings a regex cannot pin. Never grade on script names in Bash
+  commands (the agent aliases paths), and never on `Skill` for a slash-command prompt (the
+  command loads the skill without the tool). An agent dispatch is graded with
+  `tool_used: Agent` on `pacenote:<agent>`, `arm: with-only`.

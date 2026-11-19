@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: principles-trigger
+description: An ad-hoc coding request outside the flow invokes the principles skill before any edit.
+tags: [smoke, deterministic]
+context:
+  scaffold_script: scaffold.sh

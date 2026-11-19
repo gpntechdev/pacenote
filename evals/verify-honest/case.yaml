@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: verify-honest
+description: verify cites passing tests only where they exist and marks the AC whose named test is absent as missing, never passed.
+tags: [deterministic]
+context:
+  scaffold_script: scaffold.sh

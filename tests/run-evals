@@ -1,0 +1,59 @@
+#!/bin/bash
+# Run pacenote's eval suite (evals/) through `claude plugin eval`.
+#
+# Usage: run-evals [--smoke | --case NAME | --full] [extra claude plugin eval options]
+#
+#   --smoke      (default) cases tagged smoke, one run, no baseline arm, threshold 1.0
+#   --case NAME  one case by its case.yaml name, one run, no baseline arm; threshold 1.0,
+#                or 0.67 when the case is tagged judged
+#   --full       every case, default runs, with and without the plugin: deterministic
+#                cases at 1.0, then judged cases at 0.67
+#
+# Always passes --scaffold --trust-plugin --no-publish and grants Bash, Write and Edit (Bash
+# stays under the eval sandbox). On macOS it puts the CommandLineTools git first on PATH:
+# the /usr/bin shim fails inside the sandbox. Runs count against plan usage; a run that hits
+# a usage limit scores 0, so re-run it later with --case. Exit code is claude plugin eval's.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+mode=smoke
+name=""
+extra=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help) sed -n '2,/^set /p' "$0" | sed -e '$d' -e 's/^# \{0,1\}//'; exit 0 ;;
+    --smoke) mode=smoke; shift ;;
+    --full) mode=full; shift ;;
+    --case) [ $# -ge 2 ] || { echo "run-evals: --case needs a name" >&2; exit 1; }
+            mode=case; name="$2"; shift 2 ;;
+    *) extra+=("$1"); shift ;;
+  esac
+done
+
+CLT=/Library/Developer/CommandLineTools/usr/bin
+if [ "$(uname)" = Darwin ] && [ -x "$CLT/git" ]; then
+  PATH="$CLT:$PATH"
+  export PATH
+fi
+
+# --tag and --allow-tools take lists, so the target comes first and the grant last.
+run() {
+  claude plugin eval "$ROOT" "$@" --scaffold --trust-plugin --no-publish \
+    ${extra[@]+"${extra[@]}"} --allow-tools Bash Write Edit
+}
+
+case "$mode" in
+  smoke)
+    run --tag smoke --runs 1 --ablation none --threshold 1.0 ;;
+  case)
+    file="$(grep -rlx "name: $name" "$ROOT/evals" --include case.yaml || true)"
+    [ -n "$file" ] || { echo "run-evals: no case named $name" >&2; exit 1; }
+    threshold=1.0
+    grep -qE '^tags:.*\bjudged\b' "$file" && threshold=0.67
+    run --case "$name" --runs 1 --ablation none --threshold "$threshold" ;;
+  full)
+    status=0
+    run --tag deterministic --threshold 1.0 || status=$?
+    run --tag judged --threshold 0.67 || status=$?
+    exit "$status" ;;
+esac
