@@ -1716,3 +1716,153 @@ Consequences: amends `docs/M8.md` Goal 1's done-when to the deferred form. Befor
 `tests/run-evals` costs three short runs of plan usage. The full suite is the first thing to
 run when usage allows; until then a low Δ, a skill that doesn't change the outcome, would go
 unnoticed.
+
+## 2026-11-19 M8: portability probe, doc-based and offline (unverified live)
+
+Context: M8 Goal 2 kickoff (`docs/M8.md`). The user has no paid Codex or Cursor plan, so no
+step needed an authenticated `codex exec` or `cursor-agent -p` session. The probe re-read
+every source under `docs/M8.md` "Sources" on 2026-11-19, plus the Cursor plugins reference
+(`cursor.com/docs/plugins/building`), its third-party hooks page
+(`cursor.com/docs/reference/third-party-hooks`), OpenAI's Codex plugin build page
+(`developers.openai.com/codex/plugins/build/`) and the Agent Plugins schema
+(`agent-plugins.org/schemas/1.0.0/plugin.schema.json`). No page carries a date. Installed:
+`codex-cli 0.170.0` and `cursor-agent 2026.11.19-f005e9d`. Codex ran without auth in a
+scratch `CODEX_HOME` on a copy of the plugin: `plugin marketplace add`, `plugin add`,
+`debug prompt-input` (the model-visible prompt), `debug models` and `sandbox`. Cursor has
+no offline command beyond `--help` and documents no validator. Claude Code 2.1.328.
+Decision: the table below is the probe of record. It is doc-based and offline, not a live
+run. "Offline" means seen in Codex's rendered prompt or sandbox. Every **unknown** and
+every **degrades** is to confirm in the live run (`docs/M8.md`, "Live runbook").
+
+| # | Surface | Codex | Cursor |
+|---|---|---|---|
+| 1 | `${CLAUDE_PLUGIN_ROOT}` in SKILL.md | **breaks** (offline): skills are listed by file path and the model reads SKILL.md itself; nothing is substituted. Codex's prompt: "Resolve relative paths against the directory containing a filesystem-backed SKILL.md". The variable is documented for hooks only | **unknown**. Docs: "Reference scripts in your SKILL.md using relative paths from the skill root"; `${CURSOR_PLUGIN_ROOT}` documented only in `mcp.json` |
+| 2 | Agents, tool fencing | **breaks** (offline): plugin `agents/*.md` and plugin-bundled `.toml` (in `agents/` or `.codex/agents/`) are not loaded; project `.codex/agents/*.toml` is, as `spawn_agent.agent_type`. No allowlist: a spawned agent "will have the same tools as you"; `features.shell_tool = false` leaves `apply_patch`; docs: instructions "don't create a separate read-only sandbox" | **degrades**: plugin `agents/` is a documented component (`name`, `description`); `readonly: true` = "no file edits, no state-changing shell commands", web and MCP not stated; `tools:` not documented; no agent identity in hook payloads documented |
+| 3 | Model per dispatch | **works** (offline): `spawn_agent` takes `model` and `reasoning_effort`; catalog has `gpt-6.2-astra`, `gpt-6.2-sol`, `gpt-6.1-terra` | **unknown**: agent frontmatter `model` (`inherit` or an ID); no per-dispatch parameter documented |
+| 4 | Hooks | **degrades**: plugin `hooks/hooks.json` by default, or the manifest's `hooks`; `PreToolUse` matches `Bash` (also `exec_command`) and `apply_patch` (`Edit`/`Write` as aliases), patch or command in `tool_input.command`; no file-read tool, reads go through the shell; deny = exit 2 or `permissionDecision: "deny"`; `PLUGIN_ROOT` and `CLAUDE_PLUGIN_ROOT` set. Plugin hooks need user trust (`--dangerously-bypass-hook-trust` exists), and "lifecycle hooks work only for manually installed Codex desktop plugins": **unknown** for a CLI marketplace install | **works per docs**: `beforeReadFile {file_path, content, attachments}`, `preToolUse {tool_name, tool_input}` (matchers `Shell`, `Read`, `Write`, `Grep`, `Delete`, `Task`), `beforeShellExecution {command, cwd, sandbox}`; deny = exit 2 or `{"permission": "deny"}`; invalid JSON blocks a permission hook; `CURSOR_PLUGIN_ROOT` set for hooks; plugin hooks are command hooks in Cursor's format. Claude Code hooks load only from `.claude/settings*.json` |
+| 5 | Workspace files | `AGENTS.md` (offline: the block is in the prompt); project `.codex/config.toml` `[mcp_servers]` (offline: `mcp__context7` listed). **Degrades** (offline): the default sandbox makes `.git/`, `.codex/` and `.agents/` read-only (`Operation not permitted`), and `writable_roots` does not lift `.git`, so commits, `init` and toolsmith installs need an escalation or `-s danger-full-access`. No attribution setting documented | `AGENTS.md`; `.cursor/mcp.json` (`${env:VAR}` in values); no attribution setting documented |
+| 6 | Toolsmith home | `.agents/skills/` (read-only in the sandbox, row 5) | `.agents/skills/`; also reads `.claude/skills/` and `.codex/skills/` |
+| 7 | Invocation | plugin skills are listed as `pacenote:<name>` (offline); `$` mentions a skill, so `$pacenote:start` (form **unknown**) | `/skill-name`; a skill's `name` must equal its folder (all 28 do); plugin namespacing **unknown**, so `/start` |
+| - | Packaging | installs offline from `.claude-plugin/marketplace.json` alone; root `plugin.json` (Agent Plugins schema, `additionalProperties: false`) or `.codex-plugin/plugin.json`; no validate command | `.cursor-plugin/plugin.json` (only `name` required) and `.cursor-plugin/marketplace.json`; a root `plugin.json` is read as an Agent Plugin; precedence with both **unknown**; `cursor-agent --plugin-dir` loads a local plugin |
+| - | Detection | `CODEX_SANDBOX=seatbelt` is set only when sandboxed; no stable marker seen | none documented; `CURSOR_PROJECT_DIR` is documented for hooks only |
+| - | Claude Code | `readonly: true` in agent frontmatter passes `claude plugin validate` with no new warning | |
+
+Consequences: the two deciding questions came out as follows. Skill text is not
+substituted by Codex, and Cursor is unknown, so script paths become skill-relative. Neither
+runtime fences a plugin agent's tools, so both fail closed (next entry).
+
+## 2026-11-19 M8: Goal 2 decisions; one runtime table, skill-relative scripts, fail closed on both
+
+Context: the probe above, then one question round. The user chose skill-relative script
+paths, `.codex-plugin/`, fail closed on Cursor too, and the assistant asked at init and kept
+in a gitignored local file ("writing to the shared file is wrong").
+Decision:
+- **Runtime table.** `skills/_shared/runtime.md` holds one JSON row per assistant
+  (`claude`, `codex`, `cursor`, `unknown`): `fenced_agents`, `command`, `memory`,
+  `mcp_file`, `skill_home`, `models`. Its fixed fail-closed line is there too.
+  `scripts/runtime` is the only reader; `resolve-paths` adds `assistant`, `models` and
+  `command` from it, so every step gets them from the call it already makes. Lifting a
+  restriction is one cell.
+- **Assistant.** `init` asks it every time, recommending `runtime --suggest` (env markers:
+  a guess). It goes to `pacenote.local.yml` next to `pacenote.yml`, gitignored by
+  `<workspace_root>/.gitignore`, with `models.*` for Codex and Cursor. This is the
+  first slice of Goal 3's local file: `config-set --local` and the refusal of policy keys
+  come with Goal 3. A missing key reads as `claude` only when `CLAUDECODE` is set, so
+  workspaces from before M8 keep working in Claude Code; otherwise it reads as `unknown`,
+  which is unfenced. A feature worktree reads the main checkout's file.
+- **Script paths.** Every skill, reference and `_shared` file names scripts
+  `../../scripts/<name>`, relative to the folder of the `SKILL.md` being followed
+  (`paths.md`, "Plugin scripts"). The 54 uses in 28 skill files were rewritten mechanically; the
+  word diff holds path tokens only. `validate` refuses `${CLAUDE_PLUGIN_ROOT}` under `skills/`
+  and `agents/` and checks that each named script exists. Hooks keep their variables.
+- **Packaging.** `.codex-plugin/plugin.json` (`skills`, `hooks: ./hooks/codex.json`),
+  `.cursor-plugin/plugin.json` (`hooks: ./hooks/cursor.json`) and
+  `.cursor-plugin/marketplace.json`. Codex reads the existing `.claude-plugin/marketplace.json`.
+  `validate` checks one name and version across the three manifests and two marketplaces,
+  and each manifest's keys and types against its documented field list.
+- **Agents.** `scripts/codex-agents` generates `.codex/agents/<name>.toml` from
+  `agents/*.md`: `name`, `description`, `developer_instructions`. The `tools:` list becomes
+  rules at the top of the instructions, and no Bash becomes `[features] shell_tool = false`.
+  `maxTurns` and `tools` are dropped and no model is set. Codex loads no plugin agents
+  (probe), so `init-workspace --assistant codex` copies them into the workspace's
+  `.codex/agents/`; `validate` fails when they are stale. The eight read-only agents carry
+  `readonly: true` for Cursor; Claude Code accepts the key.
+- **Hooks.** `hooks/payload` normalises the three runtimes' payloads into reads, writes
+  and shell commands. A command's words count too (`cat .env`, `cat<.env`, `--file=.env`).
+  `secrets-guard` and `source-guard` take `--runtime`, deny in the runtime's form (exit 2;
+  Cursor also `{"permission": "deny"}`) and pass silently. `hooks/hooks.json` is unchanged.
+  `hooks/codex.json` matches `apply_patch|Bash`; `hooks/cursor.json` uses `beforeReadFile`,
+  `beforeShellExecution` and `preToolUse` `Read|Write|Delete`. `source-guard` off Claude
+  Code has no agent identity, so nobody is `intake` or `skill-auditor`: fetched snapshots,
+  refresh diffs and `.quarantine/` stay closed to file reads and to command words
+  (pacenote's own scripts excepted). A snapshot write that `redact` would change is denied
+  with a pointer to `redact --stdin`, because neither runtime documents rewriting a call.
+- **Fail closed** on Codex, Cursor and `unknown`: `fetch-source` refuses before any network
+  access; `skill-fetch` refuses every command but `clean`; `sources.md` (ticket fetch) and
+  `toolsmith` (discover) run `runtime --require fenced_agents` first and print its line.
+  Files, pastes and generated skills work everywhere.
+- **Workspace files.** `init-workspace --assistant claude|codex|cursor` (default `claude`)
+  writes the following per assistant. Claude: as before. Codex: an `AGENTS.md` block from
+  `templates/AGENTS.md` (no `@` imports, commands in the runtime's form),
+  `[mcp_servers.context7]` in `.codex/config.toml`, and the agents. Cursor: an `AGENTS.md`
+  block and `.cursor/mcp.json`. Neither gets an attribution setting, since none is documented;
+  `deliver`'s wording rule covers it. In private mode a new `AGENTS.md` and the copied agents
+  are git-excluded, and a team's existing `AGENTS.md` is left alone. `--add-mcp` writes the
+  assistant's file; Codex servers that need an env value get a `codex mcp add` hint.
+  `skill-lock`'s home follows `skill_home`.
+- **Models.** Codex `gpt-6.2-astra` / `gpt-6.2-sol` / `gpt-6.1-terra` from the offline
+  catalog. Cursor `inherit` for all three roles, because no per-dispatch model is documented,
+  so roles collapse to the parent's model there (degrades).
+- **Handoff.** Prose keeps `/pacenote:<step>`; `Next` renders `resolve-paths`' `command`:
+  `$pacenote:<step>` for Codex, `/<step>` for Cursor (both unknown live).
+Degradations, all to confirm in the live run:
+- Codex's sandbox blocks writes to `.git/`, `.codex/` and `.agents/`, so per-step commits,
+  init and toolsmith need an approval or `danger-full-access`.
+- Codex plugin hooks need trust and may not run for CLI installs, which would leave
+  Codex without a secrets guard.
+- Codex agents are advisory, not fenced.
+- Cursor `readonly` scope; Cursor hook payload field names for `preToolUse` `Write`;
+  whether Cursor reads `${CURSOR_PLUGIN_ROOT}` in a hook command, and whether an empty
+  stdout passes a Cursor permission hook.
+- Both command forms; the env markers; Cursor's per-dispatch model.
+- Codex's `grep -r` over a folder holding `.env` is not caught by word matching.
+Consequences: amends `docs/M8.md` Goal 2 scope items 2–8 as built (next entry). PLAN 2's
+"native plugins" row stands.
+
+## 2026-11-19 M8: Goal 2 built offline; live runs deferred
+
+Context: everything in the entry above was built and checked without a Codex or Cursor
+session, the way 2026-11-04 deferred Goal 1's full suite.
+Checks:
+- `scripts/validate` passes, with new checks for the manifests, script paths, `readonly`,
+  generated agents and the three hooks files. Each check was seen to fail on a broken copy.
+- Every `tests/test-*` passes, with and without `CLAUDECODE`. The new tests:
+  - `test-runtime`: under `codex`, `cursor` and `unknown`, a URL, a ticket fetch, a skill
+    stage, fetch and find all exit 1 with the fail-closed line and write nothing; `claude`
+    passes the check.
+  - `test-hooks`: 26 payload fixtures; the `.env` read is denied in each runtime's form,
+    and each hooks file's command lines run as written.
+  - `test-codex-agents`: goldens.
+  - `test-init-workspace`: each assistant's files from its simulated env.
+- `claude plugin validate .` passes with the same warnings as before.
+- Offline Codex on the new tree: still 28 `pacenote:` skills; a workspace that
+  `init-workspace --assistant codex` made shows the 11 agents as roles, the `AGENTS.md`
+  block with `$pacenote:start`, and `mcp__context7`.
+- `tests/run-evals`: smoke 3/3 at 1.00 (87 s, about $0.82), then one `--case` run of
+  each of the other 8 cases. Seven scored 1.00. `reviewer-seeded-bug` scored 0.20 twice
+  when run from the repo path. In both traces the skill-relative scripts resolved and ran
+  (`resolve-paths`, `state find`, `state check`). The eval sandbox, however, refused to read
+  `/Library/Developer/CommandLineTools` (`Operation not permitted`). Git fell back to the
+  `/usr/bin` shim and failed, the diff came out empty, and review stopped before dispatching
+  the reviewer, as it should. The same working tree copied into the scratchpad scored 1.00,
+  and so did `main` from a scratch worktree. So this is the sandbox's view of the repo path,
+  not this change: see whether it persists before the next `--full`.
+Decision: amends `docs/M8.md` Goal 2's done-when. Goal 2 is built and checked offline.
+These wait for access: the live probe (every **unknown** and **degrades** above); the live
+start → close runs, embedded and wrapper, on each assistant; the live `.env` denial; and the
+live fail-closed refusals of a URL `start` and a third-party `toolsmith` install. The
+commands are in `docs/M8.md`, "Live runbook". The table's Codex and Cursor rows change only
+after that run.
+Consequences: M8 is not done. Goal 2's live runs come first once a plan allows. A live
+finding that changes a row or a hook payload is a DECISIONS entry and one cell or fixture,
+not a skill rewrite.

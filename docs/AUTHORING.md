@@ -58,7 +58,11 @@ context-engineering rules in `docs/PLAN.md` section 3.9. Each rule is tagged `[v
   not a prompt. Scripts are stdlib-only Python 3 or POSIX shell, executable, with a shebang and
   `--help`, and print machine-readable output (JSON or `key=value`). `[validated: executable,
   shebang]`
-- Skills invoke them as `"${CLAUDE_PLUGIN_ROOT}/scripts/<name>"`. `[review]`
+- Skills invoke them as `../../scripts/<name>`, relative to the folder of the `SKILL.md`
+  being followed, in `SKILL.md`, `references/` and `_shared/` alike (`_shared/paths.md`,
+  "Plugin scripts"). `${CLAUDE_PLUGIN_ROOT}` is substituted only by Claude Code, so it appears
+  in `hooks/hooks.json` and nowhere in `skills/` or `agents/`. `[validated: no
+  ${CLAUDE_PLUGIN_ROOT}, every named script exists]`
 
 ## 7. No hardcoded paths
 
@@ -70,7 +74,9 @@ context-engineering rules in `docs/PLAN.md` section 3.9. Each rule is tagged `[v
 
 - Skills and agents name `judgment`, `execution` or `cheap`. The mapping to model names exists
   in one place, the `models` block of `skills/_shared/pacenote-yml.md`. A model name anywhere else
-  in `skills/` or `agents/` fails validation. `[validated]`
+  in `skills/` or `agents/` fails validation. The per-assistant defaults that `init` writes
+  to `pacenote.local.yml` live in `skills/_shared/runtime.md`, the other allowed place.
+  `[validated]`
 
 ## 9. Generated files stay small
 
@@ -90,12 +96,25 @@ context-engineering rules in `docs/PLAN.md` section 3.9. Each rule is tagged `[v
 - Agent (`agents/<name>.md`): `name` equal to the file name, `description`, `tools` as the
   minimal list the agent needs. Read-only agents get no `Write`, `Edit` or `Bash`. Agents
   that read hostile content (`intake`, `skill-auditor`) also get no way to act and no
-  network. `[validated: name, description, tools]`
+  network. Read-only agents also carry `readonly: true` (Cursor's switch).
+  `.codex/agents/*.toml` is generated from these files by `scripts/codex-agents`; never edit
+  it, re-run the script. `[validated: name, description, tools, readonly, generated TOML current]`
+
+## 10a. One plugin, three assistants
+
+- What differs between Claude Code, Codex and Cursor is one table in
+  `skills/_shared/runtime.md`. A skill reads it through `runtime` or `resolve-paths` and never
+  tests the assistant in prose. `[review]`
+- The three manifests (`.claude-plugin/`, `.codex-plugin/`, `.cursor-plugin/`) and both
+  marketplaces carry one name and version; each hooks file passes `--runtime`. `[validated]`
+- A capability a runtime lacks fails closed, in a script where one exists (`fetch-source`,
+  `skill-fetch`). `[review]`
 
 ## 11. Naming and prose
 
-- Command prefix `/pacenote:`, config `pacenote.yml`, embedded folder `.pacenote/`, gates `G1`..`G5`,
-  tiers `trivial` / `quick` / `full`, model roles `judgment` / `execution` / `cheap`.
+- Command prefix `/pacenote:` in all prose (the handoff renders the runtime's form), config
+  `pacenote.yml`, embedded folder `.pacenote/`, gates `G1`..`G5`, tiers `trivial` / `quick` /
+  `full`, model roles `judgment` / `execution` / `cheap`.
 - English. Short sentences, one instruction each. Imperative mood for protocol steps. No
   emoji. Files and commands in backticks.
 - Templates carry their generation contract as HTML comments inside the template, so the
