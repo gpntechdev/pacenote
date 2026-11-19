@@ -11,19 +11,30 @@ from inside it returns the worktree's roots; --feature NAME resolves from
 Prints one JSON object with absolute paths: mode, project, workspace_root,
 code_root, docs_root, spec_root, config, plus worktree (the worktree root, or ""),
 feature (its name, or "") and wrapper_root (the main checkout's workspace root;
-equals workspace_root outside a worktree). Exit 1 when no config is found.
-Stdlib only.
+equals workspace_root outside a worktree), and from scripts/runtime: assistant, models
+(role -> model, pacenote.local.yml over pacenote.yml) and command (the step command form,
+`{step}` for the skill name). Exit 1 when no config is found. Stdlib only.
 """
+import importlib.util
 import json
 import os
 import re
 import sys
+from importlib.machinery import SourceFileLoader
 
 DEFAULTS = {
     "embedded": {"code_root": "..", "docs_root": "docs", "spec_root": "spec"},
     "wrapper": {"code_root": None, "docs_root": "docs", "spec_root": "spec"},
 }
 WORKTREES = ".worktrees"
+
+
+def load_runtime():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "runtime")
+    loader = SourceFileLoader("pacenote_runtime", path)
+    module = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(module)
+    return module
 
 
 def find_config(start):
@@ -112,6 +123,8 @@ def main(argv):
     out["worktree"] = worktree
     out["feature"] = wt_feature
     out["wrapper_root"] = wrapper_root
+    rt = load_runtime().info(workspace)
+    out["assistant"], out["models"], out["command"] = rt["assistant"], rt["models"], rt["command"]
     print(json.dumps(out, indent=2))
     return 0
 

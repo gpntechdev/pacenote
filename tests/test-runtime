@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+"""Tests for scripts/runtime and the fail-closed refusals in fetch-source and skill-fetch.
+
+Usage: test-runtime [--help]   (run from anywhere; stdlib unittest, no network)
+
+The assistant comes from pacenote.local.yml (written by init-workspace --assistant); the
+environment only suggests it. Each case runs with CLAUDECODE removed, so the stored answer is
+the only thing that counts, then sets the markers a runtime would set where that matters.
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from importlib.machinery import SourceFileLoader
+import importlib.util
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+S = os.path.join(ROOT, "scripts")
+FAIL_CLOSED = "fail closed"
+
+
+def load(name):
+    loader = SourceFileLoader(name.replace("-", "_"), os.path.join(S, name))
+    module = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(module)
+    return module
+
+
+def clean_env(**extra):
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith(("CLAUDECODE", "CODEX_", "CURSOR_"))}
+    env.update(extra)
+    return env
+
+
+def run(args, env=None, cwd=None):
+    return subprocess.run([sys.executable] + args, capture_output=True, text=True,
+                          env=env or clean_env(), cwd=cwd)
+
+
+class Workspace(unittest.TestCase):
+    def make(self, assistant=None):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d)
+        subprocess.run(["git", "init", "-q", d], check=True)
+        args = [os.path.join(S, "init-workspace"), "--root", d]
+        res = run(args + (["--assistant", assistant] if assistant else []))
+        self.assertEqual(res.returncode, 0, res.stderr)
+        if assistant is None:
+            os.remove(os.path.join(d, ".pacenote", "pacenote.local.yml"))
+        return d, os.path.join(d, ".pacenote")
+
+
+class Table(unittest.TestCase):
+    def test_rows(self):
+        t = load("runtime").table()
+        self.assertEqual(set(t), {"claude", "codex", "cursor", "unknown"})
+        self.assertEqual({a: t[a]["fenced_agents"] for a in t},
+                         {"claude": True, "codex": False, "cursor": False, "unknown": False})
+        for row in t.values():
+            self.assertIn("{step}", row["command"])
+
+    def test_suggest(self):
+        rt = load("runtime")
+        self.assertEqual(rt.suggest({"CLAUDECODE": "1"})["assistant"], "claude")
+        self.assertEqual(rt.suggest({"CLAUDECODE": "1", "CODEX_SANDBOX": "seatbelt"})["assistant"],
+                         "codex")
+        self.assertEqual(rt.suggest({"CURSOR_TRACE_ID": "x"})["assistant"], "cursor")
+        self.assertEqual(rt.suggest({}), {"assistant": "unknown", "markers": []})
+
+
+class Which(Workspace):
+    def info(self, ws, **env):
+        res = run([os.path.join(S, "runtime"), "--from", ws], env=clean_env(**env))
+        return json.loads(res.stdout)
+
+    def test_stored_answer_wins_over_env(self):
+        _, ws = self.make("codex")
+        data = self.info(ws, CLAUDECODE="1")
+        self.assertEqual((data["assistant"], data["source"]), ("codex", "local"))
+        self.assertEqual(data["models"]["judgment"], "gpt-6.2-astra")
+
+    def test_missing_key_falls_back_only_to_claude(self):
+        _, ws = self.make(None)
+        self.assertEqual(self.info(ws, CLAUDECODE="1")["source"], "env-fallback")
+        self.assertEqual(self.info(ws, CODEX_SANDBOX="seatbelt")["assistant"], "unknown")
+        self.assertEqual(self.info(ws)["assistant"], "unknown")
+
+    def test_unknown_value_is_unknown(self):
+        _, ws = self.make("claude")
+        with open(os.path.join(ws, "pacenote.local.yml"), "w") as f:
+            f.write("assistant: emacs\n")
+        self.assertEqual(self.info(ws)["assistant"], "unknown")
+
+    def test_worktree_reads_main_checkout(self):
+        d, _ = self.make("cursor")
+        wt = os.path.join(d, ".pacenote", ".worktrees", "f1")
+        os.makedirs(wt)
+        shutil.copy(os.path.join(d, ".pacenote", "pacenote.yml"), wt)
+        self.assertEqual(load("runtime").which(wt, {})[0], "cursor")
+
+    def test_command_form(self):
+        for assistant, want in (("claude", "/pacenote:specify"), ("codex", "$pacenote:specify"),
+                                ("cursor", "/specify")):
+            _, ws = self.make(assistant)
+            res = run([os.path.join(S, "runtime"), "--from", ws, "--command", "specify"])
+            self.assertEqual(res.stdout.strip(), want)
+
+    def test_resolve_paths_carries_runtime(self):
+        _, ws = self.make("codex")
+        out = json.loads(run([os.path.join(S, "resolve-paths"), "--from", ws]).stdout)
+        self.assertEqual(out["assistant"], "codex")
+        self.assertEqual(out["command"], "$pacenote:{step}")
+        self.assertEqual(out["models"]["cheap"], "gpt-6.1-terra")
+
+
+class FailClosed(Workspace):
+    """Codex, Cursor and an unknown runtime refuse URL, MCP and third-party skill fetches."""
+
+    def refusals(self, ws):
+        out = os.path.join(ws, "sources", "page.md")
+        fetch = run([os.path.join(S, "fetch-source"), "--url", "http://127.0.0.1:9/x", "--out", out])
+        mcp = run([os.path.join(S, "runtime"), "--from", ws, "--require", "fenced_agents",
+                   "--action", "mcp"])
+        stage = run([os.path.join(S, "skill-fetch"), "stage", "--workspace", ws, "--dir",
+                     os.path.join(ROOT, "tests", "fixtures", "clean-skill")])
+        fetch_skill = run([os.path.join(S, "skill-fetch"), "fetch", "--workspace", ws, "--repo",
+                           "anthropics/skills", "--path", "x", "--commit", "0" * 40])
+        find = run([os.path.join(S, "skill-fetch"), "find", "--workspace", ws, "--query", "x"])
+        return {"url": fetch, "mcp": mcp, "stage": stage, "fetch": fetch_skill, "find": find}
+
+    def test_unfenced_runtimes_refuse(self):
+        for assistant in ("codex", "cursor", None):
+            _, ws = self.make(assistant)
+            for action, res in self.refusals(ws).items():
+                label = "%s %s" % (assistant or "unknown", action)
+                self.assertEqual(res.returncode, 1, label)
+                self.assertIn(FAIL_CLOSED, res.stderr, label)
+                self.assertEqual(res.stdout, "", label)
+                self.assertIn("cannot fence an agent's tools", res.stderr, label)
+            self.assertFalse(os.path.exists(os.path.join(ws, ".quarantine")), assistant)
+
+    def test_messages_name_the_fallback(self):
+        _, ws = self.make("codex")
+        r = self.refusals(ws)
+        self.assertIn("paste the page's text instead", r["url"].stderr)
+        self.assertIn("paste the ticket's text instead", r["mcp"].stderr)
+        self.assertIn("toolsmith generates the skill instead", r["stage"].stderr)
+
+    def test_claude_passes_the_check(self):
+        _, ws = self.make("claude")
+        out = os.path.join(ws, "sources", "page.md")
+        fetch = run([os.path.join(S, "fetch-source"), "--url", "http://127.0.0.1:9/x", "--out", out])
+        self.assertNotIn(FAIL_CLOSED, fetch.stderr)
+        self.assertEqual(json.loads(fetch.stdout)["status"], "error")  # reached the network step
+        stage = run([os.path.join(S, "skill-fetch"), "stage", "--workspace", ws, "--dir",
+                     os.path.join(ROOT, "tests", "fixtures", "clean-skill")])
+        self.assertEqual(stage.returncode, 0, stage.stderr)
+        mcp = run([os.path.join(S, "runtime"), "--from", ws, "--require", "fenced_agents",
+                   "--action", "mcp"])
+        self.assertEqual((mcp.returncode, mcp.stderr), (0, ""))
+
+    def test_clean_still_works(self):
+        _, ws = self.make("codex")
+        res = run([os.path.join(S, "skill-fetch"), "clean", "--workspace", ws])
+        self.assertEqual(res.returncode, 0, res.stderr)
+
+
+if __name__ == "__main__":
+    if "--help" in sys.argv:
+        print(__doc__.strip())
+        sys.exit(0)
+    unittest.main(verbosity=1)
