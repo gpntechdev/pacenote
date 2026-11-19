@@ -9,18 +9,32 @@ import glob
 import json
 import os
 import re
+import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SPINE_MAX_LINES = 150
 DESCRIPTION_MAX = 1536
 CLAUDE_MD_MAX_LINES = 60
-MODEL_NAME = re.compile(r"\b(opus|sonnet|haiku)\b|claude-")
-MODEL_NAME_ALLOWED = {"skills/_shared/pacenote-yml.md"}
+MODEL_NAME = re.compile(r"\b(opus|sonnet|haiku)\b|claude-|\bgpt-\d|\bcomposer-\d")
+MODEL_NAME_ALLOWED = {"skills/_shared/pacenote-yml.md", "skills/_shared/runtime.md"}
 HARDCODED_PATH = re.compile(r"(^|[\s`(\"'])~/|/Users/")
 LINK = re.compile(r"\]\(([^)\s#]+)\)")
 SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
-PLUGIN_ROOT_REF = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\s\"'\\\\]+)")
+PLUGIN_ROOT_REF = re.compile(r"\$\{(?:CLAUDE_|CURSOR_)?PLUGIN_ROOT\}/([^\s\"'\\\\]+)")
+SCRIPT_REF = re.compile(r"\.\./\.\./scripts/([A-Za-z][\w-]*)")  # skill-relative (paths.md)
+PLUGIN_NAME = re.compile(r"^[a-z0-9](?:[a-z0-9]|[.-](?=[a-z0-9]))*$")
+# Documented manifest fields (DECISIONS 2026-11-19 M8): key -> allowed JSON types.
+STR, OBJ, ARR = (str,), (dict,), (list,)
+CODEX_FIELDS = {"name": STR, "version": STR, "description": STR, "author": OBJ, "homepage": STR,
+                "repository": STR, "license": STR, "keywords": ARR, "skills": STR,
+                "hooks": (str, list, dict), "apps": STR, "interface": OBJ, "onboardingSkill": STR}
+CURSOR_FIELDS = {"name": STR, "displayName": STR, "description": STR, "version": STR,
+                 "homepage": STR, "repository": STR, "license": STR, "author": OBJ,
+                 "keywords": ARR, "logo": STR, "rules": (str, list), "agents": (str, list),
+                 "skills": (str, list), "commands": (str, list), "hooks": (str, dict),
+                 "mcpServers": (str, dict, list), "variables": OBJ}
+HOOK_FILES = {"hooks/hooks.json": "claude", "hooks/codex.json": "codex", "hooks/cursor.json": "cursor"}
 READ_ONLY_AGENTS = {"explorer", "researcher", "critic", "analyst", "reviewer", "skill-auditor",
                     "specialist", "runtime-verifier"}  # no file writes and no shell
 WRITE_TOOLS = re.compile(r"\b(Write|Edit|MultiEdit|NotebookEdit|Bash)\b")
@@ -118,6 +132,53 @@ def check_manifests():
         check(e.get("version") == plugin.get("version"), "marketplace version matches plugin")
         check(e.get("description") == plugin.get("description"),
               "marketplace description matches plugin")
+    check_other_manifests(plugin)
+
+
+def check_fields(relpath, data, fields):
+    extra = sorted(k for k in data if k not in fields)
+    check(not extra, "%s has documented keys only" % relpath, ", ".join(extra))
+    bad = sorted(k for k, v in data.items() if k in fields and not isinstance(v, fields[k]))
+    check(not bad, "%s key types match the docs" % relpath, ", ".join(bad))
+    check(PLUGIN_NAME.match(str(data.get("name", ""))) is not None, "%s name is kebab-case" % relpath)
+    author = data.get("author", {})
+    check(isinstance(author, dict) and set(author) <= {"name", "email", "url"},
+          "%s author has name/email/url only" % relpath)
+    for key in ("hooks", "skills"):
+        if isinstance(data.get(key), str):
+            check(os.path.exists(os.path.join(ROOT, data[key])), "%s %s path exists" % (relpath, key))
+
+
+def check_other_manifests(plugin):
+    """Codex and Cursor manifests: documented fields, same name and version as Claude's."""
+    codex = load_json(".codex-plugin/plugin.json")
+    cursor = load_json(".cursor-plugin/plugin.json")
+    market = load_json(".cursor-plugin/marketplace.json")
+    if not codex or not cursor or not market:
+        return
+    check_fields(".codex-plugin/plugin.json", codex, CODEX_FIELDS)
+    check_fields(".cursor-plugin/plugin.json", cursor, CURSOR_FIELDS)
+    check(codex.get("hooks") == "./hooks/codex.json", ".codex-plugin hooks point at hooks/codex.json")
+    check(cursor.get("hooks") == "./hooks/cursor.json", ".cursor-plugin hooks point at hooks/cursor.json")
+    check(set(market) <= {"name", "owner", "plugins", "metadata"},
+          ".cursor-plugin/marketplace.json has documented keys only")
+    check(bool(market.get("owner", {}).get("name")), ".cursor-plugin/marketplace.json owner.name present")
+    entries = market.get("plugins", [])
+    check(len(entries) == 1 and entries[0].get("source") == "./",
+          ".cursor-plugin/marketplace.json lists the plugin at ./")
+    names = {plugin.get("name"), codex.get("name"), cursor.get("name"), market.get("name")}
+    names |= {e.get("name") for e in entries}
+    check(names == {"pacenote"}, "all manifests name pacenote", ", ".join(sorted(map(str, names))))
+    versions = {plugin.get("version"), codex.get("version"), cursor.get("version")}
+    versions |= {e.get("version") for e in entries if "version" in e}
+    check(len(versions) == 1, "all manifests carry one version", ", ".join(sorted(map(str, versions))))
+
+
+def check_script_refs(path, text):
+    r = rel(path)
+    check("CLAUDE_PLUGIN_ROOT" not in text, "%s names scripts skill-relative" % r)
+    for name in sorted(set(SCRIPT_REF.findall(text))):
+        check(os.path.isfile(os.path.join(ROOT, "scripts", name)), "%s script %s exists" % (r, name))
 
 
 def check_skills():
@@ -148,6 +209,7 @@ def check_skills():
         if not is_template(path):
             check_links(path, text)
         check_text_rules(path, text)
+        check_script_refs(path, text)
 
 
 def check_agents():
@@ -162,6 +224,8 @@ def check_agents():
         check(bool(fm.get("description")), "agents/%s description present" % name)
         tools = fm.get("tools", "")
         check(bool(tools), "agents/%s tools declared" % name)
+        check((fm.get("readonly") == "true") == (name in READ_ONLY_AGENTS),
+              "agents/%s readonly: true exactly when read-only" % name)
         if name in READ_ONLY_AGENTS:
             m = WRITE_TOOLS.search(tools)
             check(not m, "agents/%s is read-only" % name, m.group(0) if m else "")
@@ -172,18 +236,41 @@ def check_agents():
             check(not bad, "agents/%s has MCP read tools only" % name, ", ".join(bad))
         check_links(path, text)
         check_text_rules(path, text)
+        check_script_refs(path, text)
+    gen = subprocess.run([sys.executable, os.path.join(ROOT, "scripts", "codex-agents"), "--check"],
+                         capture_output=True, text=True)
+    check(gen.returncode == 0, ".codex/agents matches agents/*.md (scripts/codex-agents)",
+          gen.stderr.strip().replace("\n", "; "))
+
+
+def hook_commands(node):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k == "command" and isinstance(v, str):
+                yield v
+            else:
+                yield from hook_commands(v)
+    elif isinstance(node, list):
+        for v in node:
+            yield from hook_commands(v)
 
 
 def check_hooks():
-    path = os.path.join(ROOT, "hooks", "hooks.json")
-    if not os.path.exists(path):
-        return
-    data = load_json("hooks/hooks.json")
-    if data is None:
-        return
-    check(isinstance(data.get("hooks"), dict), "hooks.json has a hooks object")
-    for target in PLUGIN_ROOT_REF.findall(json.dumps(data)):
-        check(os.path.exists(os.path.join(ROOT, target)), "hooks.json references %s" % target)
+    for relpath, runtime in HOOK_FILES.items():
+        if not os.path.exists(os.path.join(ROOT, relpath)):
+            check(False, "%s exists" % relpath)
+            continue
+        data = load_json(relpath)
+        if data is None:
+            continue
+        check(isinstance(data.get("hooks"), dict), "%s has a hooks object" % relpath)
+        commands = list(hook_commands(data))
+        check(bool(commands), "%s runs commands" % relpath)
+        for target in PLUGIN_ROOT_REF.findall(json.dumps(data)):
+            check(os.path.exists(os.path.join(ROOT, target)), "%s references %s" % (relpath, target))
+        if runtime != "claude":
+            wrong = [c for c in commands if "--runtime %s" % runtime not in c]
+            check(not wrong, "%s passes --runtime %s" % (relpath, runtime))
 
 
 def check_scripts():
