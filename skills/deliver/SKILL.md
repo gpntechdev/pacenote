@@ -53,7 +53,7 @@ every re-run after a feedback cycle.
 1. **Resolve** per `paths.md` ("Resolving for a feature"), `state check --step deliver` per
    `gates.md`. Every git command below runs in `<code_root>`, the repo the PR is for,
    unless it names the wrapper (`git.md`, "Wrapper").
-2. **Checks.** `"${CLAUDE_PLUGIN_ROOT}/scripts/run-checks" --from <code_root>`. Red: refuse
+2. **Checks.** `../../scripts/run-checks --from <code_root>`. Red: refuse
    with the failing tail, handoff `Next: /pacenote:implement <feature>`.
 3. **G5 view.** `git -C <code_root> log <default>..HEAD --oneline` (and, when the branch
    has an upstream, `git log @{u}..HEAD --oneline` as "since the last push"), `git diff

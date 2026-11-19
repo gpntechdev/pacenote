@@ -24,7 +24,7 @@ no `state check`, nothing written without a yes.
 - `resolve-paths` ([`../_shared/paths.md`](../_shared/paths.md)); `detect-repo --from <root>`
   for each repo that will change.
 - `<workspace_root>/pacenote.yml`: `flow.keep_days` (default 30), `git.authority`.
-- `"${CLAUDE_PLUGIN_ROOT}/scripts/spec-clean" scan` output (it reads every `state.yml`).
+- `../../scripts/spec-clean scan` output (it reads every `state.yml`).
 - Distill rows only, one folder at a time: `spec.md`, `design.md`, `tasks.md`, `review.md`,
   `state.yml` of `<spec_root>/<feature>/`; `<docs_root>/features/README.md`,
   `<docs_root>/decisions/README.md` and its `NNNN-` file names; Glob under `<code_root>`.
@@ -44,7 +44,7 @@ no `state check`, nothing written without a yes.
 ## Protocol
 
 1. **Resolve.** `resolve-paths` (no config: `run /pacenote:init first`). Read the two keys.
-2. **Scan.** `"${CLAUDE_PLUGIN_ROOT}/scripts/spec-clean" scan --spec-root <spec_root>
+2. **Scan.** `../../scripts/spec-clean scan --spec-root <spec_root>
    --docs-root <docs_root> --worktrees <wrapper_root>/.worktrees --days <flow.keep_days>`.
    Print `kept folders: <old> older than <days> days, <fresh> younger` and one line per
    `blocked` or `errors` row with its reason (they are never touched). No `old` row: say so,

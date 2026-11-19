@@ -6,10 +6,10 @@ description: >
   It does the mechanical setup only: picks embedded (inside the repo) or wrapper (your own
   repo around a client repo that must get no files), detects greenfield or brownfield, git
   host, ticket convention and project commands with scripts, asks a short interview
-  (retention, TDD, gate granularity, PR host, private mode; wrapper: where docs land), then
-  writes `pacenote.yml`, the no-attribution setting, `.mcp.json` with Context7 (and the
-  Atlassian server when Jira is the ticket source) and a pointer
-  block in `CLAUDE.md`, and commits. It writes no project knowledge; that is
+  (assistant, retention, TDD, gate granularity, PR host, private mode; wrapper: where docs
+  land), then writes `pacenote.yml`, the personal `pacenote.local.yml`, the no-attribution
+  setting, the MCP config with Context7 (and the Atlassian server when Jira is the ticket
+  source) and a pointer block in `CLAUDE.md` or `AGENTS.md`, and commits. It writes no project knowledge; that is
   `/pacenote:onboard`, which it hands off to.
 ---
 
@@ -27,7 +27,8 @@ the user's own repo around the code repo ([`./references/wrapper.md`](./referenc
 - [`../_shared/pacenote-yml.md`](../_shared/pacenote-yml.md): the config file the script copies.
 - [`../_shared/no-attribution.md`](../_shared/no-attribution.md): the setting the script merges.
 - [`../_shared/paths.md`](../_shared/paths.md): what the roots mean.
-- `./templates/CLAUDE.md` and `./templates/lessons.md`, rendered by the script.
+- `./templates/CLAUDE.md`, `./templates/AGENTS.md` and `./templates/lessons.md`, rendered by
+  the script; [`../_shared/runtime.md`](../_shared/runtime.md): what each assistant gets.
 - [`./references/wrapper.md`](./references/wrapper.md): the wrapper-mode delta.
 
 ## Outputs
@@ -36,6 +37,10 @@ the user's own repo around the code repo ([`./references/wrapper.md`](./referenc
   `<repo>/.pacenote/spec/`, `<repo>/.pacenote/sources/`; `<repo>/.claude/settings.json`
   (attribution off), `<repo>/.mcp.json` (Context7), `<repo>/CLAUDE.md` pointer block between
   `<!-- pacenote:begin -->` and `<!-- pacenote:end -->`.
+- Every assistant: `pacenote.local.yml` next to `pacenote.yml` (`assistant`, and Codex or
+  Cursor `models.*`), gitignored by `<workspace_root>/.gitignore`. Codex and Cursor instead
+  of the Claude files: an `AGENTS.md` block, `.codex/config.toml` or `.cursor/mcp.json`, and
+  for Codex the agents in `.codex/agents/`.
 - Private mode instead: `CLAUDE.local.md`, `.claude/settings.local.json`, three lines in
   `.git/info/exclude`, no `.mcp.json`.
 - Wrapper: the same files at the wrapper root, `docs/` where the user chose, `.gitignore`
@@ -44,16 +49,18 @@ the user's own repo around the code repo ([`./references/wrapper.md`](./referenc
 
 ## Protocol
 
-1. **Refuse a second init.** Run `"${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths"`. If it finds
+1. **Refuse a second init.** Run `../../scripts/resolve-paths`. If it finds
    a config, say `already initialised at <config>; use /pacenote:config to change settings` and
    end with the handoff block.
-2. **Detect and pick the mode.** Run `"${CLAUDE_PLUGIN_ROOT}/scripts/detect-repo"`. Decide
+2. **Detect and pick the mode.** Run `../../scripts/detect-repo`. Decide
    the mode per `wrapper.md` ("Deciding the mode"); wrapper: settle the code repo and run
    `detect-repo` and `detect-commands` again with `--from <code>`. Embedded: run
    `detect-commands`. If the workspace repo's `git` is false, ask whether to run `git init`;
    on no, stop. Keep the JSON results; they answer most of the interview.
 3. **Interview**, one grouped question set with defaults prefilled, nothing that detection
    already answered:
+   - assistant: Claude Code / Codex / Cursor, the recommended one from
+     `../../scripts/runtime --suggest` (a guess; always asked, never assumed);
    - retention for full-tier features: `distill` (default) / `clean` / `keep`;
    - TDD: off (default) / on;
    - gate granularity for implementation: `phase` (default) / `task` / `end`;
@@ -63,18 +70,18 @@ the user's own repo around the code repo ([`./references/wrapper.md`](./referenc
      files; wrapper: where `docs/` lands (`wrapper.md`, "Interview");
    - ticket source: none (default) / Jira + Confluence, which installs the Atlassian MCP
      server so `start --from PROJ-123` fetches the ticket ([`../_shared/sources.md`](../_shared/sources.md)).
-4. **Create.** Run `"${CLAUDE_PLUGIN_ROOT}/scripts/init-workspace" --root <root> [--private]`
+4. **Create.** Run `../../scripts/init-workspace --root <root> --assistant <a> [--private]`
    (wrapper: `--mode wrapper --code <name> [--docs <name>/docs]`); Jira + Confluence: then
    `init-workspace --root <root> --add-mcp atlassian`. Show the `created`, `merged`,
    `skipped` and `warnings` lists as they came back.
-5. **Configure.** Run `"${CLAUDE_PLUGIN_ROOT}/scripts/config-set" --file <config>` with the
+5. **Configure.** Run `../../scripts/config-set --file <config>` with the
    interview answers and the derived values: `project` (from `project_name`), `git.pr_host`,
    `git.ticket_key`, each non-empty `commands.*` from `detect-commands`, and in wrapper mode
    `mode`, `paths.code_root` and `paths.docs_root` (`wrapper.md`), and `sources.mcp=atlassian`
    when chosen. Show the `old -> new`
    list; mark derived values so the user can correct them with `/pacenote:config`.
 6. **Commit** (skip in private mode): stage exactly the paths the script created or merged
-   plus `CLAUDE.md`, commit `chore: initialise pacenote workspace` on the current branch of the
+   (never `pacenote.local.yml`), commit `chore: initialise pacenote workspace` on the current branch of the
    workspace repo, no attribution line; wrapper with docs in the code repo: the second
    commit `wrapper.md` names.
 7. **Handoff** per [`../_shared/handoff.md`](../_shared/handoff.md). `Next`: `/pacenote:onboard`.

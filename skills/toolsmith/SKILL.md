@@ -27,7 +27,7 @@ Not a flow step: no `state.yml`, no gate.
 
 ## Inputs
 
-- `"${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths"`, `detect-repo --from <code_root>`,
+- `../../scripts/resolve-paths`, `detect-repo --from <code_root>`,
   `detect-commands --from <code_root>`.
 - `<workspace_root>/pacenote.yml`: `skills.allowlist`, `skills.discovery`, `layers.*`, `models.*`,
   `git.authority`, `sources.mcp`. `<workspace_root>/skills.lock` through `skill-lock`.
@@ -42,8 +42,9 @@ Not a flow step: no `state.yml`, no gate.
 ## Outputs
 
 - Installed or generated skills in the skill home `skill-lock where` prints:
-  `<repo>/.claude/skills/<name>/` (embedded), `<wrapper>/.claude/skills/<name>/`
-  (wrapper), `<workspace_root>/skills/<name>/` (private).
+  `<repo>/<home>/<name>/` (embedded), `<wrapper>/<home>/<name>/` (wrapper), where
+  `<home>` is the runtime's `skill_home` (`.claude/skills`; `.agents/skills` in Codex and
+  Cursor), and `<workspace_root>/skills/<name>/` (private).
 - `<workspace_root>/skills.lock` (written by `skill-lock` only); `layers.<layer>` items in
   `pacenote.yml` (by `config-set --add`); servers in `.mcp.json` (by `init-workspace`).
 - One commit `chore(skills): <what was added>` in the repo holding the skill home (none in
@@ -53,15 +54,18 @@ Not a flow step: no `state.yml`, no gate.
 
 1. **Resolve.** `resolve-paths` (no config: `run /pacenote:init first`, stop),
    `detect-repo` and `detect-commands --from <code_root>`. Run
-   `"${CLAUDE_PLUGIN_ROOT}/scripts/skill-lock" verify --workspace <workspace_root>`;
+   `../../scripts/skill-lock verify --workspace <workspace_root>`;
    `modified` or `missing` entries go to step 10 first. `--update`: step 10 only, then 12.
    `--from <folder>`: ask its layer, `skill-fetch stage --dir <folder>`, then steps 6 to 8
-   (no `--repo`: the lock entry is `local`), then 12.
+   (no `--repo`: the lock entry is `local`), then 12; a fail-closed refusal: print it, stop.
 2. **Needs.** Build the list per `needs.md`: layers from the docs and detection, at most
    three needs per layer, minus needs a locked skill already covers. Show it as
    `layer · need` lines and ask once: confirm, edit, or drop. A need given as the argument
    is the whole list; ask only for its layer.
-3. **Discover.** Per need, `"${CLAUDE_PLUGIN_ROOT}/scripts/skill-fetch" find --workspace
+3. **Discover.** First `../../scripts/runtime --from <workspace_root> --require
+   fenced_agents --action skill`. Exit 1: print its line once and take every need to step
+   9 (generation only; `--from <folder>` stops there, [`runtime.md`](../_shared/runtime.md)).
+   Then, per need, `../../scripts/skill-fetch find --workspace
    <workspace_root> --query "<query>"` with the query `needs.md` builds. Gather the
    repos that are not allowlisted across all needs into one multi-select question per
    `audit.md`, "Offering repos". Each yes: `config-set --file <config> --add
@@ -75,7 +79,7 @@ Not a flow step: no `state.yml`, no gate.
 5. **Fetch** the best candidate: `skill-fetch fetch --workspace <workspace_root> --repo
    <repo> --path <folder> --commit <commit from list>`. A refusal (caps, no files): say it
    in one line and take the next candidate.
-6. **Audit, both stages, always.** Stage 1: `"${CLAUDE_PLUGIN_ROOT}/scripts/audit-static"
+6. **Audit, both stages, always.** Stage 1: `../../scripts/audit-static
    --dir <quarantine dir>`. Stage 2: dispatch `skill-auditor` at `models.judgment` with the
    prompt in `audit.md`, even when stage 1 already blocks. Never Read, Grep or open a
    quarantined file yourself; the hook denies the Read and the rest is the same rule.
@@ -87,7 +91,7 @@ Not a flow step: no `state.yml`, no gate.
 8. **Install** on yes: `skill-lock install --workspace <workspace_root> --code-root
    <code_root> --from <quarantine dir> --name <folder name> --layer <layer> --verdict
    <clean|warn> --repo <repo> --path <folder> --commit <commit>`, then
-   `"${CLAUDE_PLUGIN_ROOT}/scripts/config-set" --file <config> --add
+   `../../scripts/config-set --file <config> --add
    layers.<layer>=<layer_path>`. A refusal from `skill-lock` (a folder the user owns with
    that name): ask for another name.
 9. **Generate** when no candidate is installed for a need, per `generate.md`: one
@@ -103,7 +107,7 @@ Not a flow step: no `state.yml`, no gate.
    `missing` entry is restored or re-audited, never silently re-pinned.
 11. **MCP.** Propose servers per `mcp.md` from the stack, the layers and `sources.mcp`,
     skipping those already in `.mcp.json`; one multi-select question with a reason each.
-    For each yes: `"${CLAUDE_PLUGIN_ROOT}/scripts/init-workspace" --root <root> --add-mcp
+    For each yes: `../../scripts/init-workspace --root <root> --add-mcp
     <name>` (`<root>`: `wrapper_root`, or the repo holding `.pacenote/`); show its report and
     the follow-up line `mcp.md` gives for the server.
 12. **Clean and commit.** `skill-fetch clean --workspace <workspace_root>`. Stage exactly

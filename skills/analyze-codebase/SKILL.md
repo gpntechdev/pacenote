@@ -23,7 +23,7 @@ check`, no write, no commit.
 - `resolve-paths` ([`../_shared/paths.md`](../_shared/paths.md)); the argument: a path
   under `<code_root>` to narrow the scan, or none.
 - `<workspace_root>/pacenote.yml`: `models.cheap`.
-- `"${CLAUDE_PLUGIN_ROOT}/scripts/analyze-codebase" scan` output: hotspots, modules,
+- `../../scripts/analyze-codebase scan` output: hotspots, modules,
   cycles with their import lines, test gaps, unsupported languages.
 - `<docs_root>/architecture/overview.md` when present: its area names, to label modules.
 - [`./references/explorer-prompt.md`](./references/explorer-prompt.md) (dispatch prompt
@@ -37,7 +37,7 @@ check`, no write, no commit.
 
 1. **Resolve.** `resolve-paths` (no config: `run /pacenote:init first`). The argument, when
    given, must lie under `<code_root>`; else say so and stop.
-2. **Scan.** `"${CLAUDE_PLUGIN_ROOT}/scripts/analyze-codebase" scan --code-root
+2. **Scan.** `../../scripts/analyze-codebase scan --code-root
    <code_root> [--path <argument>]`, plus `--skip <root>` for each of `<workspace_root>`,
    `<docs_root>` and `<spec_root>` that lies inside `<code_root>` (embedded mode); every
    path absolute, no shell variables. Print

@@ -41,13 +41,14 @@ plus one:
 ## Create and configure
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/init-workspace" --root <wrapper> --mode wrapper --code <name> [--docs <name>/docs]
-"${CLAUDE_PLUGIN_ROOT}/scripts/config-set" --file <wrapper>/pacenote.yml mode=wrapper project=<name> \
+../../scripts/init-workspace --root <wrapper> --assistant <a> --mode wrapper --code <name> [--docs <name>/docs]
+../../scripts/config-set --file <wrapper>/pacenote.yml mode=wrapper project=<name> \
   paths.code_root=./<name> [paths.docs_root=<name>/docs] git.pr_host=<host> git.ticket_key=<key> commands.<k>=<v> ...
 ```
 
 `init-workspace` writes `pacenote.yml`, `docs/` (or the chosen folder), `spec/`, `sources/`,
-`.claude/settings.json`, `.mcp.json`, `CLAUDE.md` and a `.gitignore` holding `<name>/` and
+`pacenote.local.yml`, the assistant's files (Claude Code: `.claude/settings.json`,
+`.mcp.json`, `CLAUDE.md`; `runtime.md` for the others) and a `.gitignore` holding `<name>/` and
 `.worktrees/`. `git.worktrees` stays `false`: parallel features are opt-in with
 `/pacenote:config git.worktrees=true` (`paths.md`, "Feature worktrees").
 

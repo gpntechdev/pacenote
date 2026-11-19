@@ -16,11 +16,11 @@ next. It is safe to run at any time and never asks a question.
 
 ## Inputs
 
-- `resolve-paths`, `detect-repo` (current branch), `"${CLAUDE_PLUGIN_ROOT}/scripts/state"
+- `resolve-paths`, `detect-repo` (current branch), `../../scripts/state
   list` and `state find`.
 - `<workspace_root>/pacenote.yml`: `flow.keep_days`, `docs.lessons_max_lines`.
-- `"${CLAUDE_PLUGIN_ROOT}/scripts/lessons" scan --file <docs_root>/lessons.md` (counts only).
-- `"${CLAUDE_PLUGIN_ROOT}/scripts/spec-clean" scan` (kept folders by age).
+- `../../scripts/lessons scan --file <docs_root>/lessons.md` (counts only).
+- `../../scripts/spec-clean scan` (kept folders by age).
 - [`../_shared/paths.md`](../_shared/paths.md), [`../_shared/state-yml.md`](../_shared/state-yml.md)
   (step meanings).
 

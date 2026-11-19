@@ -41,7 +41,7 @@ number of `## PR round` sections already in `review.md`, plus one.
 
 1. **Resolve** per `paths.md` ("Resolving for a feature"), `state check --step
    feedback`. Round n as above; `since` = the date of the last `## PR round`, or none.
-2. **Fetch.** `"${CLAUDE_PLUGIN_ROOT}/scripts/pr-comments" --pr <pr> --from <code_root>
+2. **Fetch.** `../../scripts/pr-comments --pr <pr> --from <code_root>
    [--since <date>]`. The script refuses (no CLI, unknown host): ask the user to paste the
    comments or name a file, and read them per `comments.md`. Drop `own: true` comments and
    the ones already listed in an earlier round by id. Nothing left: say so, end with the

@@ -97,7 +97,7 @@ layers:                      # layer -> files implement and review add to "Read 
 | `flow.retention` | `distill`, `clean`, `keep` | docs (write the record on `distill`) and close; trivial and quick default to `clean` |
 | `flow.keep_days` | integer | status, spec-clean |
 | `flow.runtime_verify` | `ask` (verify asks per full-tier feature when an AC is observable in the running app, and records `runtime_verify` in `state.yml`), `off` (never; verify goes straight to docs) | verify, runtime-verify; a missing key means `ask` |
-| `models.<role>` | model name | any skill that spawns an agent; roles only elsewhere |
+| `models.<role>` | model name | any skill that spawns an agent, which takes it from `resolve-paths`' `models` (a `pacenote.local.yml` value wins); roles only elsewhere |
 | `commands.*` | shell command | implement, verify, scaffold; empty = detect |
 | `commands.serve`, `commands.serve_url` | shell command, `http(s)` URL | runtime-verify: started in `code_root`, polled until the URL answers, stopped after; never detected, asked on first use and saved on the user's yes |
 | `docs.lessons_max_lines` | integer | lessons-prune (enforces it), status (warns when `lessons.md` is over it) |
@@ -105,6 +105,14 @@ layers:                      # layer -> files implement and review add to "Read 
 | `skills.allowlist` | list of GitHub `owner/repo` | toolsmith: the only repos it fetches from (`skill-fetch` refuses others); `config-set --add` / `--remove` |
 | `skills.discovery` | `skills.sh`, `off` | toolsmith: `skills.sh` sends each need's search words (never code) to the skills.sh index and offers the repos it finds for the allowlist; `off` searches the allowlist only. A file from before this key: missing means `skills.sh` |
 | `layers.<name>` | list of paths, relative to `code_root` (not `workspace_root`) | tasks (the `layer` vocabulary), implement and review (files the agent reads first); written by toolsmith or `config-set --add layers.<name>=<path>` |
+
+## pacenote.local.yml
+
+Personal and gitignored, next to `pacenote.yml`, written by `init` (DECISIONS 2026-11-19 M8).
+For now it holds `assistant` (`claude`, `codex` or `cursor`; see
+[`runtime.md`](./runtime.md)) and, for Codex and Cursor, `models.*` in that assistant's
+names. Its keys win over `pacenote.yml`'s. Read through `resolve-paths` and `runtime`,
+never edited by a skill with a text tool.
 
 Retention per tier: trivial and quick close with `clean` unless the feature's `state.yml` says
 otherwise; full uses `flow.retention`.

@@ -49,7 +49,7 @@ migration or schema change (`schema`), a new dependency in a manifest (`dependen
 changed public endpoint, event or module interface (`api`), or files across more than two
 modules (`modules:3`); `## Blocked` with two readings of the task (`ambiguous`). One
 fires: ask once, **escalate** to the next tier (trivial → quick, quick → full) or
-**continue** as is. Escalate: `"${CLAUDE_PLUGIN_ROOT}/scripts/state" escalate --file
+**continue** as is. Escalate: `../../scripts/state escalate --file
 <state.yml> --to <tier> --signal <signal>`; do not commit the agent's files, name them in
 the handoff `Review` (the next dispatch of that task picks them up as an earlier attempt);
 `Next` is the step the script reported (`specify` for a trivial feature, `design` for a

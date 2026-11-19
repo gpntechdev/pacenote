@@ -26,7 +26,7 @@ no `state check`, nothing written without a yes.
 - `resolve-paths` ([`../_shared/paths.md`](../_shared/paths.md)); `detect-repo --from <root>`
   for each repo that will change.
 - `<workspace_root>/pacenote.yml`: `git.authority`.
-- `"${CLAUDE_PLUGIN_ROOT}/scripts/docs-clean" scan` output: every finding with its file,
+- `../../scripts/docs-clean scan` output: every finding with its file,
   line, scanned text and, when deterministic, the replacement line.
 - Only the docs files a `caps` finding names (to draft the trim), the README of a
   `readmes` finding, and the feature record of a features `missing_row` (its row's cells). Never a file under `<workspace_root>/sources/`: the
@@ -46,7 +46,7 @@ no `state check`, nothing written without a yes.
 ## Protocol
 
 1. **Resolve.** `resolve-paths` (no config: `run /pacenote:init first`). Read `git.authority`.
-2. **Scan.** `"${CLAUDE_PLUGIN_ROOT}/scripts/docs-clean" scan --docs-root <docs_root>
+2. **Scan.** `../../scripts/docs-clean scan --docs-root <docs_root>
    --code-root <code_root> --workspace-root <workspace_root> --spec-root <spec_root>`. Print
    `docs-clean: <total> findings — pointers p, links l, caps c, drafts d, readmes r,
    sources s`. Zero: say the docs are clean, end with the handoff.

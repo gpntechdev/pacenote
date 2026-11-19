@@ -31,18 +31,29 @@ From the current directory upward, at each level: `<dir>/pacenote.yml` (wrapper)
 `<dir>/.pacenote/pacenote.yml` (embedded). The first hit wins. No hit means the workspace is not
 initialised: stop and suggest `/pacenote:init`.
 
+## Plugin scripts
+
+pacenote's scripts are written `../../scripts/<name>` in every skill, its `references/`
+and this folder. The path is relative to the folder of the `SKILL.md` you are following,
+not to the file that names it or to the working directory. That folder's grandparent is
+the plugin root, so `../../scripts/state` is the plugin's `scripts/state`. Run a script by
+its absolute path (`<skill folder>/../../scripts/state`); Claude Code, Codex and Cursor all
+give you the skill's folder (DECISIONS 2026-11-19 M8).
+
 ## The script
 
 Run the helper instead of reasoning about paths:
 
 ```
-"${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths" [--from DIR] [--feature NAME]
+../../scripts/resolve-paths [--from DIR] [--feature NAME]
 ```
 
 It prints one JSON object: `mode`, `project`, `workspace_root`, `code_root`, `docs_root`,
 `spec_root`, `config` (the file it read), `worktree` (the worktree root when the workspace is
 one, else empty), `feature` (its name, else empty) and `wrapper_root` (the main checkout;
-equals `workspace_root` outside a worktree). `--feature NAME` resolves from
+equals `workspace_root` outside a worktree). From `runtime` ([`runtime.md`](./runtime.md))
+it adds `assistant`, `models` (role → model, `pacenote.local.yml` over `pacenote.yml`) and
+`command` (the step command form). `--feature NAME` resolves from
 `<wrapper_root>/.worktrees/NAME/` when that worktree exists. All paths are absolute. Exit
 code 1 with a one-line message when no `pacenote.yml` is found.
 

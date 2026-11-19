@@ -23,7 +23,7 @@ without a yes.
 - `resolve-paths` ([`../_shared/paths.md`](../_shared/paths.md)); `detect-repo --from
   <docs_root>` (branch rule).
 - `<workspace_root>/pacenote.yml`: `docs.lessons_max_lines` (default 80), `git.authority`.
-- `"${CLAUDE_PLUGIN_ROOT}/scripts/lessons" scan` output; `<docs_root>/lessons.md`.
+- `../../scripts/lessons scan` output; `<docs_root>/lessons.md`.
 - `<docs_root>/conventions.md` (its section headings and existing rules, to place a promotion
   and to spot lessons it already states).
 - `<docs_root>/decisions/README.md` and the `NNNN-` file names in `<docs_root>/decisions/`
@@ -44,7 +44,7 @@ without a yes.
 ## Protocol
 
 1. **Resolve.** `resolve-paths` (no config: `run /pacenote:init first`). Read the two keys.
-2. **Scan.** `"${CLAUDE_PLUGIN_ROOT}/scripts/lessons" scan --file <docs_root>/lessons.md
+2. **Scan.** `../../scripts/lessons scan --file <docs_root>/lessons.md
    --max <docs.lessons_max_lines>`. Print `lessons.md: <lines>/<max> lines, <n> lessons,
    <d> duplicate pairs, <m> malformed`. No lessons and nothing malformed: say so, end with the
    handoff. Under the cap: ask once whether to review anyway; no → handoff.

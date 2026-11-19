@@ -50,7 +50,7 @@ feature, so no spec and no code can get ahead of it.
    is on, exists before the brief is written). The brief's "Not said" must name expected
    behaviour and actual behaviour when the input gives only one of them; ask for the
    missing one before writing, in a single question.
-3. **State and branch.** `"${CLAUDE_PLUGIN_ROOT}/scripts/state" init --file <state.yml>
+3. **State and branch.** `../../scripts/state init --file <state.yml>
    --feature <feature> --tier quick --retention clean --branch <fix/<slug> or
    <KEY>-<n>-<slug>>`, then `state set triage.proposed=quick fix.symptom="<one line, no
    double quotes>"`. Branch and commit per `start` steps 7–8 (`--worktree` on `state init` when step 2

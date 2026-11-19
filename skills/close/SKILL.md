@@ -66,7 +66,7 @@ again to clean it). A merged PR is refused: the folder is already on the default
    `worktree` set: the session must not sit inside the worktree it removes (`resolve-paths`
    without `--feature` reports a `worktree`): say `run /pacenote:close <feature> from
    <wrapper_root>` and stop before anything is removed. Then
-   `"${CLAUDE_PLUGIN_ROOT}/scripts/worktree" remove --feature <feature> --from
+   `../../scripts/worktree remove --feature <feature> --from
    <wrapper_root>`; a refusal (dirty code tree) is printed as is and the run stops here,
    everything above is already committed. `git.wrapper_pr: true` and the wrapper has an
    `origin`: the removal commit is already pushed with step 5's rule; say that the wrapper
