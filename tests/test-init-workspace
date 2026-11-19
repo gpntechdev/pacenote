@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+"""Tests for scripts/init-workspace --assistant: the files each assistant gets.
+
+Usage: test-init-workspace [--help]   (run from anywhere; stdlib unittest, no network)
+
+Each case starts from the environment the runtime would set (`runtime --suggest`, the
+answer init recommends), runs init-workspace with that assistant in a scratch git repo,
+then checks the memory file and its command form, the MCP file, Codex's copied agents,
+pacenote.local.yml (assistant, models.*) and that git ignores it, the skill home and the
+rendered next command. pacenote.yml itself never names an assistant.
+"""
+import filecmp
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+S = os.path.join(ROOT, "scripts")
+MARKERS = {"claude": {"CLAUDECODE": "1"}, "codex": {"CODEX_SANDBOX": "seatbelt"},
+           "cursor": {"CURSOR_AGENT": "1"}}
+
+
+def env(**extra):
+    e = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDECODE", "CODEX_", "CURSOR_"))}
+    e.update(extra)
+    return e
+
+
+def run(args, cwd=None, **extra):
+    res = subprocess.run([sys.executable] + args, capture_output=True, text=True, cwd=cwd,
+                         env=env(**extra))
+    return res
+
+
+def read(path):
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+class InitWorkspace(unittest.TestCase):
+    def repo(self):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d)
+        subprocess.run(["git", "init", "-q", d], check=True)
+        return d
+
+    def init(self, d, assistant, *more):
+        res = run([os.path.join(S, "init-workspace"), "--root", d, "--assistant", assistant] + list(more))
+        self.assertEqual(res.returncode, 0, res.stderr)
+        return json.loads(res.stdout)
+
+    def suggested(self, assistant):
+        out = run([os.path.join(S, "runtime"), "--suggest"], **MARKERS[assistant]).stdout
+        return json.loads(out)["assistant"]
+
+    def ignored(self, d, rel):
+        return subprocess.run(["git", "-C", d, "check-ignore", "-q", rel]).returncode == 0
+
+    def common(self, d, assistant):
+        ws = os.path.join(d, ".pacenote")
+        local = read(os.path.join(ws, "pacenote.local.yml"))
+        self.assertIn("assistant: %s\n" % assistant, local)
+        self.assertTrue(self.ignored(d, ".pacenote/pacenote.local.yml"))
+        self.assertNotIn("assistant", read(os.path.join(ws, "pacenote.yml")))
+        paths = json.loads(run([os.path.join(S, "resolve-paths"), "--from", d]).stdout)
+        self.assertEqual(paths["assistant"], assistant)
+        where = json.loads(run([os.path.join(S, "skill-lock"), "where", "--workspace", ws,
+                                "--code-root", d, "--name", "x"]).stdout)
+        nxt = run([os.path.join(S, "runtime"), "--from", d, "--command", "specify"]).stdout.strip()
+        return local, paths["models"], where["layer_path"], nxt
+
+    def test_claude(self):
+        d = self.repo()
+        self.assertEqual(self.suggested("claude"), "claude")
+        self.init(d, "claude")
+        local, models, home, nxt = self.common(d, "claude")
+        self.assertNotIn("models:", local)
+        self.assertEqual(models, {"judgment": "opus", "execution": "sonnet", "cheap": "haiku"})
+        self.assertEqual(home, ".claude/skills/x/SKILL.md")
+        self.assertEqual(nxt, "/pacenote:specify")
+        self.assertIn("@.pacenote/docs/project.md", read(os.path.join(d, "CLAUDE.md")))
+        self.assertIn("attribution", read(os.path.join(d, ".claude", "settings.json")))
+        self.assertIn("context7", json.loads(read(os.path.join(d, ".mcp.json")))["mcpServers"])
+        self.assertFalse(os.path.exists(os.path.join(d, "AGENTS.md")))
+
+    def test_codex(self):
+        d = self.repo()
+        self.assertEqual(self.suggested("codex"), "codex")
+        self.init(d, "codex")
+        local, models, home, nxt = self.common(d, "codex")
+        self.assertEqual(models, {"judgment": "gpt-6.2-astra", "execution": "gpt-6.2-sol",
+                                  "cheap": "gpt-6.1-terra"})
+        self.assertEqual(home, ".agents/skills/x/SKILL.md")
+        self.assertEqual(nxt, "$pacenote:specify")
+        agents_md = read(os.path.join(d, "AGENTS.md"))
+        self.assertIn("`$pacenote:start <feature>`", agents_md)
+        self.assertNotIn("@.pacenote", agents_md)
+        self.assertIn('[mcp_servers.context7]\nurl = "https://mcp.context7.com/mcp"',
+                      read(os.path.join(d, ".codex", "config.toml")))
+        src = os.path.join(ROOT, ".codex", "agents")
+        names = sorted(os.listdir(src))
+        self.assertEqual(sorted(os.listdir(os.path.join(d, ".codex", "agents"))), names)
+        _, mismatch, errors = filecmp.cmpfiles(src, os.path.join(d, ".codex", "agents"), names,
+                                               shallow=False)
+        self.assertEqual((mismatch, errors), ([], []))
+        for absent in ("CLAUDE.md", ".claude", ".mcp.json"):
+            self.assertFalse(os.path.exists(os.path.join(d, absent)), absent)
+
+    def test_cursor(self):
+        d = self.repo()
+        self.assertEqual(self.suggested("cursor"), "cursor")
+        self.init(d, "cursor")
+        local, models, home, nxt = self.common(d, "cursor")
+        self.assertEqual(set(models.values()), {"inherit"})
+        self.assertEqual(home, ".agents/skills/x/SKILL.md")
+        self.assertEqual(nxt, "/specify")
+        self.assertIn("`/start <feature>`", read(os.path.join(d, "AGENTS.md")))
+        mcp = json.loads(read(os.path.join(d, ".cursor", "mcp.json")))
+        self.assertEqual(mcp["mcpServers"]["context7"], {"url": "https://mcp.context7.com/mcp"})
+        self.assertFalse(os.path.exists(os.path.join(d, ".codex")))
+
+    def test_rerun_is_idempotent_and_switch_rewrites_local(self):
+        d = self.repo()
+        self.init(d, "codex")
+        again = self.init(d, "codex")
+        self.assertEqual((again["created"], again["merged"]), ([], []))
+        self.init(d, "claude")
+        local = read(os.path.join(d, ".pacenote", "pacenote.local.yml"))
+        self.assertIn("assistant: claude", local)
+        self.assertNotIn("gpt-", local)
+        self.assertTrue(os.path.exists(os.path.join(d, "CLAUDE.md")))
+
+    def test_add_mcp_follows_the_assistant(self):
+        d = self.repo()
+        self.init(d, "cursor")
+        res = run([os.path.join(S, "init-workspace"), "--root", d, "--add-mcp", "dbhub"])
+        self.assertEqual(res.returncode, 0, res.stderr)
+        server = json.loads(read(os.path.join(d, ".cursor", "mcp.json")))["mcpServers"]["dbhub"]
+        self.assertEqual(server["env"], {"DSN": "${env:DATABASE_URL}"})
+
+    def test_wrapper_local_file_is_ignored(self):
+        d = self.repo()
+        subprocess.run(["git", "init", "-q", os.path.join(d, "client")], check=True)
+        self.init(d, "codex", "--mode", "wrapper", "--code", "client")
+        self.assertTrue(os.path.exists(os.path.join(d, "pacenote.local.yml")))
+        self.assertTrue(self.ignored(d, "pacenote.local.yml"))
+        self.assertTrue(os.path.exists(os.path.join(d, ".codex", "agents", "explorer.toml")))
+
+    def test_private_keeps_new_agents_md_local(self):
+        d = self.repo()
+        report = self.init(d, "cursor", "--private")
+        exclude = read(os.path.join(d, ".git", "info", "exclude")).splitlines()
+        self.assertIn("AGENTS.md", exclude)
+        self.assertIn(".pacenote/", exclude)
+        self.assertFalse(os.path.exists(os.path.join(d, ".cursor", "mcp.json")))
+        self.assertTrue(any("mcp.json" in w for w in report["warnings"]))
+
+    def test_private_leaves_a_team_agents_md_alone(self):
+        d = self.repo()
+        with open(os.path.join(d, "AGENTS.md"), "w") as f:
+            f.write("# Team rules\n")
+        self.init(d, "codex", "--private")
+        self.assertEqual(read(os.path.join(d, "AGENTS.md")), "# Team rules\n")
+
+
+if __name__ == "__main__":
+    if "--help" in sys.argv:
+        print(__doc__.strip())
+        sys.exit(0)
+    unittest.main(verbosity=1)
