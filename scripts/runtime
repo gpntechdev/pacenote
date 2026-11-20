@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""Which assistant pacenote runs in, and what that runtime can do. Prints JSON.
+
+Usage: runtime [--from DIR]                                   the workspace's runtime
+       runtime [--from DIR] --require fenced_agents --action url|mcp|skill
+       runtime [--from DIR] --command STEP                    the step's command, one line
+       runtime --suggest                                      a guess from the environment
+
+The capability table is the JSON fence in skills/_shared/runtime.md. The assistant is
+`assistant:` in pacenote.local.yml next to the workspace's pacenote.yml (in a feature
+worktree, the main checkout's file is read when the worktree has none). When the key is
+missing it is `claude` if CLAUDECODE is set, else `unknown`. Default output:
+{assistant, source, fenced_agents, command, dispatch, models, local_config}, where models is
+pacenote.yml's `models.*` with pacenote.local.yml's on top.
+--require: exit 1 with the fail-closed line on stderr when the capability is false, else
+exit 0 silently. --suggest: {assistant, markers}, from CLAUDECODE, CODEX_* and CURSOR_*
+variables; only init's recommended answer, never a decision. Without a workspace, the
+assistant comes from the CLAUDECODE fallback alone. Also imported by resolve-paths,
+fetch-source, skill-fetch, skill-lock and init-workspace. Stdlib only.
+"""
+import json
+import os
+import re
+import sys
+
+PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TABLE_FILE = os.path.join(PLUGIN_ROOT, "skills", "_shared", "runtime.md")
+LOCAL = "pacenote.local.yml"
+ASSISTANTS = ("claude", "codex", "cursor")
+ROLES = ("judgment", "execution", "cheap")
+ACTIONS = {
+    "url": ("a URL fetch", "paste the page's text instead"),
+    "mcp": ("a ticket or MCP fetch", "paste the ticket's text instead"),
+    "skill": ("a third-party skill install", "toolsmith generates the skill instead"),
+}
+MARKERS = {  # env markers per assistant; unconfirmed for codex and cursor (DECISIONS 2026-11-19)
+    "claude": ("CLAUDECODE",),
+    "codex": ("CODEX_SANDBOX", "CODEX_THREAD_ID", "CODEX_CI"),
+    "cursor": ("CURSOR_AGENT", "CURSOR_TRACE_ID"),
+}
+
+
+def table():
+    with open(TABLE_FILE, encoding="utf-8") as f:
+        m = re.search(r"```json\n(.*?)```", f.read(), re.S)
+    return json.loads(m.group(1))
+
+
+def find_workspace(start):
+    d = os.path.abspath(start)
+    while True:
+        for rel in ("pacenote.yml", os.path.join(".pacenote", "pacenote.yml")):
+            if os.path.isfile(os.path.join(d, rel)):
+                return os.path.dirname(os.path.join(d, rel))
+        parent = os.path.dirname(d)
+        if parent == d:
+            return None
+        d = parent
+
+
+def read_flat(path):
+    """Top-level `key: value` and one level of `section: / key: value` from a YAML file."""
+    out, section = {}, None
+    try:
+        with open(path, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return out
+    for raw in lines:
+        line = raw.split("#", 1)[0].rstrip()
+        m = re.match(r"^(\s*)([A-Za-z_][\w-]*):\s*(.*)$", line)
+        if not m:
+            continue
+        indent, key, value = len(m.group(1)), m.group(2), m.group(3).strip().strip("\"'")
+        if indent == 0:
+            section = key
+            if value:
+                out[key] = value
+        elif section:
+            out["%s.%s" % (section, key)] = value
+    return out
+
+
+def local_file(workspace):
+    """pacenote.local.yml of the workspace, else of the main checkout when in a worktree."""
+    path = os.path.join(workspace, LOCAL)
+    if os.path.isfile(path):
+        return path
+    parent = os.path.dirname(workspace)
+    if os.path.basename(parent) == ".worktrees":
+        main = os.path.join(os.path.dirname(parent), LOCAL)
+        if os.path.isfile(main):
+            return main
+    return ""
+
+
+def which(workspace, env=None):
+    """(assistant, source, local file path)."""
+    env = os.environ if env is None else env
+    path = local_file(workspace) if workspace else ""
+    value = read_flat(path).get("assistant", "") if path else ""
+    if value:
+        return (value if value in ASSISTANTS else "unknown"), "local", path
+    if env.get("CLAUDECODE"):
+        return "claude", "env-fallback", path
+    return "unknown", "missing", path
+
+
+def info(start, env=None):
+    workspace = find_workspace(start)
+    assistant, source, path = which(workspace, env)
+    row = table()[assistant]
+    shared = read_flat(os.path.join(workspace, "pacenote.yml")) if workspace else {}
+    local = read_flat(path) if path else {}
+    models = {r: local.get("models." + r) or shared.get("models." + r, "") for r in ROLES}
+    return {"assistant": assistant, "source": source, "fenced_agents": row["fenced_agents"],
+            "command": row["command"], "dispatch": row["dispatch"], "models": models,
+            "local_config": path}
+
+
+def refusal(data, action):
+    """The fail-closed line, or None when the runtime fences agents."""
+    if data["fenced_agents"]:
+        return None
+    what, fallback = ACTIONS[action]
+    return ("pacenote: %s cannot fence an agent's tools, so %s is off here (fail closed); %s."
+            % (data["assistant"], what, fallback))
+
+
+def suggest(env=None):
+    env = os.environ if env is None else env
+    hits = {a: [v for v in names if env.get(v)] for a, names in MARKERS.items()}
+    found = [a for a in ("codex", "cursor", "claude") if hits[a]]  # a nested run inherits CLAUDECODE
+    return {"assistant": found[0] if found else "unknown",
+            "markers": sorted(v for a in found for v in hits[a])}
+
+
+def opt(argv, flag):
+    if flag in argv:
+        i = argv.index(flag)
+        if i + 1 >= len(argv):
+            raise ValueError("%s needs a value" % flag)
+        return argv[i + 1]
+    return None
+
+
+def main(argv):
+    if "--help" in argv or "-h" in argv:
+        print(__doc__.strip())
+        return 0
+    if "--suggest" in argv:
+        print(json.dumps(suggest(), indent=2))
+        return 0
+    try:
+        start, cap = opt(argv, "--from") or ".", opt(argv, "--require")
+        action, step = opt(argv, "--action"), opt(argv, "--command")
+    except ValueError as e:
+        print("runtime: %s" % e, file=sys.stderr)
+        return 2
+    data = info(start)
+    if step:
+        print(data["command"].replace("{step}", step))
+        return 0
+    if cap:
+        if cap != "fenced_agents" or action not in ACTIONS:
+            print("runtime: --require fenced_agents --action url|mcp|skill", file=sys.stderr)
+            return 2
+        msg = refusal(data, action)
+        if msg:
+            print(msg, file=sys.stderr)
+            return 1
+        return 0
+    print(json.dumps(data, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

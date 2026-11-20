@@ -24,7 +24,7 @@ runs every step (`state-yml.md`, "Step order per tier").
 
 ## Inputs
 
-- `"${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths"`, `detect-repo --from <code_root>`,
+- `../../scripts/resolve-paths`, `detect-repo --from <code_root>`,
   `detect-commands --from <code_root>` (the runner, for the dependency line).
 - `<workspace_root>/pacenote.yml`: `git.authority`, `git.ticket_key`, `git.worktrees`,
   `models.cheap`, `flow.retention`, `sources.mcp`.
@@ -58,7 +58,7 @@ runs every step (`state-yml.md`, "Step order per tier").
    it: with `--tier`, go to step 10; without, say `already started; run /pacenote:status` and
    end with the handoff block.
 2. **Place.** `git.worktrees` true and authority ≠ `none`: run
-   `"${CLAUDE_PLUGIN_ROOT}/scripts/worktree" add --feature <feature> --branch <branch>` (it
+   `../../scripts/worktree add --feature <feature> --branch <branch>` (it
    creates the branch in both repos from their default branches, or checks an existing one
    out; a refusal, including "embedded", is printed as is and the run stops), then
    `resolve-paths --feature <feature>`: every root below is the worktree's. Otherwise
@@ -82,7 +82,7 @@ runs every step (`state-yml.md`, "Step order per tier").
    questions. Map its answers to signals with the table in `triage.md` and derive the
    proposed tier. Show signals and tier in at most six lines, with what the tier means for
    the flow (`triage.md`), and ask the user to confirm or override (trivial / quick / full).
-6. **State.** Run `"${CLAUDE_PLUGIN_ROOT}/scripts/state" init --file <state.yml> --feature
+6. **State.** Run `../../scripts/state init --file <state.yml> --feature
    <feature> --tier <tier> --retention <r> --branch <branch> [--worktree
    .worktrees/<feature>]`, where retention is `clean` for trivial and quick, `flow.retention`
    for full, and `--worktree` is given when step 2 placed one. The script sets `step` to the
@@ -101,8 +101,8 @@ runs every step (`state-yml.md`, "Step order per tier").
    `detect-commands` reported a runner). `Next: /pacenote:<step> <feature>` with the step
    `state init` reported; with a worktree, a second line: "or launch a session in
    `<worktree>` and run it there without the name".
-10. **Escalate** (existing feature, `--tier`). `state find`, then `"${CLAUDE_PLUGIN_ROOT}/
-    scripts/state" escalate --file <state.yml> --to <tier>`; a refusal (same or lower tier,
+10. **Escalate** (existing feature, `--tier`). `state find`, then `../../scripts/state escalate
+    --file <state.yml> --to <tier>`; a refusal (same or lower tier,
     closed) is printed as is. Show its output in at most six lines: from → to, the step it
     rewound to, the gates cleared, the files kept, the tasks already done. Commit `state.yml`
     as `spec(<feature>): escalate to <tier>` (authority ≠ `none`). Handoff: `Review` says

@@ -9,6 +9,8 @@ links as `text (url)`), redacts it with `redact` and writes PATH with the
 status (ok | login | thin | error), path, origin, final_url, title, lines, bytes,
 redactions, reason. Only status ok writes a file: a 401/403, a redirect to a login or SSO
 page, or a body under 200 characters means the page needs a paste instead.
+Refused before any network access, with the fail-closed line on stderr, when the workspace
+holding PATH runs an assistant that cannot fence agents (scripts/runtime).
 Exit 0 on ok, 1 otherwise. Stdlib only.
 """
 import datetime
@@ -160,6 +162,11 @@ def main(argv):
         return 1
     if not url or not out or not out.endswith(".md"):
         print("pacenote: --url URL and --out PATH.md are required", file=sys.stderr)
+        return 1
+    rt = load("runtime")
+    msg = rt.refusal(rt.info(os.path.dirname(os.path.abspath(out))), "url")
+    if msg:
+        print(msg, file=sys.stderr)
         return 1
     status, final, text, title, reason = fetch(url)
     report = {"status": status, "path": "", "origin": url, "final_url": final,

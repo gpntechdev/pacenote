@@ -20,7 +20,7 @@ After the interview, read the spec once more against two tests:
 
 Either test positive: ask one question, **escalate to full** (default) or **stay quick**
 (the user accepts building without a design). Escalate: run
-`"${CLAUDE_PLUGIN_ROOT}/scripts/state" escalate --file <state.yml> --to full --signal
+`../../scripts/state escalate --file <state.yml> --to full --signal
 <schema|api|sequences|ux|size>`; `step` stays `specify`; continue as full from here (the
 remaining interview rounds, the critic pass, no task draft, G1 only). Stay: say so in the
 handoff `Review` and go on. Nothing positive: say `re-triage: quick holds` and go on.

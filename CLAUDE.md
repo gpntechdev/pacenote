@@ -9,19 +9,20 @@ anything in this file. Record changes to decisions in `docs/DECISIONS.md`, not i
 ## Layout
 
 ```
-.claude-plugin/   plugin.json, marketplace.json
+.claude-plugin/   plugin.json, marketplace.json (also .codex-plugin/, .cursor-plugin/)
 skills/<name>/    SKILL.md (spine) + references/ + templates/
 skills/_shared/   blocks referenced by many skills: handoff, gate protocol, principles, utils
-agents/           subagent definitions
-hooks/            secrets guardrail, source guard (snapshots, skill quarantine)
+agents/           subagent definitions, one copy for every assistant
+hooks/            secrets guardrail, source guard; one hooks file per assistant
 scripts/          deterministic helpers: validate, resolve-paths, detect-*, config-set,
                   init-workspace, state, worktree, run-checks, squash-wip, pr-comments,
                   redact, fetch-source, refresh-source, audit-static, skill-fetch, skill-lock,
-                  lessons, spec-clean, docs-clean, analyze, analyze-codebase, runtime-check
+                  lessons, spec-clean, docs-clean, analyze, analyze-codebase, runtime-check,
+                  runtime
 evals/            claude plugin eval cases; _lib/ holds the shared scaffold and fixture app
 tests/            run-evals, test-audit, test-skill-find, test-lessons, test-spec-clean, test-docs-clean,
                   test-analyze, test-analyze-codebase, test-runtime-check, test-state,
-                  test-config-set + fixtures
+                  test-config-set, test-runtime, test-hooks, test-init-workspace + fixtures
 docs/             PLAN.md, DECISIONS.md, AUTHORING.md
 ```
 
@@ -36,6 +37,7 @@ docs/             PLAN.md, DECISIONS.md, AUTHORING.md
 - Deterministic work (command detection, static audit, state validation) is a script in
   `scripts/`, not a prompt.
 - No skill hardcodes paths; resolve `workspace_root`, `code_root`, `docs_root` from `pacenote.yml`.
+  Scripts are named skill-relative, `../../scripts/<name>`.
 - Model tiers are roles (`judgment`, `execution`, `cheap`), never model names.
 
 ## Coding principles (apply to this repo too)

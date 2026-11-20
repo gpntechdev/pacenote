@@ -10,7 +10,7 @@ that `state check` allows whenever a PR is recorded. Light tiers have fewer gate
 
 ## Entering any step
 
-1. Run `"${CLAUDE_PLUGIN_ROOT}/scripts/state" check --file <state.yml> --step <name>` first.
+1. Run `../../scripts/state check --file <state.yml> --step <name>` first.
    On `ok: false`, refuse with one line built from its output: `<reason>; run <run_first>
    first.`, adding `or escalate with <escalate>` when the output has that key (the step is
    not in the tier's flow). Then end with the handoff block. Never reason about the order

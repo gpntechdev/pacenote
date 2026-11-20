@@ -27,5 +27,9 @@ Next: /pacenote:<command> [args]   after `/clear`
   one, or the step name otherwise.
 - `Next` is one exact command. When the flow forks (for example greenfield after `onboard`),
   give the default first and the alternative on a second line.
+- Commands are written `/pacenote:<step>` throughout pacenote's text. `Next` prints them in
+  the runtime's form: `resolve-paths`' `command` with `{step}` replaced (Codex
+  `$pacenote:<step>`, Cursor `/<step>`; [`runtime.md`](./runtime.md)). Arguments are
+  unchanged.
 - A step that stops early (gate rejected, refusal, bounded retry exhausted) still ends with
   the block; `Next` then names the command that unblocks it.

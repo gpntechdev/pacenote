@@ -1,0 +1,11 @@
+{
+  "runtime": "cursor",
+  "guard": "secrets-guard",
+  "expect": "deny",
+  "payload": {
+    "hook_event_name": "beforeReadFile",
+    "file_path": "{tmp}/.env",
+    "content": "A=1\n",
+    "attachments": []
+  }
+}

@@ -9,6 +9,7 @@ description: >
   model role.
 tools: WebSearch, WebFetch, mcp__context7__*
 maxTurns: 20
+readonly: true
 ---
 
 You answer one bounded question with sources. You run in a fresh context: the prompt holds the

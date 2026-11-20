@@ -18,7 +18,7 @@ documented form.
 
 ## Inputs
 
-- `"${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths"` output: the config path.
+- `../../scripts/resolve-paths` output: the config path.
 - [`../_shared/pacenote-yml.md`](../_shared/pacenote-yml.md): every key, its values and who reads it.
 - The arguments, if any: `key=value` pairs or bare key names.
 
@@ -40,12 +40,12 @@ documented form.
    lacks (`git.wrapper_pr`, `flow.runtime_verify`, `commands.serve` on a file from before
    M7) is inserted by `config-set`. `sources.mcp` on a file from before M5 (`sources: []`):
    show the by-hand edit from `pacenote-yml.md` and stop.
-4. **Patch.** Run `"${CLAUDE_PLUGIN_ROOT}/scripts/config-set" --file <config>` with every
+4. **Patch.** Run `../../scripts/config-set --file <config>` with every
    `key=value` in one call (list items: a second call with `--add` or `--remove`). Show its
    `old -> new` list verbatim. On refusal, show the
    script's message and stop; never repair the file by hand. `sources.mcp=atlassian`: ask
    whether to install the server into `.mcp.json`; on yes run
-   `"${CLAUDE_PLUGIN_ROOT}/scripts/init-workspace" --root <root> --add-mcp atlassian`
+   `../../scripts/init-workspace --root <root> --add-mcp atlassian`
    (root: `wrapper_root` from `resolve-paths`, or the repo holding `.pacenote/`) and show its
    report; say that `/mcp` authorises it once, interactively.
 5. **Say when it applies.** `flow.gate_granularity`, `flow.critic`, `flow.specialists`,

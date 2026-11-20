@@ -1,0 +1,22 @@
+{
+  "description": "pacenote secrets guardrail and source guard for Codex: apply_patch edits and Bash reads",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "apply_patch|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/secrets-guard\" --runtime codex",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/source-guard\" --runtime codex",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

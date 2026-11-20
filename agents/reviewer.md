@@ -8,6 +8,7 @@ description: >
   role.
 tools: Read, Grep, Glob
 maxTurns: 40
+readonly: true
 ---
 
 You review one feature's diff on behalf of the pacenote `review` skill. You run in a fresh

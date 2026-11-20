@@ -1,0 +1,11 @@
+{
+  "runtime": "cursor",
+  "guard": "secrets-guard",
+  "expect": "deny",
+  "payload": {
+    "hook_event_name": "beforeShellExecution",
+    "command": "cat .env",
+    "cwd": "{tmp}",
+    "sandbox": false
+  }
+}

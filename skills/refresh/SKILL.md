@@ -47,7 +47,7 @@ behalf: what the spec does about the change is for the re-opened gate.
 2. **Re-fetch** each snapshot by its header's `via`, with `--diff <spec_root>/<feature>/
    source-refresh-<n>.diff` (onboard: `<workspace_root>/sources/.refresh-<n>.diff`) and
    `--state <state.yml>` when there is a feature:
-   - `http`: `"${CLAUDE_PLUGIN_ROOT}/scripts/refresh-source" --file <snapshot> ...`.
+   - `http`: `../../scripts/refresh-source --file <snapshot> ...`.
    - `file`: the same with `--new <origin>` (relative paths from `code_root`).
    - `mcp:*`: dispatch `intake` in `fetch` mode on `origin`. Tell it to write exactly
      `<snapshot minus .md>.new.md` with link cap 0. Then run `refresh-source --new` on that

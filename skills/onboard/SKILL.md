@@ -17,9 +17,9 @@ sections from an interview. Either way the main thread holds only summaries and 
 
 ## Inputs
 
-- `"${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths"` output (roots; see
+- `../../scripts/resolve-paths` output (roots; see
   [`../_shared/paths.md`](../_shared/paths.md)).
-- `"${CLAUDE_PLUGIN_ROOT}/scripts/detect-repo"` output: kind, existing docs.
+- `../../scripts/detect-repo` output: kind, existing docs.
 - `<workspace_root>/pacenote.yml`: `models.cheap`, `models.judgment`, `project`.
 - [`./references/checklist.md`](./references/checklist.md): what each section must answer.
 - Existing `CLAUDE.md`, `AGENTS.md`, `README`, docs folders: read, never rewritten.

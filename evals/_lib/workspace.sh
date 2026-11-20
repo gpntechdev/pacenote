@@ -22,7 +22,7 @@ ws_repo() {
 
 # An embedded workspace with the fixture docs and the app's test command, committed.
 ws_init() {
-  "$PLUGIN/scripts/init-workspace" --root . >/dev/null
+  "$PLUGIN/scripts/init-workspace" --root . --assistant claude >/dev/null
   cp "$LIB/docs/"*.md "$W/docs/"
   ws_config project=items commands.test="make test"
   ws_commit "chore: initialise pacenote workspace"

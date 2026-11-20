@@ -10,8 +10,9 @@ Usage: skill-lock install --workspace W --code-root C --from QDIR --name NAME --
        skill-lock where   --workspace W --code-root C --name NAME
        skill-lock discard --workspace W --name NAME
 
-The skill home is derived, never asked: <repo>/.claude/skills/<name>/ for an embedded
-workspace (W is <repo>/.pacenote), <W>/.claude/skills/<name>/ for a wrapper, and
+The skill home is derived, never asked: <repo>/<home>/<name>/ for an embedded
+workspace (W is <repo>/.pacenote), <W>/<home>/<name>/ for a wrapper, where <home> is the
+runtime's skill_home (.claude/skills; .agents/skills for Codex and Cursor), and
 <W>/skills/<name>/ when the workspace is private (.pacenote/ in .git/info/exclude).
 install: copies a quarantine folder (W/.quarantine/...) to the skill home and writes its
          lock section, source `repo` with --repo/--path/--commit, else `local`. Refuses a
@@ -86,13 +87,24 @@ def private(repo):
         return ".pacenote/" in f.read().splitlines()
 
 
+def skill_home(workspace):
+    """The runtime's skill folder (skills/_shared/runtime.md), relative to the repo."""
+    from importlib.machinery import SourceFileLoader
+    import importlib.util
+    loader = SourceFileLoader("pacenote_runtime", os.path.join(os.path.dirname(
+        os.path.abspath(__file__)), "runtime"))
+    rt = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(rt)
+    return rt.table()[rt.info(workspace)["assistant"]]["skill_home"]
+
+
 def home(workspace, name):
     if os.path.basename(workspace) == ".pacenote":
         repo = os.path.dirname(workspace)
         if private(repo):
             return os.path.join(workspace, "skills", name)
-        return os.path.join(repo, ".claude", "skills", name)
-    return os.path.join(workspace, ".claude", "skills", name)
+        return os.path.join(repo, skill_home(workspace), name)
+    return os.path.join(workspace, skill_home(workspace), name)
 
 
 def tree_hash(root):

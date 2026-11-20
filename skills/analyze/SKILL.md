@@ -24,7 +24,7 @@ runs at any step once `tasks.md` exists, before or after G3.
 - `resolve-paths` and `state find` ([`../_shared/paths.md`](../_shared/paths.md), "Resolving
   for a feature", steps 1 and 2); the argument: a feature, or none.
 - `<spec_root>/<feature>/state.yml`: `tier`, `step`.
-- `"${CLAUDE_PLUGIN_ROOT}/scripts/analyze" scan` output: the ACs, the tasks with their
+- `../../scripts/analyze scan` output: the ACs, the tasks with their
   covers and files, the decisions, every coverage finding with `file:line`, and the decision
   candidates.
 - `<workspace_root>/pacenote.yml`: `models.judgment`.
@@ -41,7 +41,7 @@ runs at any step once `tasks.md` exists, before or after G3.
 1. **Resolve.** `resolve-paths` (no config: `run /pacenote:init first`), then `state find`
    per `paths.md`. No feature, or several: ask which. Tier `trivial`: say there is no spec
    or tasks to compare and end with the handoff (`Next: none`).
-2. **Scan.** `"${CLAUDE_PLUGIN_ROOT}/scripts/analyze" scan --feature-dir
+2. **Scan.** `../../scripts/analyze scan --feature-dir
    <spec_root>/<feature>`. A refusal names the step to run first (`/pacenote:specify`,
    `/pacenote:tasks`): print it and end with the handoff. Print `analyze: <n> coverage
    findings, <d> decisions no task names, design <present|absent>`.

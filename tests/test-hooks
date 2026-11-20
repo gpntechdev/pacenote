@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""Tests for hooks/secrets-guard and hooks/source-guard against each runtime's payloads.
+
+Usage: test-hooks [--help]   (run from anywhere; stdlib unittest)
+
+Each tests/fixtures/hooks/*.json names the runtime, the guard, the expected outcome and a
+payload in the documented shape (DECISIONS 2026-11-19 M8; Codex and Cursor unconfirmed
+live). A denial must be in the runtime's form: exit 2 with a reason on stderr, plus
+{"permission": "deny"} on stdout for Cursor. A pass prints nothing and exits 0. The
+hooks files' own command lines are run too, with the runtime's plugin-root variable set.
+"""
+import glob
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FIXTURES = os.path.join(ROOT, "tests", "fixtures", "hooks")
+ROOT_VAR = {"codex": "PLUGIN_ROOT", "cursor": "CURSOR_PLUGIN_ROOT", "claude": "CLAUDE_PLUGIN_ROOT"}
+HOOK_FILE = {"claude": "hooks.json", "codex": "codex.json", "cursor": "cursor.json"}
+FETCHED = '<!-- pacenote:source origin="https://example.com/p" via="http" title="p" redactions=0 -->\n'
+PASTED = '<!-- pacenote:source origin="paste" via="paste" title="p" redactions=0 -->\n'
+
+
+def fill(node, tmp):
+    if isinstance(node, str):
+        return node.replace("{tmp}", tmp)
+    if isinstance(node, dict):
+        return {k: fill(v, tmp) for k, v in node.items()}
+    if isinstance(node, list):
+        return [fill(v, tmp) for v in node]
+    return node
+
+
+def commands(node):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k == "command" and isinstance(v, str):
+                yield v
+            else:
+                yield from commands(v)
+    elif isinstance(node, list):
+        for v in node:
+            yield from commands(v)
+
+
+class Guards(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.tmp, "sources"))
+        for name, header in (("page.md", FETCHED), ("paste.md", PASTED)):
+            with open(os.path.join(self.tmp, "sources", name), "w") as f:
+                f.write(header + "body\n")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def run_guard(self, case, argv=None):
+        payload = json.dumps(fill(case["payload"], self.tmp))
+        argv = argv or [sys.executable, os.path.join(ROOT, "hooks", case["guard"])] + (
+            [] if case["runtime"] == "claude" else ["--runtime", case["runtime"]])
+        return subprocess.run(argv, input=payload, capture_output=True, text=True, cwd=self.tmp)
+
+    def assert_outcome(self, name, case, res):
+        if case["expect"] == "deny":
+            self.assertEqual(res.returncode, 2, name)
+            self.assertIn("pacenote", res.stderr, name)
+            if case["runtime"] == "cursor":
+                self.assertEqual(json.loads(res.stdout)["permission"], "deny", name)
+            else:
+                self.assertEqual(res.stdout, "", name)
+        else:
+            self.assertEqual((res.returncode, res.stdout, res.stderr), (0, "", ""), name)
+
+    def test_fixtures(self):
+        files = sorted(glob.glob(os.path.join(FIXTURES, "*.json")))
+        self.assertGreaterEqual(len(files), 20)
+        for path in files:
+            name = os.path.basename(path)
+            with open(path) as f:
+                case = json.load(f)
+            self.assert_outcome(name, case, self.run_guard(case))
+
+    def test_env_read_denied_in_every_runtime(self):
+        wanted = {"claude-read-env", "claude-edit-env", "codex-apply-patch-env",
+                  "codex-bash-cat-env", "cursor-before-read-env", "cursor-pre-tool-write-env",
+                  "cursor-shell-cat-env"}
+        present = {os.path.splitext(os.path.basename(p))[0]
+                   for p in glob.glob(os.path.join(FIXTURES, "*.json"))}
+        self.assertLessEqual(wanted, present)
+
+    def test_hooks_files_run_as_written(self):
+        """Every command in each hooks file denies that runtime's .env read."""
+        env_case = {"claude": "claude-read-env", "codex": "codex-bash-cat-env",
+                    "cursor": "cursor-shell-cat-env"}
+        for runtime, fn in HOOK_FILE.items():
+            with open(os.path.join(ROOT, "hooks", fn)) as f:
+                cmds = list(commands(json.load(f)))
+            with open(os.path.join(FIXTURES, env_case[runtime] + ".json")) as f:
+                case = json.load(f)
+            guards = 0
+            for cmd in cmds:
+                if "secrets-guard" not in cmd:
+                    continue
+                guards += 1
+                env = dict(os.environ, **{ROOT_VAR[runtime]: ROOT})
+                res = subprocess.run(["sh", "-c", cmd], env=env, cwd=self.tmp, text=True,
+                                     capture_output=True,
+                                     input=json.dumps(fill(case["payload"], self.tmp)))
+                self.assertEqual(res.returncode, 2, "%s: %s" % (fn, cmd))
+            self.assertGreaterEqual(guards, 1, fn)
+
+    def test_unreadable_input_passes(self):
+        for runtime in ("claude", "codex", "cursor"):
+            for guard in ("secrets-guard", "source-guard"):
+                res = subprocess.run([sys.executable, os.path.join(ROOT, "hooks", guard),
+                                      "--runtime", runtime], input="not json",
+                                     capture_output=True, text=True)
+                self.assertEqual(res.returncode, 0, (runtime, guard))
+
+
+class Payload(unittest.TestCase):
+    def setUp(self):
+        from importlib.machinery import SourceFileLoader
+        import importlib.util
+        loader = SourceFileLoader("payload", os.path.join(ROOT, "hooks", "payload"))
+        self.p = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+        loader.exec_module(self.p)
+
+    def test_shell_tokens(self):
+        t = self.p.shell_tokens
+        self.assertIn(".env", t("cat .env"))
+        self.assertIn(".env", t("cat<.env"))
+        self.assertIn(".env", t("tool --file=.env && echo ok"))
+        self.assertIn(".env", t('cat ".env"'))
+        self.assertIn("a b.txt", t("cat 'a b.txt'"))
+
+    def test_patch_paths(self):
+        files = self.p.parse_patch("*** Begin Patch\n*** Add File: a.md\n+x\n+y\n"
+                                   "*** Delete File: b.md\n*** End Patch\n")
+        self.assertEqual(files, [["a.md", "x\ny\n"], ["b.md", ""]])
+
+
+if __name__ == "__main__":
+    if "--help" in sys.argv:
+        print(__doc__.strip())
+        sys.exit(0)
+    unittest.main(verbosity=1)

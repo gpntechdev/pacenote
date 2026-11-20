@@ -1,0 +1,14 @@
+{
+  "runtime": "cursor",
+  "guard": "source-guard",
+  "expect": "deny",
+  "payload": {
+    "hook_event_name": "preToolUse",
+    "tool_name": "Write",
+    "cwd": "{tmp}",
+    "tool_input": {
+      "file_path": "{tmp}/.quarantine/x/SKILL.md",
+      "content": "x"
+    }
+  }
+}

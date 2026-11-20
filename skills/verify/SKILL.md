@@ -38,7 +38,7 @@ review's AC table stands as evidence, trivial has no acceptance criteria).
 
 1. **Resolve** per `paths.md` ("Resolving for a feature"), `state check --step verify` per
    `gates.md`. Set `step=verify`.
-2. **Run.** `"${CLAUDE_PLUGIN_ROOT}/scripts/run-checks" --from <code_root>`. Any red check:
+2. **Run.** `../../scripts/run-checks --from <code_root>`. Any red check:
    stop, show its tail, handoff `Next: /pacenote:implement <feature>`.
 3. **Automated evidence.** For each matrix row whose Test names a test case: `grep` the
    name under `<code_root>` (skip vendored folders); found and the test suite green →

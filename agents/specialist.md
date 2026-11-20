@@ -8,6 +8,7 @@ description: >
   the base reviewer's findings. Run at the judgment model role.
 tools: Read, Grep, Glob
 maxTurns: 30
+readonly: true
 ---
 
 You review one feature's diff through one lens on behalf of the pacenote `review` skill. You

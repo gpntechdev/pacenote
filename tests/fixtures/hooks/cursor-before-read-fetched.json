@@ -1,0 +1,11 @@
+{
+  "runtime": "cursor",
+  "guard": "source-guard",
+  "expect": "deny",
+  "payload": {
+    "hook_event_name": "beforeReadFile",
+    "file_path": "{tmp}/sources/page.md",
+    "content": "x",
+    "attachments": []
+  }
+}

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Create the pacenote workspace in a repo. Idempotent; prints a JSON report.
 
-Usage: init-workspace --root DIR [--mode embedded|wrapper] [--code NAME] [--docs REL] [--private]
+Usage: init-workspace --root DIR [--assistant claude|codex|cursor] [--mode embedded|wrapper]
+                      [--code NAME] [--docs REL] [--private]
        init-workspace --root DIR --add-mcp NAME
 
 Embedded (default): creates .pacenote/ with its folders, .pacenote/pacenote.yml (copied from the
@@ -19,12 +20,24 @@ into DIR/.mcp.json, the file init wrote (embedded: the repo root; wrapper: the w
 in a private workspace (.pacenote/ git-excluded) it is skipped with a `claude mcp add` hint.
 dbhub reads its connection string from the DATABASE_URL environment variable, never from
 the file.
+--assistant (default claude) picks the assistant's files from skills/_shared/runtime.md:
+claude as above; codex and cursor get the pointer block in AGENTS.md (no @-imports), the
+MCP servers in .codex/config.toml or .cursor/mcp.json, and no attribution setting (none is
+documented). Every assistant gets pacenote.local.yml next to
+pacenote.yml: `assistant:` plus, for codex and cursor, their `models.*`, gitignored through
+<workspace>/.gitignore; never the shared pacenote.yml. Running init again with another
+assistant adds that assistant's files and switches the local file. In private mode
+AGENTS.md is written only when it is new and is then git-excluded, and so are copied agents.
+--add-mcp writes to the MCP file of the assistant in pacenote.local.yml.
 Each artifact is reported as created, merged or skipped. Exit 1 on refusal. Stdlib only.
 """
+import importlib.util
 import json
 import os
 import re
+import shutil
 import sys
+from importlib.machinery import SourceFileLoader
 
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LAYOUT = {"embedded": ".pacenote/", "wrapper": ""}  # folder prefix of the workspace files
@@ -42,7 +55,9 @@ MCP_SERVERS = {
 EXCLUDES = [".pacenote/", "CLAUDE.local.md", ".claude/settings.local.json"]
 WORKTREES = ".worktrees/"
 
-report = {"mode": "embedded", "private": False, "created": [], "merged": [], "skipped": [],
+LOCAL = "pacenote.local.yml"
+
+report = {"mode": "embedded", "assistant": "claude", "private": False, "created": [], "merged": [], "skipped": [],
           "warnings": []}
 
 
@@ -99,8 +114,22 @@ def ensure_file(path, text):
         report["created"].append(path)
 
 
-def mcp_hint(name):
+def load_runtime():
+    loader = SourceFileLoader("pacenote_runtime", os.path.join(PLUGIN_ROOT, "scripts", "runtime"))
+    module = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(module)
+    return module
+
+
+def mcp_hint(name, assistant="claude"):
     server = MCP_SERVERS[name]
+    if assistant == "codex":
+        if "url" in server:
+            return "run: codex mcp add %s --url %s" % (name, server["url"])
+        env = "".join(" --env %s=<value>" % k for k in sorted(server.get("env", {})))
+        return "run: codex mcp add%s %s -- %s" % (env, name, " ".join([server["command"]] + server["args"]))
+    if assistant == "cursor":
+        return "add %s to ~/.cursor/mcp.json: %s" % (name, json.dumps(cursor_server(server)))
     if "url" in server:
         return "run: claude mcp add --transport %s %s %s" % (server["type"], name, server["url"])
     env = "".join(' -e %s="%s"' % (k, re.sub(r"\$\{(\w+)\}", r"$\1", v))
@@ -127,7 +156,7 @@ def merge_settings(path, attribution):
     (report["merged"] if existed else report["created"]).append(path)
 
 
-def merge_mcp(path, name="context7"):
+def merge_mcp(path, name="context7", server=None):
     data = {}
     if os.path.exists(path):
         try:
@@ -145,8 +174,76 @@ def merge_mcp(path, name="context7"):
         skip(path, "%s already configured" % name)
         return
     existed = os.path.exists(path)
-    servers[name] = MCP_SERVERS[name]
+    servers[name] = server or MCP_SERVERS[name]
     write(path, json.dumps(data, indent=2) + "\n")
+    (report["merged"] if existed else report["created"]).append(path)
+
+
+def cursor_server(server):
+    out = {k: v for k, v in server.items() if k != "type"}
+    if "env" in out:
+        out["env"] = {k: re.sub(r"\$\{(\w+)\}", r"${env:\1}", v) for k, v in out["env"].items()}
+    return out
+
+
+def toml_value(v):
+    if isinstance(v, list):
+        return "[%s]" % ", ".join(json.dumps(x) for x in v)
+    return json.dumps(v)
+
+
+def merge_codex_mcp(path, name="context7"):
+    """Append [mcp_servers.NAME] to a config.toml; servers that need env are left to the user."""
+    text = read(path) if os.path.exists(path) else ""
+    if re.search(r"^\[mcp_servers\.%s\]" % re.escape(name), text, re.M):
+        skip(path, "%s already configured" % name)
+        return
+    server = MCP_SERVERS[name]
+    if "env" in server:
+        skip(path, "%s needs an environment variable" % name)
+        report["warnings"].append(mcp_hint(name, "codex"))
+        return
+    lines = ["[mcp_servers.%s]" % name]
+    lines += ["url = %s" % json.dumps(server["url"])] if "url" in server else [
+        "command = %s" % json.dumps(server["command"]), "args = %s" % toml_value(server["args"])]
+    sep = "" if not text or text.endswith("\n\n") else ("\n" if text.endswith("\n") else "\n\n")
+    write(path, text + sep + "\n".join(lines) + "\n")
+    (report["merged"] if text else report["created"]).append(path)
+
+
+def merge_assistant_mcp(root, assistant, name="context7"):
+    target = os.path.join(root, load_runtime().table()[assistant]["mcp_file"])
+    if assistant == "codex":
+        merge_codex_mcp(target, name)
+    elif assistant == "cursor":
+        merge_mcp(target, name, cursor_server(MCP_SERVERS[name]))
+    else:
+        merge_mcp(target, name)
+
+
+def write_local(workspace, assistant):
+    """Set assistant (and its models block) in pacenote.local.yml; keep any other key."""
+    path = os.path.join(workspace, LOCAL)
+    models = load_runtime().table()[assistant]["models"]
+    new = ["assistant: %s" % assistant]
+    if models:
+        new += ["models:"] + ["  %s: %s" % (r, models[r]) for r in ("judgment", "execution", "cheap")]
+    old = read(path).splitlines() if os.path.exists(path) else [
+        "# Personal pacenote settings: gitignored, read after pacenote.yml (DECISIONS 2026-11-19 M8)."]
+    kept, section = [], None
+    for line in old:
+        m = re.match(r"^([A-Za-z_][\w-]*):", line)
+        if m:
+            section = m.group(1)
+        if section in ("assistant", "models"):
+            continue
+        kept.append(line)
+    text = "\n".join(kept + new) + "\n"
+    if os.path.exists(path) and read(path) == text:
+        skip(path, "assistant already %s" % assistant)
+        return
+    existed = os.path.exists(path)
+    write(path, text)
     (report["merged"] if existed else report["created"]).append(path)
 
 
@@ -209,10 +306,11 @@ def ensure_excludes(root):
     ensure_lines(os.path.join(gd, "info", "exclude"), EXCLUDES, "excludes")
 
 
-def render_claude_md(template, docs_rel, code):
+def render_claude_md(template, docs_rel, code, command="/pacenote:{step}"):
     """Fill the placeholders; lines about the code folder exist only in wrapper mode."""
     lines = [l for l in template.splitlines() if code or "{{code_root}}" not in l]
     text = "\n".join(lines) + "\n"
+    text = re.sub(r"\{\{cmd (\S+)\}\}", lambda m: command.replace("{step}", m.group(1)), text)
     return text.replace("{{docs_root}}", docs_rel).replace("{{code_root}}", code or "")
 
 
@@ -228,14 +326,18 @@ def opt(argv, flag, default=None):
 def add_mcp(root, name):
     if name not in MCP_SERVERS or name == "context7":
         return fail("--add-mcp takes one of: %s" % ", ".join(n for n in MCP_SERVERS if n != "context7"))
+    rt = load_runtime()
+    assistant = rt.info(root)["assistant"]
+    assistant = assistant if assistant in rt.ASSISTANTS else "claude"
+    report["assistant"] = assistant
     gd = git_dir(root)
     exclude = os.path.join(gd, "info", "exclude") if gd else ""
     if exclude and os.path.isfile(exclude) and ".pacenote/" in read(exclude).splitlines():
         report["private"] = True
-        skip(os.path.join(root, ".mcp.json"), "private mode")
-        report["warnings"].append(mcp_hint(name))
+        skip(os.path.join(root, rt.table()[assistant]["mcp_file"]), "private mode")
+        report["warnings"].append(mcp_hint(name, assistant))
     else:
-        merge_mcp(os.path.join(root, ".mcp.json"), name)
+        merge_assistant_mcp(root, assistant, name)
     print(json.dumps(report, indent=2))
     return 0
 
@@ -255,12 +357,16 @@ def main(argv):
     try:
         root, mode = opt(argv, "--root"), opt(argv, "--mode", "embedded")
         code, docs_rel = opt(argv, "--code"), opt(argv, "--docs")
+        assistant = opt(argv, "--assistant", "claude")
     except ValueError as e:
         return fail(str(e))
     if not root:
         return fail("--root DIR is required")
     if mode not in LAYOUT:
         return fail("--mode must be embedded or wrapper")
+    if assistant not in ("claude", "codex", "cursor"):
+        return fail("--assistant must be claude, codex or cursor")
+    report["assistant"] = assistant
     root = os.path.abspath(root)
     private = "--private" in argv
     report["mode"], report["private"] = mode, private
@@ -282,7 +388,9 @@ def main(argv):
     try:
         config = fence("skills/_shared/pacenote-yml.md", "yaml")
         attribution = json.loads(fence("skills/_shared/no-attribution.md", "json"))["attribution"]
-        claude_md = read(os.path.join(PLUGIN_ROOT, "skills/init/templates/CLAUDE.md"))
+        memory = "CLAUDE.md" if assistant == "claude" else "AGENTS.md"
+        claude_md = read(os.path.join(PLUGIN_ROOT, "skills/init/templates", memory))
+        command = load_runtime().table()[assistant]["command"]
         lessons = read(os.path.join(PLUGIN_ROOT, "skills/init/templates/lessons.md"))
     except (OSError, ValueError, KeyError) as e:
         return fail("plugin files unreadable: %s" % e)
@@ -290,15 +398,33 @@ def main(argv):
     ensure_folders(root, prefix, docs_rel)
     ensure_file(os.path.join(root, prefix + "pacenote.yml"), config)
     ensure_file(os.path.join(root, docs_rel, "lessons.md"), lessons)
-    settings = ".claude/settings.local.json" if private else ".claude/settings.json"
-    merge_settings(os.path.join(root, settings), attribution)
-    if private:
-        skip(os.path.join(root, ".mcp.json"), "private mode")
-        report["warnings"].append(mcp_hint("context7"))
+    workspace = os.path.join(root, prefix.rstrip("/")) if prefix else root
+    write_local(workspace, assistant)
+    ensure_lines(os.path.join(workspace, ".gitignore"), [LOCAL], "ignores")
+    block = render_claude_md(claude_md, docs_rel, code, command)
+    if assistant == "claude":
+        settings = ".claude/settings.local.json" if private else ".claude/settings.json"
+        merge_settings(os.path.join(root, settings), attribution)
+        target = "CLAUDE.local.md" if private else "CLAUDE.md"
     else:
-        merge_mcp(os.path.join(root, ".mcp.json"))
-    target = "CLAUDE.local.md" if private else "CLAUDE.md"
-    insert_block(os.path.join(root, target), render_claude_md(claude_md, docs_rel, code))
+        target = "AGENTS.md"
+    mcp_file = load_runtime().table()[assistant]["mcp_file"]
+    if private:
+        skip(os.path.join(root, mcp_file), "private mode")
+        report["warnings"].append(mcp_hint("context7", assistant))
+    else:
+        merge_assistant_mcp(root, assistant)
+    if private and target == "AGENTS.md" and os.path.exists(os.path.join(root, target)) \
+            and BEGIN not in read(os.path.join(root, target)):
+        skip(os.path.join(root, target), "private mode: AGENTS.md is the team's file")
+        report["warnings"].append("add the pacenote block to AGENTS.md by hand, or keep it local")
+    else:
+        new_agents_md = target == "AGENTS.md" and not os.path.exists(os.path.join(root, target))
+        insert_block(os.path.join(root, target), block)
+        if private and new_agents_md:
+            gd = git_dir(root)
+            if gd:
+                ensure_lines(os.path.join(gd, "info", "exclude"), ["AGENTS.md"], "excludes")
     if private:
         ensure_excludes(root)
     if mode == "wrapper":

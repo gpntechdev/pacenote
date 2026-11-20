@@ -25,6 +25,8 @@ fetch: downloads the repo tarball at exactly that 40-hex commit and extracts onl
 stage: copies a local skill folder (no links followed) into W/.quarantine/<name>-local/,
        for auditing a folder the user names or a skill already installed.
 clean: removes one quarantine folder, or the whole quarantine.
+Every command but clean is refused, with the fail-closed line, when the workspace runs an
+assistant that cannot fence agents (scripts/runtime): toolsmith only generates there.
 GitHub API calls go anonymous first, then with GITHUB_TOKEN or GH_TOKEN when set, then
 through `gh api` on a rate-limit refusal; the token goes to api.github.com only.
 The quarantine holds a `.gitignore` of `*` and sits outside every folder Claude Code loads
@@ -59,6 +61,16 @@ SAFE = re.compile(r"[^A-Za-z0-9._-]+")
 
 class Refused(Exception):
     pass
+
+
+def load_runtime():
+    from importlib.machinery import SourceFileLoader
+    import importlib.util
+    loader = SourceFileLoader("pacenote_runtime", os.path.join(os.path.dirname(
+        os.path.abspath(__file__)), "runtime"))
+    module = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(module)
+    return module
 
 
 def opt(argv, flag, default=None):
@@ -369,6 +381,11 @@ def main(argv):
         workspace = opt(argv, "--workspace")
         if not workspace or not os.path.isdir(workspace):
             raise Refused("--workspace W (the folder holding pacenote.yml) is required")
+        if argv[0] != "clean":
+            rt = load_runtime()
+            msg = rt.refusal(rt.info(workspace), "skill")
+            if msg:
+                raise Refused(msg[len("pacenote: "):])
         result = COMMANDS[argv[0]](os.path.abspath(workspace), argv[1:])
     except Refused as e:
         print("pacenote: %s" % e, file=sys.stderr)

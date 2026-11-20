@@ -13,7 +13,7 @@
 
 `implement` commits every task as `WIP: <its commit line>` until a PR is recorded. Before
 the first push, step 5 offers to collapse the branch into one commit with
-`"${CLAUDE_PLUGIN_ROOT}/scripts/squash-wip" --from <code_root> --base <default> --title "<title>" --body-file <spec_root>/<feature>/change-summary.md`:
+`../../scripts/squash-wip --from <code_root> --base <default> --title "<title>" --body-file <spec_root>/<feature>/change-summary.md`:
 a soft reset to the merge base and one commit, so the tree is unchanged and `before` in its
 output restores the old history (`git reset --hard <before>`). In embedded mode the
 `spec(<feature>): …` commits on the branch collapse into it too. The body is the change

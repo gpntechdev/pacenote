@@ -1,0 +1,15 @@
+{
+  "runtime": "codex",
+  "guard": "secrets-guard",
+  "expect": "deny",
+  "payload": {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "apply_patch",
+    "turn_id": "t1",
+    "tool_use_id": "c1",
+    "cwd": "{tmp}",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Update File: .env\n@@\n-A=1\n+A=2\n*** End Patch\n"
+    }
+  }
+}

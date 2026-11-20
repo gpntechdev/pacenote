@@ -1,0 +1,11 @@
+{
+  "runtime": "cursor",
+  "guard": "secrets-guard",
+  "expect": "allow",
+  "payload": {
+    "hook_event_name": "beforeReadFile",
+    "file_path": "{tmp}/README.md",
+    "content": "hi\n",
+    "attachments": []
+  }
+}

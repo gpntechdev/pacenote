@@ -1,0 +1,15 @@
+{
+  "runtime": "cursor",
+  "guard": "secrets-guard",
+  "expect": "deny",
+  "payload": {
+    "hook_event_name": "preToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "c1",
+    "cwd": "{tmp}",
+    "tool_input": {
+      "file_path": "{tmp}/.env",
+      "content": "A=1"
+    }
+  }
+}

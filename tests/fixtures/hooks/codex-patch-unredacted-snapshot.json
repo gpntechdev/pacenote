@@ -1,0 +1,13 @@
+{
+  "runtime": "codex",
+  "guard": "source-guard",
+  "expect": "deny",
+  "payload": {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "apply_patch",
+    "cwd": "{tmp}",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Add File: sources/new.md\n+<!-- pacenote:source origin=\"paste\" via=\"paste\" title=\"t\" redactions=0 -->\n+api_key=abc123\n*** End Patch\n"
+    }
+  }
+}

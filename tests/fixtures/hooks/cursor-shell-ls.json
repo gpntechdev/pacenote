@@ -1,0 +1,11 @@
+{
+  "runtime": "cursor",
+  "guard": "secrets-guard",
+  "expect": "allow",
+  "payload": {
+    "hook_event_name": "beforeShellExecution",
+    "command": "ls -la",
+    "cwd": "{tmp}",
+    "sandbox": false
+  }
+}

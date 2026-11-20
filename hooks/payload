@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""Normalise a hook payload from Claude Code, Codex or Cursor. Imported by the guards.
+
+Usage: payload --runtime claude|codex|cursor   (reads hook JSON on stdin, prints the event)
+
+normalise(data, runtime) returns {tool, reads, writes, shell, limit, offset, agent, cwd}:
+reads is a list of paths, writes a list of [path, content or None], shell the command
+text or "". The payloads, as documented (DECISIONS 2026-11-19 M8; unconfirmed live for
+Codex and Cursor):
+  claude  PreToolUse: tool_input.file_path, notebook_path, file_edits[].file_path;
+          Read is a read, every other matched tool a write (Write carries content).
+  codex   PreToolUse: apply_patch with the patch in tool_input.command (`*** Add File:`,
+          `*** Update File:`, `*** Delete File:`, `*** Move to:`; added lines as content);
+          Bash (also exec_command, shell) with the command in tool_input.command or cmd.
+  cursor  beforeReadFile {file_path}; beforeShellExecution {command};
+          preToolUse {tool_name Read | Write | Edit | Delete | Shell, tool_input}.
+shell_tokens(command) splits a command into words, also at < > | ; & ( ) and =, so
+`cat .env`, `cat<.env` and `--file=.env` all yield `.env`. Stdlib only.
+"""
+import json
+import re
+import shlex
+import sys
+
+PATH_KEYS = ("file_path", "path", "target_file", "filePath", "notebook_path")
+PATCH_OP = re.compile(r"^\*\*\* (Add File|Update File|Delete File|Move to): (.+?)\s*$")
+CODEX_SHELL = {"Bash", "exec_command", "shell", "local_shell"}
+
+
+def _paths(tool_input):
+    out = [tool_input[k] for k in PATH_KEYS if isinstance(tool_input.get(k), str)]
+    for edit in tool_input.get("file_edits") or []:
+        if isinstance(edit, dict) and isinstance(edit.get("file_path"), str):
+            out.append(edit["file_path"])
+    return out
+
+
+def _command(tool_input):
+    cmd = tool_input.get("command", tool_input.get("cmd", ""))
+    if isinstance(cmd, list):
+        cmd = " ".join(str(c) for c in cmd)
+    return cmd if isinstance(cmd, str) else ""
+
+
+def parse_patch(text):
+    """[[path, added text]] for each file an apply_patch touches."""
+    files, current = [], None
+    for line in text.splitlines():
+        m = PATCH_OP.match(line)
+        if m:
+            current = [m.group(2), []]
+            files.append(current)
+        elif line.startswith("***"):
+            current = None
+        elif current is not None and line.startswith("+"):
+            current[1].append(line[1:])
+    return [[p, "\n".join(lines) + ("\n" if lines else "")] for p, lines in files]
+
+
+def shell_tokens(command):
+    try:
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        words = list(lexer)
+    except ValueError:
+        words = command.split()
+    out = []
+    for w in words:
+        out.extend(t for t in re.split(r"[<>|;&()=]+", w.strip("\"'")) if t)
+    return out
+
+
+def normalise(data, runtime):
+    ti = data.get("tool_input") if isinstance(data.get("tool_input"), dict) else {}
+    tool = str(data.get("tool_name") or data.get("hook_event_name") or "tool")
+    ev = {"tool": tool, "reads": [], "writes": [], "shell": "", "limit": ti.get("limit"),
+          "offset": ti.get("offset"), "agent": str(data.get("agent_type") or ""),
+          "cwd": str(data.get("cwd") or "")}
+    if runtime == "claude":
+        paths = _paths(ti)
+        if tool == "Read":
+            ev["reads"] = paths
+        else:
+            content = ti.get("content") if isinstance(ti.get("content"), str) else None
+            ev["writes"] = [[p, content] for p in paths]
+    elif runtime == "codex":
+        if tool == "apply_patch":
+            ev["writes"] = parse_patch(_command(ti))
+        elif tool in CODEX_SHELL:
+            ev["shell"] = _command(ti)
+    elif runtime == "cursor":
+        event = data.get("hook_event_name", "")
+        if event == "beforeReadFile" or (event != "preToolUse" and "file_path" in data
+                                         and "tool_name" not in data):
+            ev["tool"], ev["reads"] = "Read", [str(data.get("file_path", ""))]
+        elif event == "beforeShellExecution" or ("command" in data and "tool_name" not in data):
+            ev["tool"], ev["shell"] = "Shell", str(data.get("command", ""))
+        elif tool == "Read":
+            ev["reads"] = _paths(ti)
+        elif tool == "Shell":
+            ev["shell"] = _command(ti)
+        elif tool in ("Write", "Edit", "Delete", "MultiEdit"):
+            content = next((ti[k] for k in ("content", "contents", "file_text")
+                            if isinstance(ti.get(k), str)), None)
+            ev["writes"] = [[p, content] for p in _paths(ti)]
+    return ev
+
+
+def deny(runtime, message):
+    """Block the call in the runtime's form; returns the exit code."""
+    if runtime == "cursor":
+        print(json.dumps({"permission": "deny", "user_message": message,
+                          "agent_message": message}))
+    print(message, file=sys.stderr)
+    return 2
+
+
+def runtime_arg(argv):
+    if "--runtime" in argv:
+        i = argv.index("--runtime")
+        if i + 1 < len(argv) and argv[i + 1] in ("claude", "codex", "cursor"):
+            return argv[i + 1]
+    return "claude"
+
+
+if __name__ == "__main__":
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(__doc__.strip())
+        sys.exit(0)
+    print(json.dumps(normalise(json.load(sys.stdin), runtime_arg(sys.argv[1:])), indent=2))

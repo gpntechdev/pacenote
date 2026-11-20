@@ -99,7 +99,7 @@ reproduction). Re-entry after a G4 stop or a review round is the same command: t
    commit), then ask again. Reject: handoff; a pending task stays `todo` with its
    files uncommitted in the tree, named under `Review`; `Next` is this command. No stop due:
    continue at step 2 without asking.
-6. **Finish.** No `todo` left in the feature: run `"${CLAUDE_PLUGIN_ROOT}/scripts/run-checks"
+6. **Finish.** No `todo` left in the feature: run `../../scripts/run-checks
    --from <code_root>`. Red: one repair dispatch with the failing output, commit its files
    as `fix(<scope>): make <check> pass` (prefixed per `loop.md`), re-run; still red:
    handoff with the output,

@@ -51,7 +51,7 @@ flow and the check names the step that is.
 2. **Serve.** Read `commands.serve` and `commands.serve_url`. Either empty: one question
    with a suggestion from `project.md` (how to run) — the command, run in `<code_root>`, and
    the URL it answers on; or "already running at <URL>" with no command. Then offer once to
-   save both with `"${CLAUDE_PLUGIN_ROOT}/scripts/config-set" --file
+   save both with `../../scripts/config-set --file
    <workspace_root>/pacenote.yml commands.serve=<cmd> commands.serve_url=<url>`. A URL whose
    host is not `localhost`, `127.0.0.1`, `[::1]` or `*.local`: confirm it is not production
    before going on, since checks may write data.
@@ -64,7 +64,7 @@ flow and the check names the step that is.
    installing it (`init-workspace --root <MCP root> --add-mcp playwright`; the server
    loads only after Claude Code restarts, so this run treats those rows as skipped and the
    handoff says to re-run), attesting by a manual note as `verify` does, or skipping.
-4. **Start.** `"${CLAUDE_PLUGIN_ROOT}/scripts/runtime-check" start --serve <cmd> --url
+4. **Start.** `../../scripts/runtime-check start --serve <cmd> --url
    <url> --cwd <code_root> --state-dir <workspace_root>/.runtime`, every path absolute
    (no `$PWD`). Status `exited` or
    `timeout`: show the log tail; no evidence is written; handoff `Next:

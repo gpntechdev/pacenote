@@ -2,7 +2,15 @@
 """PreToolUse hook on Read and Write: keep fetched text away from everyone but intake, and
 quarantined skills away from everyone but the skill-auditor.
 
-Usage: source-guard [--help]   (reads the hook JSON on stdin)
+Usage: source-guard [--runtime claude|codex|cursor] [--help]   (reads the hook JSON on stdin)
+
+Claude Code (the default) gets rules 1-4 below. Codex and Cursor send no agent identity
+and run no fenced agent (skills/_shared/runtime.md), so there nobody is intake or the
+skill-auditor: reads of a fetched snapshot, a refresh diff or anything in `.quarantine/`
+are denied whether they come as a file read or as a word of a shell command (pacenote's
+own scripts excepted), writes into `.quarantine/` are denied, and a snapshot write that
+scripts/redact would change is denied with a pointer to `redact --stdin` (the runtime
+cannot rewrite the call). Denials use the runtime's form (hooks/payload).
 
 1. A Write from the `intake` agent (agent_type `intake` or `<plugin>:intake`) is denied
    (exit 2) unless it writes a `sources/<name>.md` snapshot whose content starts with the
@@ -74,10 +82,80 @@ def check_read(path, tool_input):
                 "content reaches you through the intake agent's answer" % path)
 
 
+def load_payload():
+    loader = SourceFileLoader("pacenote_payload", os.path.join(os.path.dirname(
+        os.path.abspath(__file__)), "payload"))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+def fetched(path, cwd):
+    full = path if os.path.isabs(path) or not cwd else os.path.join(cwd, path)
+    if not SNAPSHOT.search(path.replace("\\", "/")):
+        return False
+    try:
+        with open(full, encoding="utf-8") as f:
+            return bool(FETCHED.match(f.readline()))
+    except OSError:
+        return False
+
+
+def guarded_read(path, cwd):
+    """Why a read of path is refused off Claude Code, or None."""
+    norm = path.replace("\\", "/")
+    if QUARANTINE.search(norm):
+        return "%s is a quarantined skill candidate; this runtime runs no skill-auditor" % path
+    if DIFF.search(norm):
+        return "%s is a refresh diff of fetched text; only the intake agent reads it" % path
+    if fetched(norm, cwd):
+        return ("%s is a fetched snapshot; this runtime cannot fence the intake agent, so "
+                "paste the source instead" % path)
+    return None
+
+
+def other_runtime(runtime, data):
+    payload = load_payload()
+    ev = payload.normalise(data, runtime)
+    for path in ev["reads"]:
+        why = guarded_read(path, ev["cwd"])
+        if why:
+            return payload.deny(runtime, "pacenote source-guard: " + why)
+    words = payload.shell_tokens(ev["shell"]) if ev["shell"] else []
+    if words and os.path.dirname(os.path.abspath(words[0])) != SCRIPTS:
+        for word in words:
+            why = guarded_read(word, ev["cwd"])
+            if why:
+                return payload.deny(runtime, "pacenote source-guard: " + why)
+    for path, content in ev["writes"]:
+        if QUARANTINE.search(path.replace("\\", "/")):
+            return payload.deny(runtime, "pacenote source-guard: nothing writes into "
+                                ".quarantine/ but scripts/skill-fetch; refused %s" % path)
+        if isinstance(content, str) and content.startswith(HEADER):
+            try:
+                text, count, _ = load_redact().process(content)
+            except Exception as e:  # fail closed: never write a snapshot unredacted
+                return payload.deny(runtime, "pacenote source-guard: redaction failed (%s); "
+                                    "snapshot not written" % e)
+            if text != content:
+                return payload.deny(runtime, "pacenote source-guard: %s holds %d secret-looking "
+                                    "string(s); write the text that `scripts/redact --stdin` "
+                                    "prints instead" % (path, count))
+    return 0
+
+
 def main(argv):
     if "--help" in argv or "-h" in argv:
         print(__doc__.strip())
         return 0
+    runtime = load_payload().runtime_arg(argv)
+    if runtime != "claude":
+        try:
+            data = json.load(sys.stdin)
+        except ValueError:
+            return 0
+        return other_runtime(runtime, data) if isinstance(data, dict) else 0
     try:
         data = json.load(sys.stdin)
         tool_input = data.get("tool_input") or {}
