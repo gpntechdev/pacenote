@@ -52,8 +52,8 @@ It prints one JSON object: `mode`, `project`, `workspace_root`, `code_root`, `do
 `spec_root`, `config` (the file it read), `worktree` (the worktree root when the workspace is
 one, else empty), `feature` (its name, else empty) and `wrapper_root` (the main checkout;
 equals `workspace_root` outside a worktree). From `runtime` ([`runtime.md`](./runtime.md))
-it adds `assistant`, `models` (role → model, `pacenote.local.yml` over `pacenote.yml`) and
-`command` (the step command form). `--feature NAME` resolves from
+it adds `assistant`, `models` (role → model, `pacenote.local.yml` over `pacenote.yml`),
+`command` (the step command form) and `dispatch` (`named` or `inline`). `--feature NAME` resolves from
 `<wrapper_root>/.worktrees/NAME/` when that worktree exists. All paths are absolute. Exit
 code 1 with a one-line message when no `pacenote.yml` is found.
 

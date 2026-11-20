@@ -10,7 +10,7 @@ The capability table is the JSON fence in skills/_shared/runtime.md. The assista
 `assistant:` in pacenote.local.yml next to the workspace's pacenote.yml (in a feature
 worktree, the main checkout's file is read when the worktree has none). When the key is
 missing it is `claude` if CLAUDECODE is set, else `unknown`. Default output:
-{assistant, source, fenced_agents, command, models, local_config}, where models is
+{assistant, source, fenced_agents, command, dispatch, models, local_config}, where models is
 pacenote.yml's `models.*` with pacenote.local.yml's on top.
 --require: exit 1 with the fail-closed line on stderr when the capability is false, else
 exit 0 silently. --suggest: {assistant, markers}, from CLAUDECODE, CODEX_* and CURSOR_*
@@ -114,7 +114,8 @@ def info(start, env=None):
     local = read_flat(path) if path else {}
     models = {r: local.get("models." + r) or shared.get("models." + r, "") for r in ROLES}
     return {"assistant": assistant, "source": source, "fenced_agents": row["fenced_agents"],
-            "command": row["command"], "models": models, "local_config": path}
+            "command": row["command"], "dispatch": row["dispatch"], "models": models,
+            "local_config": path}
 
 
 def refusal(data, action):

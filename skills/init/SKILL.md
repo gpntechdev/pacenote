@@ -39,8 +39,7 @@ the user's own repo around the code repo ([`./references/wrapper.md`](./referenc
   `<!-- pacenote:begin -->` and `<!-- pacenote:end -->`.
 - Every assistant: `pacenote.local.yml` next to `pacenote.yml` (`assistant`, and Codex or
   Cursor `models.*`), gitignored by `<workspace_root>/.gitignore`. Codex and Cursor instead
-  of the Claude files: an `AGENTS.md` block, `.codex/config.toml` or `.cursor/mcp.json`, and
-  for Codex the agents in `.codex/agents/`.
+  of the Claude files: an `AGENTS.md` block, and `.codex/config.toml` or `.cursor/mcp.json`.
 - Private mode instead: `CLAUDE.local.md`, `.claude/settings.local.json`, three lines in
   `.git/info/exclude`, no `.mcp.json`.
 - Wrapper: the same files at the wrapper root, `docs/` where the user chose, `.gitignore`

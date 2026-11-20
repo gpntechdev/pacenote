@@ -60,6 +60,9 @@ class Table(unittest.TestCase):
         self.assertEqual(set(t), {"claude", "codex", "cursor", "unknown"})
         self.assertEqual({a: t[a]["fenced_agents"] for a in t},
                          {"claude": True, "codex": False, "cursor": False, "unknown": False})
+        self.assertEqual({a: t[a]["dispatch"] for a in t},
+                         {"claude": "named", "codex": "inline", "cursor": "named",
+                          "unknown": "inline"})
         for row in t.values():
             self.assertIn("{step}", row["command"])
 
@@ -114,6 +117,7 @@ class Which(Workspace):
         out = json.loads(run([os.path.join(S, "resolve-paths"), "--from", ws]).stdout)
         self.assertEqual(out["assistant"], "codex")
         self.assertEqual(out["command"], "$pacenote:{step}")
+        self.assertEqual(out["dispatch"], "inline")
         self.assertEqual(out["models"]["cheap"], "gpt-6.1-terra")
 
 

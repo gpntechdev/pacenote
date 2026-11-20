@@ -1759,7 +1759,8 @@ in a gitignored local file ("writing to the shared file is wrong").
 Decision:
 - **Runtime table.** `skills/_shared/runtime.md` holds one JSON row per assistant
   (`claude`, `codex`, `cursor`, `unknown`): `fenced_agents`, `command`, `memory`,
-  `mcp_file`, `skill_home`, `models`. Its fixed fail-closed line is there too.
+  `mcp_file`, `skill_home`, `dispatch` (added 2026-11-20), `models`. Its fixed fail-closed
+  line is there too.
   `scripts/runtime` is the only reader; `resolve-paths` adds `assistant`, `models` and
   `command` from it, so every step gets them from the call it already makes. Lifting a
   restriction is one cell.
@@ -1780,13 +1781,11 @@ Decision:
   `.cursor-plugin/marketplace.json`. Codex reads the existing `.claude-plugin/marketplace.json`.
   `validate` checks one name and version across the three manifests and two marketplaces,
   and each manifest's keys and types against its documented field list.
-- **Agents.** `scripts/codex-agents` generates `.codex/agents/<name>.toml` from
-  `agents/*.md`: `name`, `description`, `developer_instructions`. The `tools:` list becomes
-  rules at the top of the instructions, and no Bash becomes `[features] shell_tool = false`.
-  `maxTurns` and `tools` are dropped and no model is set. Codex loads no plugin agents
-  (probe), so `init-workspace --assistant codex` copies them into the workspace's
-  `.codex/agents/`; `validate` fails when they are stale. The eight read-only agents carry
-  `readonly: true` for Cursor; Claude Code accepts the key.
+- **Agents.** One `agents/` folder for every assistant (revised 2026-11-20, below; the
+  generated `.codex/agents/*.toml` first built here was removed). Claude Code and Cursor
+  dispatch the plugin agent; Codex loads no plugin agents (probe), so it dispatches inline
+  from `agents/<name>.md`. The eight read-only agents carry `readonly: true` for Cursor;
+  Claude Code accepts the key.
 - **Hooks.** `hooks/payload` normalises the three runtimes' payloads into reads, writes
   and shell commands. A command's words count too (`cat .env`, `cat<.env`, `--file=.env`).
   `secrets-guard` and `source-guard` take `--runtime`, deny in the runtime's form (exit 2;
@@ -1804,10 +1803,10 @@ Decision:
 - **Workspace files.** `init-workspace --assistant claude|codex|cursor` (default `claude`)
   writes the following per assistant. Claude: as before. Codex: an `AGENTS.md` block from
   `templates/AGENTS.md` (no `@` imports, commands in the runtime's form),
-  `[mcp_servers.context7]` in `.codex/config.toml`, and the agents. Cursor: an `AGENTS.md`
+  `[mcp_servers.context7]` in `.codex/config.toml`. Cursor: an `AGENTS.md`
   block and `.cursor/mcp.json`. Neither gets an attribution setting, since none is documented;
-  `deliver`'s wording rule covers it. In private mode a new `AGENTS.md` and the copied agents
-  are git-excluded, and a team's existing `AGENTS.md` is left alone. `--add-mcp` writes the
+  `deliver`'s wording rule covers it. In private mode a new `AGENTS.md` is
+  git-excluded, and a team's existing `AGENTS.md` is left alone. `--add-mcp` writes the
   assistant's file; Codex servers that need an env value get a `codex mcp add` hint.
   `skill-lock`'s home follows `skill_home`.
 - **Models.** Codex `gpt-6.2-astra` / `gpt-6.2-sol` / `gpt-6.1-terra` from the offline
@@ -1820,7 +1819,7 @@ Degradations, all to confirm in the live run:
   init and toolsmith need an approval or `danger-full-access`.
 - Codex plugin hooks need trust and may not run for CLI installs, which would leave
   Codex without a secrets guard.
-- Codex agents are advisory, not fenced.
+- Codex agents run inline and are advisory, not fenced.
 - Cursor `readonly` scope; Cursor hook payload field names for `preToolUse` `Write`;
   whether Cursor reads `${CURSOR_PLUGIN_ROOT}` in a hook command, and whether an empty
   stdout passes a Cursor permission hook.
@@ -1866,3 +1865,26 @@ after that run.
 Consequences: M8 is not done. Goal 2's live runs come first once a plan allows. A live
 finding that changes a row or a hook payload is a DECISIONS entry and one cell or fixture,
 not a skill rewrite.
+
+## 2026-11-20 M8: one agents folder; Codex dispatches inline
+
+Context: Goal 2 (2026-11-19) generated `.codex/agents/*.toml` from `agents/*.md` and had
+`init-workspace --assistant codex` copy them into the workspace, because Codex 0.170 loads
+no plugin agents. The user asked why, pointing at a plugin with one `agents/` folder
+(genkovich/sdd, read at `b7e1e6e`). That plugin also generates Codex TOMLs, but from an
+`install.sh` run on the user's machine, and falls back to running the agent file inline.
+A Codex role adds little here. It gives no tool fence (the parent's tools; `shell_tool =
+false` leaves `apply_patch`), and `spawn_agent` takes `model` per call. What it does add is
+the body in the developer prompt rather than the message. Against that: 11 files written
+into the user's repo, copies that go stale on a plugin update, `.codex/` read-only in
+Codex's sandbox, and a generator, goldens and a validator check to keep in sync.
+Decision: one `agents/` folder for every assistant. `runtime.md` gets a `dispatch` column:
+`named` (Claude Code, Cursor: start `pacenote:<name>`, inline if the runtime lists none)
+or `inline` (Codex, `unknown`: read `../../agents/<name>.md` skill-relative and start a
+subagent with its body plus the prompt, at `models.<role>`). `runtime` and
+`resolve-paths` print it. Removed: `scripts/codex-agents`, `.codex/agents/`,
+`tests/test-codex-agents` and its goldens, init's copy, `validate`'s generated-agents check.
+Consequences: supersedes the Agents bullet of the Goal 2 decisions entry and the
+generated-agent lines of the built-offline entry's checks (those record what ran on
+2026-11-19). Codex inline dispatch, and Cursor's plugin agent name, are to confirm in the
+live run (`docs/M8.md`, live probe item 2).

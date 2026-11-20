@@ -12,18 +12,17 @@ anything in this file. Record changes to decisions in `docs/DECISIONS.md`, not i
 .claude-plugin/   plugin.json, marketplace.json (also .codex-plugin/, .cursor-plugin/)
 skills/<name>/    SKILL.md (spine) + references/ + templates/
 skills/_shared/   blocks referenced by many skills: handoff, gate protocol, principles, utils
-agents/           subagent definitions (.codex/agents/*.toml generated from them)
+agents/           subagent definitions, one copy for every assistant
 hooks/            secrets guardrail, source guard; one hooks file per assistant
 scripts/          deterministic helpers: validate, resolve-paths, detect-*, config-set,
                   init-workspace, state, worktree, run-checks, squash-wip, pr-comments,
                   redact, fetch-source, refresh-source, audit-static, skill-fetch, skill-lock,
                   lessons, spec-clean, docs-clean, analyze, analyze-codebase, runtime-check,
-                  runtime, codex-agents
+                  runtime
 evals/            claude plugin eval cases; _lib/ holds the shared scaffold and fixture app
 tests/            run-evals, test-audit, test-skill-find, test-lessons, test-spec-clean, test-docs-clean,
                   test-analyze, test-analyze-codebase, test-runtime-check, test-state,
-                  test-config-set, test-runtime, test-hooks, test-codex-agents,
-                  test-init-workspace + fixtures
+                  test-config-set, test-runtime, test-hooks, test-init-workspace + fixtures
 docs/             PLAN.md, DECISIONS.md, AUTHORING.md
 ```
 

@@ -20,27 +20,46 @@ Hostile text (fetched pages, tickets, third-party skills) is read only by such a
 `command`: how a step is invoked (`{step}` is the skill name). `memory`: the project memory
 file `init` points at `docs/`. `mcp_file`: where `init` writes MCP servers (relative to the
 repo root, or the wrapper root). `skill_home`: where `toolsmith` installs project skills.
-`models`: the role defaults `init` writes to `pacenote.local.yml` (`null` = `pacenote.yml`'s).
+`dispatch`: how a skill runs one of the plugin's agents (below). `models`: the role
+defaults `init` writes to `pacenote.local.yml` (`null` = `pacenote.yml`'s).
 
 ```json
 {
   "claude": {"fenced_agents": true, "command": "/pacenote:{step}", "memory": "CLAUDE.md",
-             "mcp_file": ".mcp.json", "skill_home": ".claude/skills", "models": null},
+             "mcp_file": ".mcp.json", "skill_home": ".claude/skills", "dispatch": "named",
+             "models": null},
   "codex":  {"fenced_agents": false, "command": "$pacenote:{step}", "memory": "AGENTS.md",
              "mcp_file": ".codex/config.toml", "skill_home": ".agents/skills",
+             "dispatch": "inline",
              "models": {"judgment": "gpt-6.2-astra", "execution": "gpt-6.2-sol",
                         "cheap": "gpt-6.1-terra"}},
   "cursor": {"fenced_agents": false, "command": "/{step}", "memory": "AGENTS.md",
              "mcp_file": ".cursor/mcp.json", "skill_home": ".agents/skills",
+             "dispatch": "named",
              "models": {"judgment": "inherit", "execution": "inherit", "cheap": "inherit"}},
   "unknown": {"fenced_agents": false, "command": "/pacenote:{step}", "memory": "AGENTS.md",
-              "mcp_file": ".mcp.json", "skill_home": ".agents/skills", "models": null}
+              "mcp_file": ".mcp.json", "skill_home": ".agents/skills", "dispatch": "inline",
+              "models": null}
 }
 ```
 
 Codex and Cursor rows are taken from the docs and an offline probe, not from a live run
 (DECISIONS 2026-11-19 M8). `fenced_agents` flips to `true` there only after a live probe
 shows a read-only agent that cannot act.
+
+## Dispatching an agent
+
+The agents live once, in the plugin's `agents/<name>.md`. When a skill says "dispatch
+`<name>` at `models.<role>`":
+- `named`: start the plugin agent `pacenote:<name>` with the model from `resolve-paths`'
+  `models`. If the runtime lists no such agent, dispatch inline instead.
+- `inline`: read `../../agents/<name>.md` (relative to the folder of the `SKILL.md` being
+  followed, like scripts). Start a subagent with the model from `models`, and give it the
+  file's body (below the frontmatter) followed by the skill's prompt. Its `tools:` line
+  is a rule the subagent is told to keep, not a fence.
+
+Codex loads no plugin agents (DECISIONS 2026-11-19 M8), so it dispatches inline. That is
+also why `fenced_agents` is false there.
 
 ## Fail closed
 

@@ -5,11 +5,10 @@ Usage: test-init-workspace [--help]   (run from anywhere; stdlib unittest, no ne
 
 Each case starts from the environment the runtime would set (`runtime --suggest`, the
 answer init recommends), runs init-workspace with that assistant in a scratch git repo,
-then checks the memory file and its command form, the MCP file, Codex's copied agents,
-pacenote.local.yml (assistant, models.*) and that git ignores it, the skill home and the
+then checks the memory file and its command form, the MCP file, that no agents are copied
+(Codex dispatches inline), pacenote.local.yml (assistant, models.*) and that git ignores it, the skill home and the
 rendered next command. pacenote.yml itself never names an assistant.
 """
-import filecmp
 import json
 import os
 import shutil
@@ -101,12 +100,7 @@ class InitWorkspace(unittest.TestCase):
         self.assertNotIn("@.pacenote", agents_md)
         self.assertIn('[mcp_servers.context7]\nurl = "https://mcp.context7.com/mcp"',
                       read(os.path.join(d, ".codex", "config.toml")))
-        src = os.path.join(ROOT, ".codex", "agents")
-        names = sorted(os.listdir(src))
-        self.assertEqual(sorted(os.listdir(os.path.join(d, ".codex", "agents"))), names)
-        _, mismatch, errors = filecmp.cmpfiles(src, os.path.join(d, ".codex", "agents"), names,
-                                               shallow=False)
-        self.assertEqual((mismatch, errors), ([], []))
+        self.assertFalse(os.path.exists(os.path.join(d, ".codex", "agents")))
         for absent in ("CLAUDE.md", ".claude", ".mcp.json"):
             self.assertFalse(os.path.exists(os.path.join(d, absent)), absent)
 
@@ -148,7 +142,6 @@ class InitWorkspace(unittest.TestCase):
         self.init(d, "codex", "--mode", "wrapper", "--code", "client")
         self.assertTrue(os.path.exists(os.path.join(d, "pacenote.local.yml")))
         self.assertTrue(self.ignored(d, "pacenote.local.yml"))
-        self.assertTrue(os.path.exists(os.path.join(d, ".codex", "agents", "explorer.toml")))
 
     def test_private_keeps_new_agents_md_local(self):
         d = self.repo()

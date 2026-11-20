@@ -9,7 +9,6 @@ import glob
 import json
 import os
 import re
-import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -237,10 +236,6 @@ def check_agents():
         check_links(path, text)
         check_text_rules(path, text)
         check_script_refs(path, text)
-    gen = subprocess.run([sys.executable, os.path.join(ROOT, "scripts", "codex-agents"), "--check"],
-                         capture_output=True, text=True)
-    check(gen.returncode == 0, ".codex/agents matches agents/*.md (scripts/codex-agents)",
-          gen.stderr.strip().replace("\n", "; "))
 
 
 def hook_commands(node):

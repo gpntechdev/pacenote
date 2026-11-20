@@ -96,9 +96,9 @@ context-engineering rules in `docs/PLAN.md` section 3.9. Each rule is tagged `[v
 - Agent (`agents/<name>.md`): `name` equal to the file name, `description`, `tools` as the
   minimal list the agent needs. Read-only agents get no `Write`, `Edit` or `Bash`. Agents
   that read hostile content (`intake`, `skill-auditor`) also get no way to act and no
-  network. Read-only agents also carry `readonly: true` (Cursor's switch).
-  `.codex/agents/*.toml` is generated from these files by `scripts/codex-agents`; never edit
-  it, re-run the script. `[validated: name, description, tools, readonly, generated TOML current]`
+  network. Read-only agents also carry `readonly: true` (Cursor's switch). There is one copy
+  of each agent for every assistant; Codex runs it inline (`_shared/runtime.md`,
+  "Dispatching an agent"). `[validated: name, description, tools, readonly]`
 
 ## 10a. One plugin, three assistants
 
